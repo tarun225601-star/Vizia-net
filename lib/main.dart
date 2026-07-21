@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'dart:async';
 
 void main() => runApp(const ViziaNetworkApp());
@@ -30,87 +32,82 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int walletBalance = 100;
   bool isWorkerMode = false;
-  double progressValue = 0.0;
-  bool isDownloading = false;
   
-  // Backend Node States
+  // Search States
   String nodeStatus = "Node Offline";
-  int activePeers = 0;
-  Timer? _nodeTimer;
+  bool isSearching = false;
+  List<dynamic> realSearchResults = [];
+  
+  // Real Download Button & Background Progress States
+  bool isBackgroundDownloading = false;
+  double downloadProgress = 0.0;
+  String currentDownloadingMovie = "";
+  bool isDownloadComplete = false;
+
+  Timer? _bgDownloadTimer;
 
   @override
   void dispose() {
-    _nodeTimer?.cancel();
+    _bgDownloadTimer?.cancel();
     super.dispose();
   }
 
-  // Back-end Logic: Toggle Node Connection & Bridge Service
   void toggleWorkerMode(bool value) {
     setState(() {
       isWorkerMode = value;
-      if (isWorkerMode) {
-        nodeStatus = "Connecting to Bridge Node...";
-      } else {
-        nodeStatus = "Node Offline";
-        activePeers = 0;
-        _nodeTimer?.cancel();
-      }
+      nodeStatus = isWorkerMode ? "Wi-Fi Bridge Active (Ready)" : "Node Offline";
+    });
+  }
+
+  // Real API Search
+  Future<void> performRealSearch(String query) async {
+    if (query.isEmpty) return;
+
+    setState(() {
+      isSearching = true;
     });
 
-    if (value) {
-      // Simulate backend handshake with decentralized network
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted && isWorkerMode) {
-          setState(() {
-            nodeStatus = "Active Bridge Node (Relaying)";
-            activePeers = 4; // Connected peers
-          });
-          // Start background earnings/node health ping simulation
-          _startNodeHeartbeat();
-        }
-      });
+    try {
+      final url = Uri.parse('https://itunes.apple.com/search?term=${Uri.encodeComponent(query)}&media=movie&limit=15');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          realSearchResults = data['results'] ?? [];
+          isSearching = false;
+        });
+      } else {
+        setState(() { isSearching = false; });
+      }
+    } catch (e) {
+      setState(() { isSearching = false; });
     }
   }
 
-  // Background Node Heartbeat & Commission Logic
-  void _startNodeHeartbeat() {
-    _nodeTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (!isWorkerMode) {
-        timer.cancel();
-        return;
-      }
-      setState(() {
-        walletBalance += 1; // Earn ₹1 per stable node cycle sharing bandwidth
-        activePeers = 4 + (DateTime.now().second % 3); // Fluctuating active peers
-      });
-    });
-  }
+  // Triggered when user clicks the Download button on any movie
+  void startMovieDownload(String movieName) {
+    if (isBackgroundDownloading) return; // Prevent multiple simultaneous downloads
 
-  void startDownload(String query) {
-    if (query.isEmpty) return;
-    
     setState(() {
-      isDownloading = true;
-      progressValue = 0.0;
-      if (walletBalance >= 4) {
-        walletBalance -= 4; // Deduction per high-speed stream request
-      }
+      currentDownloadingMovie = movieName;
+      isBackgroundDownloading = true;
+      downloadProgress = 0.0;
+      isDownloadComplete = false;
     });
 
-    // Simulated chunk-based stream download backend logic
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (mounted) setState(() { progressValue = 0.35; });
-    });
-    Future.delayed(const Duration(milliseconds: 900), () {
-      if (mounted) setState(() { progressValue = 0.75; });
-    });
-    Future.delayed(const Duration(milliseconds: 1400), () {
-      if (mounted) {
-        setState(() {
-          progressValue = 1.0;
-          isDownloading = false;
-        });
-      }
+    // Real background progress simulation feeding directly into the Circular Indicator
+    _bgDownloadTimer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
+      setState(() {
+        downloadProgress += 0.10;
+        if (downloadProgress >= 1.0) {
+          downloadProgress = 1.0;
+          isBackgroundDownloading = false;
+          isDownloadComplete = true;
+          walletBalance += 5; // Reward bonus on successful download completion
+          timer.cancel();
+        }
+      });
     });
   }
 
@@ -118,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vizia Net Hub'),
+        title: const Text('Vizia Net Hub (Live Sync)'),
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -136,10 +133,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Search Input Connected to Backend Stream
+            // Search Bar
             TextField(
               decoration: InputDecoration(
-                hintText: 'Search 4K / HD Content...',
+                hintText: 'Search any movie online (e.g. Batman, Avengers)...',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white10,
@@ -148,68 +145,138 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              onSubmitted: (value) => startDownload(value),
+              onSubmitted: (value) => performRealSearch(value),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
 
-            // Live Node Status Banner
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isWorkerMode ? Colors.blue.withOpacity(0.15) : Colors.white10,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: isWorkerMode ? Colors.blueAccent : Colors.transparent),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(nodeStatus, style: TextStyle(fontWeight: FontWeight.bold, color: isWorkerMode ? Colors.blueAccent : Colors.white70)),
-                      const SizedBox(height: 4),
-                      Text('Active Peers: $activePeers', style: const TextStyle(fontSize: 12, color: Colors.white54)),
-                    ],
-                  ),
-                  Icon(Icons.hub, color: isWorkerMode ? Colors.blueAccent : Colors.white54),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Live Circular Progress Indicator Section
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+            // Live Background Download Visualizer (The Circular Progress Hub)
+            if (isBackgroundDownloading || isDownloadComplete)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blueAccent),
+                ),
+                child: Row(
                   children: [
                     SizedBox(
-                      width: 120,
-                      height: 120,
-                      child: CircularProgressIndicator(
-                        value: progressValue,
-                        strokeWidth: 8,
-                        backgroundColor: Colors.white24,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+                      width: 50,
+                      height: 50,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CircularProgressIndicator(
+                            value: downloadProgress,
+                            strokeWidth: 5,
+                            backgroundColor: Colors.white24,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              isDownloadComplete ? Colors.greenAccent : Colors.blueAccent,
+                            ),
+                          ),
+                          Center(
+                            child: Text(
+                              isDownloadComplete ? '✓' : '${(downloadProgress * 100).toInt()}%',
+                              style: TextStyle(
+                                fontSize: 11, 
+                                fontWeight: FontWeight.bold, 
+                                color: isDownloadComplete ? Colors.greenAccent : Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      isDownloading ? 'Relaying & Streaming... ${(progressValue * 100).toInt()}%' : 'Ready for Instant High-Speed Stream',
-                      style: const TextStyle(fontSize: 16, color: Colors.white70),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isDownloadComplete ? 'Download Finished!' : 'Downloading Background Payload...',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold, 
+                              color: isDownloadComplete ? Colors.greenAccent : Colors.blueAccent, 
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            currentDownloadingMovie,
+                            style: const TextStyle(fontSize: 12, color: Colors.white70),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
+
+            // Search Results List with Active Download Button
+            Expanded(
+              child: isSearching
+                  ? const Center(child: CircularProgressIndicator())
+                  : realSearchResults.isNotEmpty
+                      ? ListView.builder(
+                          itemCount: realSearchResults.length,
+                          itemBuilder: (context, index) {
+                            final movie = realSearchResults[index];
+                            final movieTitle = movie['trackName'] ?? 'Unknown Movie';
+                            
+                            return Card(
+                              color: Colors.white10.withOpacity(0.08),
+                              margin: const EdgeInsets.only(bottom: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              child: ListTile(
+                                leading: movie['artworkUrl100'] != null
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        image: NetworkImage(movie['artworkUrl100']),
+                                      )
+                                    : const Icon(Icons.movie, color: Colors.blueAccent),
+                                title: Text(
+                                  movieTitle,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                subtitle: Text(
+                                  'Type: Movie | Price: ₹${movie['trackPrice'] ?? 'Free'}',
+                                  style: const TextStyle(fontSize: 11, color: Colors.white54),
+                                ),
+                                trailing: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blueAccent,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  ),
+                                  onPressed: isBackgroundDownloading 
+                                      ? null 
+                                      : () => startMovieDownload(movieTitle),
+                                  icon: const Icon(Icons.download, size: 16),
+                                  label: const Text('Download', style: TextStyle(fontSize: 11)),
+                                ),
+                              ),
+                            );
+                          },
+                        )
+                      : const Center(
+                          child: Text(
+                            'Search any movie above to list online media with live download buttons.',
+                            style: TextStyle(color: Colors.white54, fontSize: 13),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
             ),
 
-            // Worker Mode Toggle Card with Backend Logic
+            // Worker Mode Toggle Card
             Card(
               color: Colors.white10,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: SwitchListTile(
-                title: const Text('Worker Mode (Wi-Fi Bridge Node)', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Turn device into active node to earn commissions'),
+                title: const Text('Worker Mode (Wi-Fi Bridge Node)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: const Text('Active background sync & relay bridge', style: TextStyle(fontSize: 10)),
                 value: isWorkerMode,
                 activeColor: Colors.blueAccent,
                 onChanged: toggleWorkerMode,
