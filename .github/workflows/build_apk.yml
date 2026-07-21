@@ -23,6 +23,17 @@ jobs:
         flutter-version: '3.19.x'
         channel: 'stable'
 
+    - name: Create Full Flutter Project Structure
+      run: |
+        flutter create . --org com.vizianet --project-name vizia_net --platforms=android
+        mkdir -p lib
+        echo "Replacing default main.dart with custom code"
+
+    - name: Restore Custom Code
+      run: |
+        # Ensure our custom main.dart and pubspec.yaml remain active
+        git checkout pubspec.yaml
+
     - name: Install Dependencies
       run: flutter pub get
 
