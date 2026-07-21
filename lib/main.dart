@@ -27,8 +27,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int walletBalance = 100; // ₹100 pre-paid wallet
-  bool isWorkerMode = false; // Settings toggle for Wi-Fi bridge node
+  int walletBalance = 100;
+  bool isWorkerMode = false;
   double progressValue = 0.0;
   bool isDownloading = false;
 
@@ -37,11 +37,10 @@ class _HomeScreenState extends State<HomeScreen> {
       isDownloading = true;
       progressValue = 0.0;
       if (walletBalance >= 4) {
-        walletBalance -= 4; // Instant deduction per download
+        walletBalance -= 4;
       }
     });
 
-    // Simulate live circular progress (0% to 100%)
     Future.delayed(const Duration(milliseconds: 500), () {
       setState(() { progressValue = 0.3; });
     });
@@ -64,10 +63,11 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            alignment: Alignment.center,
-            child: Text(
-              '₹$walletBalance',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent),
+            child: Center(
+              child: Text(
+                '₹$walletBalance',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent),
+              ),
             ),
           ),
         ],
@@ -77,7 +77,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Minimalist Search Bar
             TextField(
               decoration: InputDecoration(
                 hintText: 'Search 4K / HD Content...',
@@ -92,8 +91,6 @@ class _HomeScreenState extends State<HomeScreen> {
               onSubmitted: (value) => startDownload(),
             ),
             const SizedBox(height: 30),
-
-            // Live Circular Progress Indicator Section
             Expanded(
               child: Center(
                 child: Column(
@@ -118,8 +115,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-
-            // Worker Mode Toggle Section in Settings View
             Card(
               color: Colors.white10,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
