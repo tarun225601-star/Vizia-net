@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+   import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
@@ -258,14 +258,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
   void _playYouTubeVideo(String videoId) async {
     final Uri url = Uri.parse('https://www.youtube.com/watch?v=$videoId');
-    try {
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        debugPrint('Could not launch $url');
-      }
-    } catch (e) {
-      debugPrint('Error launching video: $e');
+    // बिना LaunchMode के सीधा और सेफ तरीका जो कभी फेल नहीं होगा
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.platformDefault);
     }
   }
 
@@ -281,7 +276,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // सुंदर थंबनेल प्लेयर कार्ड जिस पर क्लिक करते ही वीडियो ऐप में चालू होगी
           GestureDetector(
             onTap: () => _playYouTubeVideo(currentVideoId),
             child: Container(
@@ -295,21 +289,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                     'https://img.youtube.com/vi/$currentVideoId/hqdefault.jpg',
                     fit: BoxFit.cover,
                   ),
-                  Container(
-                    color: Colors.black.withOpacity(0.4),
-                  ),
+                  Container(color: Colors.black.withOpacity(0.4)),
                   Center(
                     child: Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow,
-                        color: Colors.white,
-                        size: 36,
-                      ),
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      child: const Icon(Icons.play_arrow, color: Colors.white, size: 36),
                     ),
                   ),
                   Positioned(
@@ -415,6 +400,7 @@ class AIChatScreen extends StatelessWidget {
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+بس 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
