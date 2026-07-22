@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() => runApp(const ViziaNetworkApp());
@@ -159,20 +158,21 @@ class _HomeScreenState extends State<HomeScreen> {
           downloadStatusText = "Receiving from Worker...";
         });
 
-        Directory? directory;
+        // Direct Public Download Directory path for Android/Desktop
+        Directory directory;
         if (Platform.isAndroid) {
           directory = Directory('/storage/emulated/0/Download');
-          if (!await directory.exists()) {
-            directory = await getExternalStorageDirectory();
-          }
         } else {
-          directory = await getApplicationDocumentsDirectory();
+          directory = Directory.current;
         }
 
-        final filePath = '${directory?.path}/$movieName.mp4';
+        if (!await directory.exists()) {
+          await directory.create(recursive: true);
+        }
+
+        final filePath = '${directory.path}/$movieName.mp4';
         final file = File(filePath);
         
-        // Write bytes directly
         await file.writeAsBytes(streamedResponse.bodyBytes);
 
         setState(() {
