@@ -1,5 +1,5 @@
 name: skillsetu_ai
-description: A new Flutter project for AI skill learning.
+description: A new Flutter project for AI & micro-skills learning.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  youtube_player_flutter: ^8.1.2
+  url_launcher: ^6.2.5
 
 dev_dependencies:
   flutter_test:
