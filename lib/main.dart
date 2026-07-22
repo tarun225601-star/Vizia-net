@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 void main() {
   runApp(const SkillSetuApp());
@@ -245,88 +245,88 @@ class CourseDetailScreen extends StatefulWidget {
 }
 
 class _CourseDetailScreenState extends State<CourseDetailScreen> {
-  late YoutubePlayerController _controller;
+  late WebViewController _webViewController;
   String currentVideoTitle = '';
+  String activeVideoId = '';
 
   @override
   void initState() {
     super.initState();
     final chapters = widget.courseData['chapterList'] as List;
-    String initialVideoId = chapters.isNotEmpty ? chapters[0]['videoId'] : 'kJQP7kiw5Fk';
+    activeVideoId = chapters.isNotEmpty ? chapters[0]['videoId'] : 'kJQP7kiw5Fk';
     currentVideoTitle = chapters.isNotEmpty ? chapters[0]['name'] : 'Introduction';
 
-    _controller = YoutubePlayerController(
-      initialVideoId: initialVideoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: false,
-        mute: false,
-      ),
-    );
+    _initController(activeVideoId);
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void _initController(String videoId) {
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..loadRequest(Uri.parse('https://www.youtube.com/embed/$videoId?autoplay=1'));
   }
 
   @override
   Widget build(BuildContext context) {
     final List chapters = widget.courseData['chapterList'] ?? [];
 
-    return YoutubePlayerBuilder(
-      player: YoutubePlayer(controller: _controller),
-      builder: (context, player) {
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(widget.courseData['title'], style: const TextStyle(fontSize: 15)),
-            backgroundColor: const Color(0xFF1E1E1E),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.courseData['title'], style: const TextStyle(fontSize: 15)),
+        backgroundColor: const Color(0xFF1E1E1E),
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 220,
+            child: WebViewWidget(controller: _webViewController),
           ),
-          body: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              player,
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Text(
-                  'Now Playing: $currentVideoTitle',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.amberAccent),
-                ),
-              ),
-              const Divider(color: Colors.white24),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-                child: Text('Course Lessons', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: chapters.length,
-                  itemBuilder: (context, index) {
-                    final chapter = chapters[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.deepPurple.withOpacity(0.4),
-                        child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 12)),
-                      ),
-                      title: Text(chapter['name'], style: const TextStyle(color: Colors.white, fontSize: 13)),
-                      subtitle: Text(chapter['duration'], style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                      trailing: const Icon(Icons.play_circle_fill, color: Colors.amberAccent),
-                      onTap: () {
-                        setState(() {
-                          currentVideoTitle = chapter['name'];
-                          _controller.load(chapter['videoId']);
-                        });
-                      },
-                    );
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Text(
+              'Now Playing: $currentVideoTitle',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.amberAccent),
+            ),
+          ),
+          const Divider(color: Colors.white24),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+            child: Text('Course Lessons', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: chapters.length,
+              itemBuilder: (context, index) {
+                final chapter = chapters[index];
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.deepPurple.withOpacity(0.4),
+                    child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  ),
+                  title: Text(chapter['name'], style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  subtitle: Text(chapter['duration'], style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                  trailing: const Icon(Icons.play_circle_fill, color: Colors.amberAccent),
+                  onTap: () {
+                    setState(() {
+                      currentVideoTitle = chapter['name'];
+                      activeVideoId = chapter['videoId'];
+                      _initController(activeVideoId);
+                    });
                   },
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
+}
+
+class AIChatScreen extends StatelessWidget {
+  const AIChatScreen({super.key});
+
+  @override
 }
 
 class AIChatScreen extends StatelessWidget {
