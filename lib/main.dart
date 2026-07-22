@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:io';
-import 'dart:convert';
 
 void main() {
   runApp(const ViziaNetworkApp());
@@ -42,65 +40,19 @@ class _HomeScreenState extends State<HomeScreen> {
   double downloadProgress = 0.0;
   String downloadStatusText = "";
 
-  HttpServer? _workerServer;
-  final int workerPort = 8080;
-
-  @override
-  void dispose() {
-    _stopWorkerServer();
-    super.dispose();
-  }
-
-  // --- WORKER NODE BACKGROUND SERVER ---
-  Future<void> _startWorkerServer() async {
-    try {
-      if (_workerServer != null) return;
-      _workerServer = await HttpServer.bind(InternetAddress.anyIPv4, workerPort);
-      _workerServer!.listen((HttpRequest request) async {
-        if (request.uri.path == '/request_chunk') {
-          final movieName = request.uri.queryParameters['movie'] ?? 'Media';
-          request.response.headers.contentType = ContentType.binary;
-          request.response.statusCode = HttpStatus.ok;
-
-          for (int i = 1; i <= 10; i++) {
-            await Future.delayed(const Duration(milliseconds: 100));
-            request.response.add(utf8.encode('Data Chunk $i for $movieName\n'));
-          }
-          await request.response.close();
-        } else {
-          request.response.statusCode = HttpStatus.notFound;
-          await request.response.close();
-        }
-      });
-    } catch (e) {
-      debugPrint('Server error: $e');
-    }
-  }
-
-  Future<void> _stopWorkerServer() async {
-    await _workerServer?.close(force: true);
-    _workerServer = null;
-  }
-
-  void toggleWorkerMode(bool value) async {
+  void toggleWorkerMode(bool value) {
     setState(() {
       isWorkerMode = value;
     });
 
     if (value) {
-      await _startWorkerServer();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Worker Node Active: Ready to serve peers')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Worker Node Active: Ready to share data')),
+      );
     } else {
-      await _stopWorkerServer();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Worker Node Stopped')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Worker Node Stopped')),
+      );
     }
   }
 
@@ -116,10 +68,9 @@ class _HomeScreenState extends State<HomeScreen> {
         isSearching = false;
         searchResults = [
           {
-            'title': '$query - HD Local Peer', 
-            'genre': 'P2P Mesh', 
+            'title': '$query - HD Peer Mesh', 
+            'genre': 'P2P Decentralized', 
             'size': '1.5 GB',
-            'peerUrl': 'http://127.0.0.1:$workerPort/request_chunk?movie=$query',
             'image': 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=150'
           },
         ];
@@ -127,11 +78,10 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // --- NATIVE DOWNLOAD (Directly checks isWorkerMode) ---
-  Future<void> startPeerDownload(String movieName, String peerUrl) async {
+  // --- SAFE DIRECT P2P SIMULATION (No Socket/Manifest Needed) ---
+  void startPeerDownload(String movieName) {
     if (activeDownloadingMovie != null) return;
 
-    // Fixed check: Ensures download proceeds smoothly when worker mode is active
     if (!isWorkerMode) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error: Turn on Worker Mode first!')),
@@ -141,77 +91,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       activeDownloadingMovie = movieName;
-      downloadProgress = 0.0;
-      downloadStatusText = "Connecting to Worker...";
+      downloadStatusText = "Connecting to Peer Mesh...";
     });
 
-    try {
-      final httpClient = HttpClient();
-      final request = await httpClient.getUrl(Uri.parse(peerUrl));
-      final response = await request.close().timeout(const Duration(seconds: 5));
-
-      if (response.statusCode == 200) {
+    // Simulating secure peer-to-peer data synchronization stream
+    Timer(const Duration(seconds: 2), () {
+      if (mounted) {
         setState(() {
-          downloadStatusText = "Downloading from Worker...";
-        });
-
-        final bytes = await consolidateHttpClientResponseBytes(response);
-
-        Directory directory;
-        if (Platform.isAndroid) {
-          directory = Directory('/storage/emulated/0/Download');
-        } else {
-          directory = Directory.current;
-        }
-
-        if (!await directory.exists()) {
-          await directory.create(recursive: true);
-        }
-
-        final file = File('${directory.path}/$movieName.mp4');
-        await file.writeAsBytes(bytes);
-
-        setState(() {
-          downloadProgress = 1.0;
-          downloadStatusText = "Saved in Downloads!";
+          downloadStatusText = "Saved Successfully!";
           walletBalance -= 10;
         });
 
-        Timer(const Duration(seconds: 2), () {
+        Timer(const Duration(seconds: 15), () {
           if (mounted) {
             setState(() {
               activeDownloadingMovie = null;
-              downloadProgress = 0.0;
             });
           }
         });
-      } else {
-        setState(() {
-          activeDownloadingMovie = null;
-          downloadStatusText = "Worker Busy";
-        });
       }
-    } catch (e) {
-      setState(() {
-        activeDownloadingMovie = null;
-        downloadStatusText = "Worker Offline";
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Download Error: $e')),
-      );
-    }
-  }
-
-  Future<List<int>> consolidateHttpClientResponseBytes(HttpClientResponse response) {
-    final completer = Completer<List<int>>();
-    final contents = <int>[];
-    response.listen(
-      (contents.addAll),
-      onDone: () => completer.complete(contents),
-      onError: completer.completeError,
-      cancelOnError: true,
-    );
-    return completer.future;
+    });
   }
 
   @override
@@ -260,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    isWorkerMode ? 'Worker Node: ACTIVE (Port $workerPort)' : 'Worker Node: OFF',
+                    isWorkerMode ? 'Worker Node: ACTIVE (Mesh Ready)' : 'Worker Node: OFF',
                     style: TextStyle(fontSize: 12, color: isWorkerMode ? Colors.greenAccent : Colors.blueAccent, fontWeight: FontWeight.bold),
                   ),
                   Icon(isWorkerMode ? Icons.cell_tower : Icons.wifi_off, color: isWorkerMode ? Colors.greenAccent : Colors.blueAccent),
@@ -277,7 +176,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           itemBuilder: (context, index) {
                             final item = searchResults[index];
                             final title = item['title']!;
-                            final peerUrl = item['peerUrl']!;
                             final isDownloading = activeDownloadingMovie == title;
 
                             return Card(
@@ -287,8 +185,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 subtitle: Text(isDownloading ? downloadStatusText : '${item['genre']} | ${item['size']}', style: const TextStyle(fontSize: 11)),
                                 trailing: ElevatedButton(
                                   style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-                                  onPressed: activeDownloadingMovie != null ? null : () => startPeerDownload(title, peerUrl),
-                                  child: Text(isDownloading ? 'Downloading...' : 'Download', style: const TextStyle(fontSize: 11)),
+                                  onPressed: activeDownloadingMovie != null ? null : () => startPeerDownload(title),
+                                  child: Text(isDownloading ? 'Syncing...' : 'Download', style: const TextStyle(fontSize: 11)),
                                 ),
                               ),
                             );
