@@ -29,17 +29,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int walletBalance = 100;
-  bool isWorkerMode = false;
+  bool isWorkerMode = true;
   
-  String nodeStatus = "Node Offline";
   bool isSearching = false;
   List<Map<String, String>> searchResults = [];
   
-  bool isBackgroundDownloading = false;
+  // Track which specific movie is downloading and its progress (0.0 to 1.0)
+  String? activeDownloadingMovie;
   double downloadProgress = 0.0;
-  String currentDownloadingMovie = "";
-  bool isDownloadComplete = false;
-
   Timer? _bgDownloadTimer;
 
   @override
@@ -51,11 +48,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void toggleWorkerMode(bool value) {
     setState(() {
       isWorkerMode = value;
-      nodeStatus = isWorkerMode ? "Wi-Fi Bridge Active (Ready)" : "Node Offline";
     });
   }
 
-  // Instant local/online catalog matching for movies & media
   void performSearch(String query) {
     if (query.isEmpty) return;
 
@@ -63,10 +58,9 @@ class _HomeScreenState extends State<HomeScreen> {
       isSearching = true;
     });
 
-    Timer(const Duration(milliseconds: 600), () {
+    Timer(const Duration(milliseconds: 400), () {
       setState(() {
         isSearching = false;
-        // Dynamic generation based on user query to provide instant realistic results
         searchResults = [
           {'title': '$query - Director\'s Cut HD', 'genre': 'Sci-Fi / Action', 'size': '1.8 GB'},
           {'title': '$query (Remastered 4K Ultra)', 'genre': 'Blockbuster', 'size': '3.2 GB'},
@@ -78,24 +72,29 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void startMovieDownload(String movieName) {
-    if (isBackgroundDownloading) return;
+    if (activeDownloadingMovie != null) return; // Only one download at a time
 
     setState(() {
-      currentDownloadingMovie = movieName;
-      isBackgroundDownloading = true;
+      activeDownloadingMovie = movieName;
       downloadProgress = 0.0;
-      isDownloadComplete = false;
     });
 
-    _bgDownloadTimer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
+    _bgDownloadTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
       setState(() {
-        downloadProgress += 0.10;
+        downloadProgress += 0.15;
         if (downloadProgress >= 1.0) {
           downloadProgress = 1.0;
-          isBackgroundDownloading = false;
-          isDownloadComplete = true;
-          walletBalance += 5;
+          walletBalance += 5; // Reward added
           timer.cancel();
+          // Keep completed state briefly or reset
+          Future.delayed(const Duration(seconds: 1), () {
+            if (mounted) {
+              setState(() {
+                activeDownloadingMovie = null;
+                downloadProgress = 0.0;
+              });
+            }
+          });
         }
       });
     });
@@ -105,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vizia Net Hub (Direct Sync)'),
+        title: const Text('Vizia Net Hub'),
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -123,9 +122,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Search Bar
             TextField(
               decoration: InputDecoration(
-                hintText: 'Search any movie or media (e.g. Avatar, Batman)...',
+                hintText: 'Search movie or media (e.g. Avatar)...',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white10,
@@ -136,73 +136,27 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               onSubmitted: (value) => performSearch(value),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-            if (isBackgroundDownloading || isDownloadComplete)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blueAccent),
-                ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 50,
-                      height: 50,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          CircularProgressIndicator(
-                            value: downloadProgress,
-                            strokeWidth: 5,
-                            backgroundColor: Colors.white24,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              isDownloadComplete ? Colors.greenAccent : Colors.blueAccent,
-                            ),
-                          ),
-                          Center(
-                            child: Text(
-                              isDownloadComplete ? '✓' : '${(downloadProgress * 100).toInt()}%',
-                              style: TextStyle(
-                                fontSize: 11, 
-                                fontWeight: FontWeight.bold, 
-                                color: isDownloadComplete ? Colors.greenAccent : Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isDownloadComplete ? 'Download Finished!' : 'Downloading Background Payload...',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold, 
-                              color: isDownloadComplete ? Colors.greenAccent : Colors.blueAccent, 
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            currentDownloadingMovie,
-                            style: const TextStyle(fontSize: 12, color: Colors.white70),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+            // Node Status Card
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.blueAccent),
               ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text('Active Bridge Node (Relaying)\nActive Peers: 6', style: TextStyle(fontSize: 12, color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+                  Icon(Icons.hub, color: Colors.blueAccent),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
 
+            // Search Results List with YouTube-style inline download loaders
             Expanded(
               child: isSearching
                   ? const Center(child: CircularProgressIndicator())
@@ -212,52 +166,83 @@ class _HomeScreenState extends State<HomeScreen> {
                           itemBuilder: (context, index) {
                             final item = searchResults[index];
                             final movieTitle = item['title']!;
-                            
+                            final isThisDownloading = activeDownloadingMovie == movieTitle;
+                            final isCompleted = isThisDownloading && downloadProgress >= 1.0;
+
                             return Card(
-                              color: Colors.white10.withOpacity(0.08),
+                              color: Colors.white10,
                               margin: const EdgeInsets.only(bottom: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               child: ListTile(
-                                leading: const Icon(Icons.movie_creation, color: Colors.blueAccent, size: 32),
-                                title: Text(
-                                  movieTitle,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                ),
-                                subtitle: Text(
-                                  'Genre: ${item['genre']} | Size: ${item['size']}',
-                                  style: const TextStyle(fontSize: 11, color: Colors.white54),
-                                ),
-                                trailing: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blueAccent,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                dense: true,
+                                leading: const Icon(Icons.movie_creation, color: Colors.blueAccent),
+                                title: Text(movieTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                subtitle: Text('Genre: ${item['genre']} | ${item['size']}', style: const TextStyle(fontSize: 10, color: Colors.white54)),
+                                trailing: SizedBox(
+                                  height: 32,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isCompleted ? Colors.green : Colors.blueAccent,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                    ),
+                                    onPressed: activeDownloadingMovie != null 
+                                        ? null 
+                                        : () => startMovieDownload(movieTitle),
+                                    child: isThisDownloading
+                                        ? Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              SizedBox(
+                                                width: 12,
+                                                height: 12,
+                                                child: CircularProgressIndicator(
+                                                  value: isCompleted ? null : downloadProgress,
+                                                  strokeWidth: 2,
+                                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                isCompleted ? 'Done' : '${(downloadProgress * 100).toInt()}%',
+                                                style: const TextStyle(fontSize: 10),
+                                              ),
+                                            ],
+                                          )
+                                        : const Text('Download', style: TextStyle(fontSize: 10)),
                                   ),
-                                  onPressed: isBackgroundDownloading 
-                                      ? null 
-                                      : () => startMovieDownload(movieTitle),
-                                  icon: const Icon(Icons.download, size: 16),
-                                  label: const Text('Download', style: TextStyle(fontSize: 11)),
                                 ),
                               ),
                             );
                           },
                         )
-                      : const Center(
-                          child: Text(
-                            'Type any movie above to list options with live download buttons & circle progress.',
-                            style: TextStyle(color: Colors.white54, fontSize: 13),
-                            textAlign: TextAlign.center,
+                      : Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.movie_filter, size: 48, color: Colors.white24),
+                              SizedBox(height: 8),
+                              Text(
+                                'Type any name in search above and press enter\nto list media files.',
+                                style: TextStyle(color: Colors.white54, fontSize: 12),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
                         ),
             ),
 
+            const SizedBox(height: 10),
+
+            // Worker Mode Toggle Card at Bottom
             Card(
               color: Colors.white10,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               child: SwitchListTile(
-                title: const Text('Worker Mode (Wi-Fi Bridge Node)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                subtitle: const Text('Active background sync & relay bridge', style: TextStyle(fontSize: 10)),
+                dense: true,
+                title: const Text('Worker Mode (Wi-Fi Bridge)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                subtitle: const Text('Turn device into active node to earn', style: TextStyle(fontSize: 9, color: Colors.white54)),
                 value: isWorkerMode,
                 activeColor: Colors.blueAccent,
                 onChanged: toggleWorkerMode,
