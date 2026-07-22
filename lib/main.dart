@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+ import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(const SkillSetuApp());
@@ -255,46 +256,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     currentVideoTitle = chapters.isNotEmpty ? chapters[0]['name'] : 'Introduction';
   }
 
-  void _showVideoDialog(String videoId, String title) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
-                fit: BoxFit.cover,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Click below to watch this lesson directly.',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
-              Navigator.pop(context);
-              // Safe fallback dialog view
-            },
-            child: const Text('Watch Lesson', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
+  Future<void> _launchYouTubeVideo(String videoId) async {
+    final Uri url = Uri.parse('https://www.youtube.com/watch?v=$videoId');
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      throw Exception('Could not launch $url');
+    }
   }
 
   @override
@@ -310,7 +276,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GestureDetector(
-            onTap: () => _showVideoDialog(currentVideoId, currentVideoTitle),
+            onTap: () => _launchYouTubeVideo(currentVideoId),
             child: Container(
               height: 210,
               width: double.infinity,
@@ -335,7 +301,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                     left: 12,
                     right: 12,
                     child: Text(
-                      'Tap to View: $currentVideoTitle',
+                      'Tap to Play: $currentVideoTitle',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -351,7 +317,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Text(
-              'Now Selected: $currentVideoTitle',
+              'Now Playing: $currentVideoTitle',
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.amberAccent),
             ),
           ),
@@ -378,7 +344,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                       currentVideoId = chapter['videoId'];
                       currentVideoTitle = chapter['name'];
                     });
-                    _showVideoDialog(currentVideoId, currentVideoTitle);
+                    _launchYouTubeVideo(currentVideoId);
                   },
                 );
               },
