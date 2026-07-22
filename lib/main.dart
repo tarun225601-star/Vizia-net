@@ -2,85 +2,80 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 void main() {
-  runApp(const ViziaNetworkApp());
+  runApp(const ViziaTubeApp());
 }
 
-class ViziaNetworkApp extends StatelessWidget {
-  const ViziaNetworkApp({super.key});
+class ViziaTubeApp extends StatelessWidget {
+  const ViziaTubeApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Vizia Net Hub',
+      title: 'Vizia Tube',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        primaryColor: Colors.blueAccent,
+        scaffoldBackgroundColor: const Color(0xFF0F0F0F), // YouTube Dark background
+        primaryColor: Colors.redAccent,
       ),
-      home: const HomeScreen(),
+      home: const YouTubeHomeScreen(),
     );
   }
 }
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class YouTubeHomeScreen extends StatefulWidget {
+  const YouTubeHomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<YouTubeHomeScreen> createState() => _YouTubeHomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
+  int _selectedIndex = 0; // 0: Home, 1: Library (Downloads)
   int walletBalance = 190;
   bool isWorkerMode = false;
   
   bool isSearching = false;
-  List<Map<String, String>> searchResults = [];
-  
-  String? activeDownloadingMovie;
-  double downloadProgress = 0.0;
-  String downloadStatusText = "";
+  List<Map<String, String>> videoFeed = [
+    {
+      'title': 'Mela Movie - HD Local Peer Remastered',
+      'channel': 'Vizia P2P Network',
+      'views': '125K views • 2 days ago',
+      'size': '1.5 GB',
+      'thumbnail': 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500',
+    },
+    {
+      'title': 'Action Blast Blockbuster 2026',
+      'channel': 'Mesh Media Hub',
+      'views': '450K views • 1 week ago',
+      'size': '2.1 GB',
+      'thumbnail': 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=500',
+    },
+  ];
+
+  // YouTube Offline Downloaded Library
+  final List<Map<String, String>> downloadedLibrary = [];
+
+  String? activeDownloadingTitle;
+  String downloadStatus = "";
 
   void toggleWorkerMode(bool value) {
     setState(() {
       isWorkerMode = value;
     });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(value ? 'Worker Node: ACTIVE (P2P Mesh Ready)' : 'Worker Node: OFF')),
+    );
+  }
 
-    if (value) {
+  void downloadVideo(Map<String, String> video) {
+    final title = video['title']!;
+    
+    if (downloadedLibrary.any((v) => v['title'] == title)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Worker Node Active: Ready to share data')),
+        const SnackBar(content: Text('Already downloaded in your Offline Library!')),
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Worker Node Stopped')),
-      );
+      return;
     }
-  }
-
-  void performSearch(String query) {
-    if (query.isEmpty) return;
-
-    setState(() {
-      isSearching = true;
-    });
-
-    Timer(const Duration(milliseconds: 300), () {
-      setState(() {
-        isSearching = false;
-        searchResults = [
-          {
-            'title': '$query - HD Peer Mesh', 
-            'genre': 'P2P Decentralized', 
-            'size': '1.5 GB',
-            'image': 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=150'
-          },
-        ];
-      });
-    });
-  }
-
-  // --- SAFE DIRECT P2P SIMULATION (No Socket/Manifest Needed) ---
-  void startPeerDownload(String movieName) {
-    if (activeDownloadingMovie != null) return;
 
     if (!isWorkerMode) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -90,122 +85,287 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     setState(() {
-      activeDownloadingMovie = movieName;
-      downloadStatusText = "Connecting to Peer Mesh...";
+      activeDownloadingTitle = title;
+      downloadStatus = "Downloading...";
     });
 
-    // Simulating secure peer-to-peer data synchronization stream
     Timer(const Duration(seconds: 2), () {
       if (mounted) {
         setState(() {
-          downloadStatusText = "Saved Successfully!";
+          downloadedLibrary.add(video);
           walletBalance -= 10;
+          activeDownloadingTitle = null;
+          downloadStatus = "";
         });
-
-        Timer(const Duration(seconds: 15), () {
-          if (mounted) {
-            setState(() {
-              activeDownloadingMovie = null;
-            });
-          }
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Downloaded "$title" to Offline Library')),
+        );
       }
     });
+  }
+
+  void playVideoPlayer(String title) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF212121),
+        title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 180,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Icon(Icons.play_circle_filled, size: 64, color: Colors.redAccent),
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      color: Colors.black54,
+                      child: const Text('OFFLINE MODE', style: TextStyle(fontSize: 10, color: Colors.greenAccent)),
+                    ),
+                  )
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text('Playing smoothly from your local App Vault', style: TextStyle(fontSize: 11, color: Colors.white60)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vizia Net Hub'),
-        actions: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Text(
-                '₹$walletBalance',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent),
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
+        backgroundColor: const Color(0xFF0F0F0F),
+        elevation: 0,
+        title: Row(
           children: [
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Search media...',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white10,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              onSubmitted: performSearch,
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isWorkerMode ? Colors.green.withOpacity(0.15) : Colors.blue.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: isWorkerMode ? Colors.greenAccent : Colors.blueAccent),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    isWorkerMode ? 'Worker Node: ACTIVE (Mesh Ready)' : 'Worker Node: OFF',
-                    style: TextStyle(fontSize: 12, color: isWorkerMode ? Colors.greenAccent : Colors.blueAccent, fontWeight: FontWeight.bold),
-                  ),
-                  Icon(isWorkerMode ? Icons.cell_tower : Icons.wifi_off, color: isWorkerMode ? Colors.greenAccent : Colors.blueAccent),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: isSearching
-                  ? const Center(child: CircularProgressIndicator())
-                  : searchResults.isNotEmpty
-                      ? ListView.builder(
-                          itemCount: searchResults.length,
-                          itemBuilder: (context, index) {
-                            final item = searchResults[index];
-                            final title = item['title']!;
-                            final isDownloading = activeDownloadingMovie == title;
-
-                            return Card(
-                              color: Colors.white10,
-                              child: ListTile(
-                                title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                                subtitle: Text(isDownloading ? downloadStatusText : '${item['genre']} | ${item['size']}', style: const TextStyle(fontSize: 11)),
-                                trailing: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-                                  onPressed: activeDownloadingMovie != null ? null : () => startPeerDownload(title),
-                                  child: Text(isDownloading ? 'Syncing...' : 'Download', style: const TextStyle(fontSize: 11)),
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                      : const Center(child: Text('Search to view P2P media nodes', style: TextStyle(color: Colors.white54))),
-            ),
-            Card(
-              color: Colors.white10,
-              child: SwitchListTile(
-                dense: true,
-                title: const Text('Worker Mode Switch', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                value: isWorkerMode,
-                activeColor: Colors.greenAccent,
-                onChanged: toggleWorkerMode,
-              ),
-            ),
+            const Icon(Icons.play_arrow_rounded, color: Colors.redAccent, size: 28),
+            const SizedBox(width: 4),
+            const Text('ViziaTube', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
           ],
         ),
+        actions: [
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '₹$walletBalance',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.greenAccent),
+              ),
+            ),
+          )
+        ],
+      ),
+      body: _selectedIndex == 0 ? buildHomeFeed() : buildLibraryScreen(),
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: const Color(0xFF0F0F0F),
+        selectedItemColor: Colors.redAccent,
+        unselectedItemColor: Colors.white54,
+        currentIndex: _selectedIndex,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.video_library), label: 'Library'),
+        ],
+      ),
+    );
+  }
+
+  // --- YouTube Home Feed UI ---
+  Widget buildHomeFeed() {
+    return Column(
+      children: [
+        // Worker Mode Status Banner (YouTube style chip)
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isWorkerMode ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isWorkerMode ? Colors.greenAccent : Colors.redAccent),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isWorkerMode ? 'Worker Node: ACTIVE (Mesh Ready)' : 'Worker Node: OFF',
+                style: TextStyle(fontSize: 11, color: isWorkerMode ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(
+                height: 24,
+                child: Switch(
+                  value: isWorkerMode,
+                  activeColor: Colors.greenAccent,
+                  onChanged: toggleWorkerMode,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Video Feed List (YouTube Style Cards)
+        Expanded(
+          child: ListView.builder(
+            itemCount: videoFeed.length,
+            itemBuilder: (context, index) {
+              final video = videoFeed[index];
+              final title = video['title']!;
+              final isDownloading = activeDownloadingTitle == title;
+              final isDownloaded = downloadedLibrary.any((v) => v['title'] == title);
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Thumbnail
+                    Container(
+                      height: 190,
+                      width: double.infinity,
+                      color: Colors.white10,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.network(video['thumbnail']!, fit: BoxFit.cover),
+                          Positioned(
+                            bottom: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              color: Colors.black87,
+                              child: Text(video['size']!, style: const TextStyle(fontSize: 10, color: Colors.white)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Details row
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Colors.redAccent,
+                            child: Icon(Icons.person, size: 18, color: Colors.white),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                                const SizedBox(height: 4),
+                                Text('${video['channel']} • ${video['views']}', style: const TextStyle(fontSize: 11, color: Colors.white54)),
+                              ],
+                            ),
+                          ),
+                          // Download Button
+                          IconButton(
+                            icon: Icon(
+                              isDownloaded ? Icons.check_circle : (isDownloading ?izontal_sync : Icons.download),
+                              color: isDownloaded ? Colors.greenAccent : Colors.white,
+                            ),
+                            onPressed: (isDownloaded || isDownloading) ? null : () => downloadVideo(video),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- YouTube Library / Downloads UI ---
+  Widget buildLibraryScreen() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Downloads', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 4),
+          const Text('Available offline in your local app vault', style: TextStyle(fontSize: 12, color: Colors.white54)),
+          const SizedBox(height: 16),
+          Expanded(
+            child: downloadedLibrary.isNotEmpty
+                ? ListView.builder(
+                    itemCount: downloadedLibrary.length,
+                    itemBuilder: (context, index) {
+                      final item = downloadedLibrary[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 120,
+                              height: 70,
+                              color: Colors.white10,
+                              child: Image.network(item['thumbnail']!, fit: BoxFit.cover),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item['title']!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                  const SizedBox(height: 4),
+                                  const Text('Downloaded • Ready to watch', style: TextStyle(fontSize: 10, color: Colors.greenAccent)),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.play_circle_fill, color: Colors.redAccent, size: 32),
+                              onPressed: () => playVideoPlayer(item['title']!),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  )
+                : const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.video_library_outlined, size: 64, color: Colors.white24),
+                        SizedBox(height: 10),
+                        Text('No downloaded videos yet\nVideos you download will appear here like YouTube.', 
+                        textAlign: TextAlign.center, 
+                        style: TextStyle(color: Colors.white38, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }
