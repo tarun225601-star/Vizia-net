@@ -327,12 +327,6 @@ class AIChatScreen extends StatelessWidget {
   const AIChatScreen({super.key});
 
   @override
-}
-
-class AIChatScreen extends StatelessWidget {
-  const AIChatScreen({super.key});
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('AI Learning Assistant'), backgroundColor: const Color(0xFF1E1E1E)),
