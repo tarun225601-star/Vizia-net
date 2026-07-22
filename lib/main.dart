@@ -33,12 +33,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int walletBalance = 100;
   bool isWorkerMode = false;
   
-  // Search States
   String nodeStatus = "Node Offline";
   bool isSearching = false;
   List<dynamic> realSearchResults = [];
   
-  // Real Download Button & Background Progress States
   bool isBackgroundDownloading = false;
   double downloadProgress = 0.0;
   String currentDownloadingMovie = "";
@@ -59,7 +57,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // Real API Search
   Future<void> performRealSearch(String query) async {
     if (query.isEmpty) return;
 
@@ -85,9 +82,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Triggered when user clicks the Download button on any movie
   void startMovieDownload(String movieName) {
-    if (isBackgroundDownloading) return; // Prevent multiple simultaneous downloads
+    if (isBackgroundDownloading) return;
 
     setState(() {
       currentDownloadingMovie = movieName;
@@ -96,7 +92,6 @@ class _HomeScreenState extends State<HomeScreen> {
       isDownloadComplete = false;
     });
 
-    // Real background progress simulation feeding directly into the Circular Indicator
     _bgDownloadTimer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
       setState(() {
         downloadProgress += 0.10;
@@ -104,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
           downloadProgress = 1.0;
           isBackgroundDownloading = false;
           isDownloadComplete = true;
-          walletBalance += 5; // Reward bonus on successful download completion
+          walletBalance += 5;
           timer.cancel();
         }
       });
@@ -133,7 +128,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Search Bar
             TextField(
               decoration: InputDecoration(
                 hintText: 'Search any movie online (e.g. Batman, Avengers)...',
@@ -149,7 +143,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Live Background Download Visualizer (The Circular Progress Hub)
             if (isBackgroundDownloading || isDownloadComplete)
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -215,7 +208,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-            // Search Results List with Active Download Button
             Expanded(
               child: isSearching
                   ? const Center(child: CircularProgressIndicator())
@@ -234,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 leading: movie['artworkUrl100'] != null
                                     ? ClipRRect(
                                         borderRadius: BorderRadius.circular(6),
-                                        image: NetworkImage(movie['artworkUrl100']),
+                                        child: Image.network(movie['artworkUrl100']), // Fixed Image syntax
                                       )
                                     : const Icon(Icons.movie, color: Colors.blueAccent),
                                 title: Text(
@@ -270,7 +262,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
             ),
 
-            // Worker Mode Toggle Card
             Card(
               color: Colors.white10,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
