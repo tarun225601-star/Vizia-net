@@ -14,7 +14,7 @@ class ViziaTubeApp extends StatelessWidget {
       title: 'Vizia Tube',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0F0F0F), // YouTube Dark background
+        scaffoldBackgroundColor: const Color(0xFF0F0F0F),
         primaryColor: Colors.redAccent,
       ),
       home: const YouTubeHomeScreen(),
@@ -30,11 +30,10 @@ class YouTubeHomeScreen extends StatefulWidget {
 }
 
 class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
-  int _selectedIndex = 0; // 0: Home, 1: Library (Downloads)
+  int _selectedIndex = 0;
   int walletBalance = 190;
   bool isWorkerMode = false;
   
-  bool isSearching = false;
   List<Map<String, String>> videoFeed = [
     {
       'title': 'Mela Movie - HD Local Peer Remastered',
@@ -52,11 +51,9 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     },
   ];
 
-  // YouTube Offline Downloaded Library
   final List<Map<String, String>> downloadedLibrary = [];
 
   String? activeDownloadingTitle;
-  String downloadStatus = "";
 
   void toggleWorkerMode(bool value) {
     setState(() {
@@ -86,7 +83,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
 
     setState(() {
       activeDownloadingTitle = title;
-      downloadStatus = "Downloading...";
     });
 
     Timer(const Duration(seconds: 2), () {
@@ -95,7 +91,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
           downloadedLibrary.add(video);
           walletBalance -= 10;
           activeDownloadingTitle = null;
-          downloadStatus = "";
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Downloaded "$title" to Offline Library')),
@@ -119,19 +114,10 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                 color: Colors.black,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Stack(
+              child: const Stack(
                 alignment: Alignment.center,
                 children: [
-                  const Icon(Icons.play_circle_filled, size: 64, color: Colors.redAccent),
-                  Positioned(
-                    bottom: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      color: Colors.black54,
-                      child: const Text('OFFLINE MODE', style: TextStyle(fontSize: 10, color: Colors.greenAccent)),
-                    ),
-                  )
+                  Icon(Icons.play_circle_filled, size: 64, color: Colors.redAccent),
                 ],
               ),
             ),
@@ -155,11 +141,11 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F0F0F),
         elevation: 0,
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.play_arrow_rounded, color: Colors.redAccent, size: 28),
-            const SizedBox(width: 4),
-            const Text('ViziaTube', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+            Icon(Icons.play_arrow_rounded, color: Colors.redAccent, size: 28),
+            SizedBox(width: 4),
+            Text('ViziaTube', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
           ],
         ),
         actions: [
@@ -194,11 +180,9 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     );
   }
 
-  // --- YouTube Home Feed UI ---
   Widget buildHomeFeed() {
     return Column(
       children: [
-        // Worker Mode Status Banner (YouTube style chip)
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -225,8 +209,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
             ],
           ),
         ),
-
-        // Video Feed List (YouTube Style Cards)
         Expanded(
           child: ListView.builder(
             itemCount: videoFeed.length,
@@ -241,7 +223,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Thumbnail
                     Container(
                       height: 190,
                       width: double.infinity,
@@ -262,7 +243,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                         ],
                       ),
                     ),
-                    // Details row
                     Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Row(
@@ -284,10 +264,9 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                               ],
                             ),
                           ),
-                          // Download Button
                           IconButton(
                             icon: Icon(
-                              isDownloaded ? Icons.check_circle : (isDownloading ?izontal_sync : Icons.download),
+                              isDownloaded ? Icons.check_circle : (isDownloading ? Icons.hourglass_top : Icons.download),
                               color: isDownloaded ? Colors.greenAccent : Colors.white,
                             ),
                             onPressed: (isDownloaded || isDownloading) ? null : () => downloadVideo(video),
@@ -305,7 +284,6 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
     );
   }
 
-  // --- YouTube Library / Downloads UI ---
   Widget buildLibraryScreen() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
