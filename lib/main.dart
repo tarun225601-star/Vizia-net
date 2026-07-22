@@ -42,7 +42,6 @@ class _HomeScreenState extends State<HomeScreen> {
   double downloadProgress = 0.0;
   String downloadStatusText = "";
 
-  // Background Worker Node Server
   HttpServer? _workerServer;
   final int workerPort = 8080;
 
@@ -73,7 +72,6 @@ class _HomeScreenState extends State<HomeScreen> {
           request.response.headers.contentType = ContentType.binary;
           request.response.statusCode = HttpStatus.ok;
 
-          // Streaming chunks from worker to peer user
           for (int i = 1; i <= 15; i++) {
             await Future.delayed(const Duration(milliseconds: 150));
             request.response.add(utf8.encode('P2P Data Block $i for $movieName\n'));
@@ -153,16 +151,14 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      var request = http.Request('GET', Uri.parse(peerUrl));
-      var client = http.Client();
-      var response = await client.send(request).timeout(const Duration(seconds: 4));
+      final uri = Uri.parse(peerUrl);
+      final streamedResponse = await http.get(uri).timeout(const Duration(seconds: 4));
 
-      if (response.statusCode == 200) {
+      if (streamedResponse.statusCode == 200) {
         setState(() {
           downloadStatusText = "Receiving from Worker...";
         });
 
-        // Permanent storage path (Public Download Directory)
         Directory? directory;
         if (Platform.isAndroid) {
           directory = Directory('/storage/emulated/0/Download');
@@ -175,46 +171,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final filePath = '${directory?.path}/$movieName.mp4';
         final file = File(filePath);
-        final sink = file.openWrite();
+        
+        // Write bytes directly
+        await file.writeAsBytes(streamedResponse.bodyBytes);
 
-        int receivedBytes = 0;
-        const int estimatedTotalBytes = 60000;
+        setState(() {
+          downloadProgress = 1.0;
+          downloadStatusText = "Saved Permanently in Downloads!";
+          walletBalance -= 10; 
+        });
 
-        await response.stream.listen(
-          (List<int> chunk) {
-            sink.add(chunk);
-            receivedBytes += chunk.length;
-            setState(() {
-              downloadProgress = (receivedBytes / estimatedTotalBytes).clamp(0.0, 1.0);
-              downloadStatusText = "Downloading: ${(downloadProgress * 100).toInt()}%";
-            });
-          },
-          onDone: () async {
-            await sink.close();
-            setState(() {
-              downloadProgress = 1.0;
-              downloadStatusText = "Saved Permanently in Downloads!";
-              walletBalance -= 10; // Wallet deduction on completion
-            });
-
-            Future.delayed(const Duration(seconds: 2), () {
-              if (mounted) {
-                setState(() {
-                  activeDownloadingMovie = null;
-                  downloadProgress = 0.0;
-                });
-              }
-            });
-          },
-          onError: (e) {
-            sink.close();
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
             setState(() {
               activeDownloadingMovie = null;
-              downloadStatusText = "Transfer Failed";
+              downloadProgress = 0.0;
             });
-          },
-          cancelOnError: true,
-        );
+          }
+        });
       } else {
         setState(() {
           activeDownloadingMovie = null;
@@ -254,7 +228,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Search Bar
             TextField(
               decoration: InputDecoration(
                 hintText: 'Search media index...',
@@ -270,7 +243,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 10),
 
-            // Worker Status Card
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -293,7 +265,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 10),
 
-            // Search Results List
             Expanded(
               child: isSearching
                   ? const Center(child: CircularProgressIndicator())
@@ -385,7 +356,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 10),
 
-            // Worker Mode Toggle Card at Bottom
             Card(
               color: Colors.white10,
               margin: EdgeInsets.zero,
