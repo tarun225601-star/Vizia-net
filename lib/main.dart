@@ -134,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.between,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -176,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 20),
             Row(
-              mainAxisAlignment: MainAxisAlignment.between,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Top AI & Micro-Skills', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                 Text('${displayedCourses.length} Courses', style: const TextStyle(fontSize: 12, color: Colors.amberAccent)),
