@@ -31,10 +31,12 @@ class YouTubeHomeScreen extends StatefulWidget {
 
 class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   int _selectedIndex = 0;
-  int walletBalance = 190;
-  bool isWorkerMode = false;
+  int walletBalance = 170;
+  bool isWorkerMode = true;
   
-  List<Map<String, String>> videoFeed = [
+  final TextEditingController searchController = TextEditingController();
+
+  final List<Map<String, dynamic>> allVideos = [
     {
       'title': 'Mela Movie - HD Local Peer Remastered',
       'channel': 'Vizia P2P Network',
@@ -49,24 +51,55 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
       'size': '2.1 GB',
       'thumbnail': 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=500',
     },
+    {
+      'title': 'Comedy Nights Special Live',
+      'channel': 'Vizia Creator Studio',
+      'views': '89K views • 5 hours ago',
+      'size': '950 MB',
+      'thumbnail': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500',
+    },
   ];
 
-  final List<Map<String, String>> downloadedLibrary = [];
+  List<Map<String, dynamic>> displayedVideos = [];
+  final List<Map<String, dynamic>> downloadedLibrary = [];
+  final Map<String, double> downloadProgressMap = {};
 
-  String? activeDownloadingTitle;
+  @override
+  void initState() {
+    super.initState();
+    displayedVideos = List.from(allVideos);
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  void filterSearch(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        displayedVideos = List.from(allVideos);
+      } else {
+        displayedVideos = allVideos
+            .where((v) => v['title'].toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
+    });
+  }
 
   void toggleWorkerMode(bool value) {
     setState(() {
       isWorkerMode = value;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(value ? 'Worker Node: ACTIVE (P2P Mesh Ready)' : 'Worker Node: OFF')),
+      SnackBar(content: Text(value ? 'Worker Node: ACTIVE (Mesh Ready)' : 'Worker Node: OFF')),
     );
   }
 
-  void downloadVideo(Map<String, String> video) {
-    final title = video['title']!;
-    
+  void startDownload(Map<String, dynamic> video) {
+    final title = video['title'] as String;
+
     if (downloadedLibrary.any((v) => v['title'] == title)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Already downloaded in your Offline Library!')),
@@ -76,61 +109,48 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
 
     if (!isWorkerMode) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: Turn on Worker Mode first!')),
+        const SnackBar(content: Text('Error: Turn on Worker Node first!')),
       );
       return;
     }
 
     setState(() {
-      activeDownloadingTitle = title;
+      downloadProgressMap[title] = 0.0;
     });
 
-    Timer(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
+    Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        double currentProgress = downloadProgressMap[title] ?? 0.0;
+        if (currentProgress < 1.0) {
+          currentProgress += 0.2;
+          downloadProgressMap[title] = currentProgress;
+        } else {
+          timer.cancel();
+          downloadProgressMap.remove(title);
           downloadedLibrary.add(video);
           walletBalance -= 10;
-          activeDownloadingTitle = null;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Downloaded "$title" to Offline Library')),
-        );
-      }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Successfully downloaded "$title" to Offline Library!')),
+          );
+        }
+      });
     });
   }
 
-  void playVideoPlayer(String title) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF212121),
-        title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              height: 180,
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(Icons.play_circle_filled, size: 64, color: Colors.redAccent),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Text('Playing smoothly from your local App Vault', style: TextStyle(fontSize: 11, color: Colors.white60)),
-          ],
+  void openMoviePlayer(Map<String, dynamic> video) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MoviePlayerScreen(
+          videoTitle: video['title'] as String,
+          thumbnail: video['thumbnail'] as String,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: Colors.redAccent)),
-          ),
-        ],
       ),
     );
   }
@@ -183,9 +203,27 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
   Widget buildHomeFeed() {
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: TextField(
+            controller: searchController,
+            onChanged: filterSearch,
+            decoration: InputDecoration(
+              hintText: 'Search movies, shows...',
+              prefixIcon: const Icon(Icons.search, color: Colors.white54),
+              filled: true,
+              fillColor: Colors.white10,
+              contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
             color: isWorkerMode ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
             borderRadius: BorderRadius.circular(8),
@@ -209,76 +247,104 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 8),
         Expanded(
-          child: ListView.builder(
-            itemCount: videoFeed.length,
-            itemBuilder: (context, index) {
-              final video = videoFeed[index];
-              final title = video['title']!;
-              final isDownloading = activeDownloadingTitle == title;
-              final isDownloaded = downloadedLibrary.any((v) => v['title'] == title);
+          child: displayedVideos.isNotEmpty
+              ? ListView.builder(
+                  itemCount: displayedVideos.length,
+                  itemBuilder: (context, index) {
+                    final video = displayedVideos[index];
+                    final title = video['title'] as String;
+                    final isDownloaded = downloadedLibrary.any((v) => v['title'] == title);
+                    final bool isDownloading = downloadProgressMap.containsKey(title);
+                    final double progress = downloadProgressMap[title] ?? 0.0;
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      height: 190,
-                      width: double.infinity,
-                      color: Colors.white10,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Image.network(video['thumbnail']!, fit: BoxFit.cover),
-                          Positioned(
-                            bottom: 8,
-                            right: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                              color: Colors.black87,
-                              child: Text(video['size']!, style: const TextStyle(fontSize: 10, color: Colors.white)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Row(
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const CircleAvatar(
-                            radius: 16,
-                            backgroundColor: Colors.redAccent,
-                            child: Icon(Icons.person, size: 18, color: Colors.white),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          Container(
+                            height: 190,
+                            width: double.infinity,
+                            color: Colors.white10,
+                            child: Stack(
+                              fit: StackFit.expand,
                               children: [
-                                Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                                const SizedBox(height: 4),
-                                Text('${video['channel']} • ${video['views']}', style: const TextStyle(fontSize: 11, color: Colors.white54)),
+                                Image.network(video['thumbnail'] as String, fit: BoxFit.cover),
+                                Positioned(
+                                  bottom: 8,
+                                  right: 8,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    color: Colors.black87,
+                                    child: Text(video['size'] as String, style: const TextStyle(fontSize: 10, color: Colors.white)),
+                                  ),
+                                ),
+                                if (isDownloading)
+                                  Container(
+                                    color: Colors.black54,
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          CircularProgressIndicator(value: progress, color: Colors.redAccent),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Downloading... ${(progress * 100).toInt()}%',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
-                          IconButton(
-                            icon: Icon(
-                              isDownloaded ? Icons.check_circle : (isDownloading ? Icons.hourglass_top : Icons.download),
-                              color: isDownloaded ? Colors.greenAccent : Colors.white,
+                          Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const CircleAvatar(
+                                  radius: 16,
+                                  backgroundColor: Colors.redAccent,
+                                  child: Icon(Icons.person, size: 18, color: Colors.white),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                                      const SizedBox(height: 4),
+                                      Text('${video['channel']} • ${video['views']}', style: const TextStyle(fontSize: 11, color: Colors.white54)),
+                                    ],
+                                  ),
+                                ),
+                                isDownloaded
+                                    ? IconButton(
+                                        icon: const Icon(Icons.play_circle_filled, color: Colors.greenAccent, size: 32),
+                                        onPressed: () => openMoviePlayer(video),
+                                      )
+                                    : IconButton(
+                                        icon: Icon(
+                                          isDownloading ? Icons.hourglass_top : Icons.download,
+                                          color: Colors.white,
+                                        ),
+                                        onPressed: isDownloading ? null : () => startDownload(video),
+                                      ),
+                              ],
                             ),
-                            onPressed: (isDownloaded || isDownloading) ? null : () => downloadVideo(video),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                    );
+                  },
+                )
+              : const Center(
+                  child: Text('No videos found matching your search.', style: TextStyle(color: Colors.white54)),
                 ),
-              );
-            },
-          ),
         ),
       ],
     );
@@ -308,22 +374,22 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                               width: 120,
                               height: 70,
                               color: Colors.white10,
-                              child: Image.network(item['thumbnail']!, fit: BoxFit.cover),
+                              child: Image.network(item['thumbnail'] as String, fit: BoxFit.cover),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(item['title']!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                  Text(item['title'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
                                   const SizedBox(height: 4),
                                   const Text('Downloaded • Ready to watch', style: TextStyle(fontSize: 10, color: Colors.greenAccent)),
                                 ],
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.play_circle_fill, color: Colors.redAccent, size: 32),
-                              onPressed: () => playVideoPlayer(item['title']!),
+                              icon: const Icon(Icons.play_circle_fill, color: Colors.redAccent, size: 36),
+                              onPressed: () => openMoviePlayer(item),
                             ),
                           ],
                         ),
@@ -342,6 +408,90 @@ class _YouTubeHomeScreenState extends State<YouTubeHomeScreen> {
                       ],
                     ),
                   ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class MoviePlayerScreen extends StatelessWidget {
+  final String videoTitle;
+  final String thumbnail;
+
+  const MoviePlayerScreen({super.key, required this.videoTitle, required this.thumbnail});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: Text(videoTitle, style: const TextStyle(fontSize: 14)),
+      ),
+      body: Column(
+        children: [
+          Container(
+            height: 230,
+            width: double.infinity,
+            color: Colors.black,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.network(thumbnail, fit: BoxFit.cover),
+                Container(color: Colors.black45),
+                const Center(
+                  child: Icon(Icons.play_circle_filled, size: 72, color: Colors.redAccent),
+                ),
+                const Positioned(
+                  bottom: 12,
+                  left: 12,
+                  child: Row(
+                    children: [
+                      Icon(Icons.hd, color: Colors.greenAccent),
+                      SizedBox(width: 6),
+                      Text('OFFLINE VAULT STREAM', style: TextStyle(fontSize: 11, color: Colors.greenAccent, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Column(
+              children: [
+                LinearProgressIndicator(value: 0.35, color: Colors.redAccent, backgroundColor: Colors.white24),
+                SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('01:15', style: TextStyle(fontSize: 10, color: Colors.white54)),
+                    Text('02:30:00', style: TextStyle(fontSize: 10, color: Colors.white54)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                IconButton(icon: const Icon(Icons.replay_10, size: 32, color: Colors.white), onPressed: () {}),
+                IconButton(icon: const Icon(Icons.pause_circle_filled, size: 54, color: Colors.redAccent), onPressed: () {}),
+                IconButton(icon: const Icon(Icons.forward_10, size: 32, color: Colors.white), onPressed: () {}),
+              ],
+            ),
+          ),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Now playing "$videoTitle" securely from your local device storage.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
           ),
         ],
       ),
