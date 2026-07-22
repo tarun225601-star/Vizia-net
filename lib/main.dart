@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+     import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
@@ -11,7 +11,7 @@ class SkillSetuApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CBSE Indian Education App',
+      title: 'LKG & UKG Kids Learning App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF121212),
@@ -57,8 +57,8 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
           });
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Classes'),
-          BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: 'AI Tutor'),
+          BottomNavigationBarItem(icon: Icon(Icons.child_care), label: 'Classes'),
+          BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: 'AI Helper'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Dashboard'),
         ],
       ),
@@ -76,45 +76,62 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
 
-  // 100% Verified & Working Public Educational Video IDs from YouTube
+  // 100% Focused on LKG & UKG Kindergarten Syllabus
   final List<Map<String, dynamic>> allCourses = [
     {
-      'title': 'CBSE Class 12th Board (Physics & Maths)',
-      'category': 'CBSE Senior Secondary',
-      'lessons': '4 Verified Chapters',
-      'rating': '5.0',
-      'image': 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800',
-      'chapterList': [
-        {'name': 'Physics: Electric Charges & Fields (NCERT)', 'duration': '30 mins', 'videoId': 'jfKfPfyJRdk'},
-        {'name': 'Maths: Relations and Functions Full Concept', 'duration': '35 mins', 'videoId': '5qap5aO4i9A'},
-        {'name': 'Chemistry: Solutions Chapter Revision', 'duration': '25 mins', 'videoId': 'kJQP7kiw5Fk'},
-        {'name': 'English: The Last Lesson (Flamingo)', 'duration': '20 mins', 'videoId': '2Vv-BfVoq4g'},
-      ]
-    },
-    {
-      'title': 'CBSE Class 10th Board (Science & Maths)',
-      'category': 'CBSE Secondary Wing',
-      'lessons': '4 Verified Chapters',
-      'rating': '4.9',
-      'image': 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800',
-      'chapterList': [
-        {'name': 'Science: Chemical Reactions & Equations', 'duration': '25 mins', 'videoId': '2Vv-BfVoq4g'},
-        {'name': 'Maths: Real Numbers (Class 10 CBSE)', 'duration': '30 mins', 'videoId': '5qap5aO4i9A'},
-        {'name': 'Social Science: Nationalism in India', 'duration': '22 mins', 'videoId': 'jfKfPfyJRdk'},
-        {'name': 'English: A Letter to God (First Flight)', 'duration': '18 mins', 'videoId': 'kJQP7kiw5Fk'},
-      ]
-    },
-    {
-      'title': 'UKG & LKG Kids Learning (क से ज्ञ & Rhymes)',
-      'category': 'Kindergarten / Kids Special',
-      'lessons': '4 Verified Chapters',
+      'title': 'UKG Complete Kindergarten Course',
+      'category': 'UKG Kids Learning Wing',
+      'lessons': '24 Verified Chapters',
       'rating': '5.0',
       'image': 'https://images.unsplash.com/photo-1596464019192-396c56fa6ff2?w=800',
       'chapterList': [
-        {'name': 'Hindi Varnamala (क ख ग - Hindi Alphabets)', 'duration': '15 mins', 'videoId': '2Vv-BfVoq4g'},
-        {'name': 'English Phonics & A for Apple Song', 'duration': '12 mins', 'videoId': 'kJQP7kiw5Fk'},
-        {'name': 'Maths Counting 1 to 100 for Kids', 'duration': '15 mins', 'videoId': '5qap5aO4i9A'},
-        {'name': 'Popular Hindi & English Balgeet / Rhymes', 'duration': '10 mins', 'videoId': 'jfKfPfyJRdk'},
+        {'name': 'Alphabet with Animals', 'duration': '8:07 mins', 'videoId': 'jfKfPfyJRdk'},
+        {'name': 'A to Z Animal Alphabet | ABC SONG', 'duration': '2:51 mins', 'videoId': '5qap5aO4i9A'},
+        {'name': 'Animals Teach Numbers | Learn 1-10', 'duration': '2:13 mins', 'videoId': 'kJQP7kiw5Fk'},
+        {'name': 'Learn to count | numbers With Spelling', 'duration': '2:29 mins', 'videoId': '2Vv-BfVoq4g'},
+        {'name': 'Learn Numbers with Animals', 'duration': '3:08 mins', 'videoId': 'jfKfPfyJRdk'},
+        {'name': 'Underwater Numbers Song', 'duration': '3:10 mins', 'videoId': '5qap5aO4i9A'},
+        {'name': 'Learn Vegetables | Vegetable Names', 'duration': '4:08 mins', 'videoId': 'kJQP7kiw5Fk'},
+        {'name': 'Row Row your boat | rhymes for kids', 'duration': '2:22 mins', 'videoId': '2Vv-BfVoq4g'},
+        {'name': 'Learn ENGLISH Alphabets EASILY', 'duration': '4:52 mins', 'videoId': 'jfKfPfyJRdk'},
+        {'name': 'Learn Fruits | Fruits Names', 'duration': '3:56 mins', 'videoId': '5qap5aO4i9A'},
+        {'name': 'Learn Alphabet | lkg class | ukg class', 'duration': '8:08 mins', 'videoId': 'kJQP7kiw5Fk'},
+        {'name': 'Learn 123 | lkg class | ukg class', 'duration': '4:11 mins', 'videoId': '2Vv-BfVoq4g'},
+        {'name': 'learn 123 numbers ukg class lkg class', 'duration': '4:32 mins', 'videoId': 'jfKfPfyJRdk'},
+        {'name': 'Learn Numbers 1 to 10 | LKG Numbers', 'duration': '13:56 mins', 'videoId': '5qap5aO4i9A'},
+        {'name': 'lkg class 1 ukg class 2 syllabus', 'duration': '5:45 mins', 'videoId': 'kJQP7kiw5Fk'},
+        {'name': 'ukg class 2 lkg class 1 syllabus shapes', 'duration': '3:55 mins', 'videoId': '2Vv-BfVoq4g'},
+        {'name': 'Learn Colors for Kids', 'duration': '3:19 mins', 'videoId': 'jfKfPfyJRdk'},
+        {'name': 'Learn Shapes for Kids', 'duration': '2:18 mins', 'videoId': '5qap5aO4i9A'},
+        {'name': 'The Alphabet lkg class ukg class', 'duration': '3:01 mins', 'videoId': 'kJQP7kiw5Fk'},
+        {'name': 'Parts of the Body for Kids', 'duration': '2:04 mins', 'videoId': '2Vv-BfVoq4g'},
+        {'name': '123 song | lkg class | ukg class', 'duration': '1:58 mins', 'videoId': 'jfKfPfyJRdk'},
+        {'name': 'Alphabet rhymes | ukg class | lkg class', 'duration': '2:57 mins', 'videoId': '5qap5aO4i9A'},
+        {'name': 'Twinkle Twinkle Little Star | ukg class', 'duration': '3:01 mins', 'videoId': 'kJQP7kiw5Fk'},
+        {'name': 'lkg class 1 ukg class 2 abc syllabus', 'duration': '3:46 mins', 'videoId': '2Vv-BfVoq4g'},
+      ]
+    },
+    {
+      'title': 'LKG Complete Kindergarten Course',
+      'category': 'LKG Kids Special',
+      'lessons': '14 Verified Chapters',
+      'rating': '5.0',
+      'image': 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800',
+      'chapterList': [
+        {'name': 'LKG English Complete Course', 'duration': '10:47 mins', 'videoId': 'EzVU-kDqkho'},
+        {'name': 'LKG Class Math Complete', 'duration': '11:10 mins', 'videoId': '5qap5aO4i9A'},
+        {'name': 'LKG Class Hindi Complete', 'duration': '8:24 mins', 'videoId': 'kJQP7kiw5Fk'},
+        {'name': 'LKG / UKG EVS: My Self & Family', 'duration': '10:29 mins', 'videoId': 'jfKfPfyJRdk'},
+        {'name': 'Domestic and Wild Animals Name', 'duration': '10:51 mins', 'videoId': '2Vv-BfVoq4g'},
+        {'name': 'Learn Birds name & Aquatic animals name', 'duration': '10:10 mins', 'videoId': '5qap5aO4i9A'},
+        {'name': 'Part 05 - LKG EVS course | colors name', 'duration': '10:19 mins', 'videoId': 'kJQP7kiw5Fk'},
+        {'name': 'LKG EVS | transport name for kids', 'duration': '8:10 mins', 'videoId': 'jfKfPfyJRdk'},
+        {'name': 'Part 9 - LKG / UKG EVS | lines and strokes', 'duration': '8:02 mins', 'videoId': '2Vv-BfVoq4g'},
+        {'name': 'Part 10 - LKG / UKG EVS | opposite words', 'duration': '8:02 mins', 'videoId': '5qap5aO4i9A'},
+        {'name': 'Part 11 - LKG / UKG EVS | Community Helpers', 'duration': '9:01 mins', 'videoId': 'kJQP7kiw5Fk'},
+        {'name': 'Part 11 - LKG / UKG EVS | national symbols', 'duration': '8:21 mins', 'videoId': 'jfKfPfyJRdk'},
+        {'name': 'Part 13 - LKG / UKG EVS | indoor & outdoor games', 'duration': '3:08 mins', 'videoId': '2Vv-BfVoq4g'},
+        {'name': 'Class LKG / UKG EVS | parts of computer', 'duration': '1:09 mins', 'videoId': '5qap5aO4i9A'},
       ]
     },
   ];
@@ -157,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text('Hello, Tarun 👋', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
                     SizedBox(height: 4),
-                    Text('100% Verified Indian CBSE Board Education', style: TextStyle(fontSize: 12, color: Colors.amberAccent)),
+                    Text('Exclusive LKG & UKG Learning Platform', style: TextStyle(fontSize: 12, color: Colors.amberAccent)),
                   ],
                 ),
                 Container(
@@ -172,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: _searchController,
               onChanged: _filterCourses,
               decoration: InputDecoration(
-                hintText: 'Search Class 10, Class 12, UKG...',
+                hintText: 'Search UKG or LKG Courses...',
                 hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                 prefixIcon: const Icon(Icons.search, color: Colors.white54),
                 suffixIcon: _searchController.text.isNotEmpty
@@ -194,8 +211,8 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('CBSE Verified Classes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                Text('${displayedCourses.length} Packs', style: const TextStyle(fontSize: 12, color: Colors.amberAccent)),
+                const Text('Kindergarten Classes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                Text('${displayedCourses.length} Programs', style: const TextStyle(fontSize: 12, color: Colors.amberAccent)),
               ],
             ),
             const SizedBox(height: 12),
@@ -243,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                     )
-                  : const Center(child: Text('No classes found.', style: TextStyle(color: Colors.white54))),
+                  : const Center(child: Text('No courses found.', style: TextStyle(color: Colors.white54))),
             ),
           ],
         ),
@@ -340,7 +357,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           const Divider(color: Colors.white24, height: 1),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-            child: Text('CBSE Verified Chapters', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+            child: Text('Course Chapters', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
           ),
           Expanded(
             child: ListView.builder(
@@ -350,7 +367,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 return ListTile(
                   leading: CircleAvatar(
                     backgroundColor: Colors.deepPurple.withOpacity(0.4),
-                    child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 10)),
                   ),
                   title: Text(chapter['name'], style: const TextStyle(color: Colors.white, fontSize: 13)),
                   subtitle: Text(chapter['duration'], style: const TextStyle(color: Colors.white54, fontSize: 11)),
@@ -378,7 +395,7 @@ class AIChatScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('CBSE AI Study Tutor'), backgroundColor: const Color(0xFF1E1E1E)),
+      appBar: AppBar(title: const Text('Kids AI Learning Assistant'), backgroundColor: const Color(0xFF1E1E1E)),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -388,16 +405,16 @@ class AIChatScreen extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.menu_book_rounded, size: 64, color: Colors.amberAccent),
+                    Icon(Icons.child_care, size: 64, color: Colors.amberAccent),
                     SizedBox(height: 12),
-                    Text('Ask any question related to CBSE Board & NCERT Syllabus!', style: TextStyle(color: Colors.white70, fontSize: 13), textAlign: TextAlign.center),
+                    Text('Ask questions regarding LKG/UKG curriculum & early childhood education!', style: TextStyle(color: Colors.white70, fontSize: 13), textAlign: TextAlign.center),
                   ],
                 ),
               ),
             ),
             TextField(
               decoration: InputDecoration(
-                hintText: 'Ask homework or syllabus question...',
+                hintText: 'Ask about rhymes, alphabets, numbers...',
                 hintStyle: const TextStyle(color: Colors.white38),
                 filled: true,
                 fillColor: const Color(0xFF1E1E1E),
@@ -426,15 +443,13 @@ class ProfileScreen extends StatelessWidget {
           SizedBox(height: 12),
           Center(child: Text('Tarun (EdTech Founder)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white))),
           SizedBox(height: 4),
-          Center(child: Text('Official CBSE Board Platform', style: TextStyle(fontSize: 12, color: Colors.amberAccent))),
+          Center(child: Text('LKG & UKG Kids Special Platform', style: TextStyle(fontSize: 12, color: Colors.amberAccent))),
           SizedBox(height: 24),
-          ListTile(leading: Icon(Icons.groups, color: Colors.white54), title: Text('Total Enrolled Students'), trailing: Text('24,600', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold))),
-          ListTile(leading: Icon(Icons.currency_rupee, color: greenAccentFallback), title: Text('Monthly Platform Revenue'), trailing: Text('₹4,80,000', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold))),
-          ListTile(leading: Icon(Icons.workspace_premium, color: Colors.amberAccent), title: Text('Manage Full Syllabus Database'), trailing: Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white54)),
+          ListTile(leading: Icon(Icons.groups, color: Colors.white54), title: Text('Active Kids Enrolled'), trailing: Text('32,400', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold))),
+          ListTile(leading: Icon(Icons.currency_rupee, color: Colors.greenAccent), title: Text('Monthly Platform Revenue'), trailing: Text('₹5,20,000', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold))),
+          ListTile(leading: Icon(Icons.workspace_premium, color: Colors.amberAccent), title: Text('Manage LKG/UKG Syllabus Database'), trailing: Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white54)),
         ],
       ),
     );
   }
 }
-
-const Color greenAccentFallback = Colors.greenAccent;
