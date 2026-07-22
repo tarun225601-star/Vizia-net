@@ -1,4 +1,4 @@
-   import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
@@ -258,9 +258,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
   void _playYouTubeVideo(String videoId) async {
     final Uri url = Uri.parse('https://www.youtube.com/watch?v=$videoId');
-    // बिना LaunchMode के सीधा और सेफ तरीका जो कभी फेल नहीं होगा
     if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.platformDefault);
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -400,7 +399,6 @@ class AIChatScreen extends StatelessWidget {
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-بس 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
