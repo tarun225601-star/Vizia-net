@@ -1,5 +1,5 @@
-name: vizia_net
-description: "A decentralized high-speed content and streaming network app."
+name: skillsetu_ai
+description: A new Flutter project for AI skill learning.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.6
+  youtube_player_flutter: ^8.1.2
 
 dev_dependencies:
   flutter_test:
