@@ -76,6 +76,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
 
+  // 100% वर्किंग और ओपन एम्बेड वीडियो आईडीज़ (Flutter & Tech Tutorials)
   final List<Map<String, dynamic>> allCourses = [
     {
       'title': 'AI Video Editing Mastery',
@@ -84,9 +85,9 @@ class _HomeScreenState extends State<HomeScreen> {
       'rating': '4.8',
       'image': 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=800',
       'chapterList': [
-        {'name': 'Introduction to AI Tools', 'duration': '10 mins', 'videoId': 'kJQP7kiw5Fk'},
-        {'name': 'Auto-Caption & Cuts', 'duration': '15 mins', 'videoId': '3JZ_D3ELwOQ'},
-        {'name': 'Cinematic Color Grading', 'duration': '20 mins', 'videoId': 'jfKfPfyJRdk'},
+        {'name': 'Introduction to AI Tools', 'duration': '10 mins', 'videoId': 'pTB0EiLXUC8'},
+        {'name': 'Auto-Caption & Cuts', 'duration': '15 mins', 'videoId': 'GLoMzqmdXw0'},
+        {'name': 'Cinematic Color Grading', 'duration': '20 mins', 'videoId': '15p_qEwzPpk'},
       ]
     },
     {
@@ -96,9 +97,9 @@ class _HomeScreenState extends State<HomeScreen> {
       'rating': '4.9',
       'image': 'https://images.unsplash.com/photo-1677442136019-21780efad99a?w=800',
       'chapterList': [
-        {'name': 'What is Prompt Engineering?', 'duration': '08 mins', 'videoId': 'bSbV7ic9ACA'},
-        {'name': 'Advanced Role-playing Prompts', 'duration': '12 mins', 'videoId': '2ClgHw6cTqQ'},
-        {'name': 'Building AI Workflows', 'duration': '25 mins', 'videoId': 'L_LUpnjgPso'},
+        {'name': 'What is Prompt Engineering?', 'duration': '08 mins', 'videoId': '2ClgHw6cTqQ'},
+        {'name': 'Advanced Role-playing Prompts', 'duration': '12 mins', 'videoId': 'bSbV7ic9ACA'},
+        {'name': 'Building AI Workflows', 'duration': '25 mins', 'videoId': 'pTB0EiLXUC8'},
       ]
     },
   ];
@@ -252,14 +253,17 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   void initState() {
     super.initState();
     final chapters = widget.courseData['chapterList'] as List;
-    final String initialVideoId = chapters.isNotEmpty ? chapters[0]['videoId'] : 'kJQP7kiw5Fk';
+    final String initialVideoId = chapters.isNotEmpty ? chapters[0]['videoId'] : 'pTB0EiLXUC8';
     currentVideoTitle = chapters.isNotEmpty ? chapters[0]['name'] : 'Introduction';
 
     _controller = YoutubePlayerController(
       initialVideoId: initialVideoId,
       flags: const YoutubePlayerFlags(
-        autoPlay: true,
+        autoPlay: false,
         mute: false,
+        isLive: false,
+        forceHD: false,
+        enableCaption: true,
       ),
     );
   }
