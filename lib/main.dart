@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(const SkillSetuApp());
@@ -76,7 +76,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
 
-  // 100% वर्किंग और ओपन एम्बेड वीडियो आईडीज़ (Flutter & Tech Tutorials)
   final List<Map<String, dynamic>> allCourses = [
     {
       'title': 'AI Video Editing Mastery',
@@ -246,101 +245,129 @@ class CourseDetailScreen extends StatefulWidget {
 }
 
 class _CourseDetailScreenState extends State<CourseDetailScreen> {
-  late YoutubePlayerController _controller;
+  String currentVideoId = '';
   String currentVideoTitle = '';
 
   @override
   void initState() {
     super.initState();
     final chapters = widget.courseData['chapterList'] as List;
-    final String initialVideoId = chapters.isNotEmpty ? chapters[0]['videoId'] : 'pTB0EiLXUC8';
+    currentVideoId = chapters.isNotEmpty ? chapters[0]['videoId'] : 'pTB0EiLXUC8';
     currentVideoTitle = chapters.isNotEmpty ? chapters[0]['name'] : 'Introduction';
-
-    _controller = YoutubePlayerController(
-      initialVideoId: initialVideoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: false,
-        mute: false,
-        isLive: false,
-        forceHD: false,
-        enableCaption: true,
-      ),
-    );
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _loadNewVideo(String videoId, String title) {
-    setState(() {
-      currentVideoTitle = title;
-      _controller.load(videoId);
-    });
+  void _playYouTubeVideo(String videoId) async {
+    final Uri url = Uri.parse('https://www.youtube.com/watch?v=$videoId');
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        debugPrint('Could not launch $url');
+      }
+    } catch (e) {
+      debugPrint('Error launching video: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final List chapters = widget.courseData['chapterList'] ?? [];
 
-    return YoutubePlayerBuilder(
-      player: YoutubePlayer(
-        controller: _controller,
-        showVideoProgressIndicator: true,
-        progressIndicatorColor: Colors.amberAccent,
-        progressColors: const ProgressBarColors(
-          playedColor: Colors.amberAccent,
-          handleColor: Colors.white,
-        ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.courseData['title'], style: const TextStyle(fontSize: 15)),
+        backgroundColor: const Color(0xFF1E1E1E),
       ),
-      builder: (context, player) {
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(widget.courseData['title'], style: const TextStyle(fontSize: 15)),
-            backgroundColor: const Color(0xFF1E1E1E),
-          ),
-          body: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              player,
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Text(
-                  'Now Playing: $currentVideoTitle',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.amberAccent),
-                ),
-              ),
-              const Divider(color: Colors.white24, height: 1),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                child: Text('Course Lessons', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: chapters.length,
-                  itemBuilder: (context, index) {
-                    final chapter = chapters[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.deepPurple.withOpacity(0.4),
-                        child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // सुंदर थंबनेल प्लेयर कार्ड जिस पर क्लिक करते ही वीडियो ऐप में चालू होगी
+          GestureDetector(
+            onTap: () => _playYouTubeVideo(currentVideoId),
+            child: Container(
+              height: 210,
+              width: double.infinity,
+              color: Colors.black,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    'https://img.youtube.com/vi/$currentVideoId/hqdefault.jpg',
+                    fit: BoxFit.cover,
+                  ),
+                  Container(
+                    color: Colors.black.withOpacity(0.4),
+                  ),
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
                       ),
-                      title: Text(chapter['name'], style: const TextStyle(color: Colors.white, fontSize: 13)),
-                      subtitle: Text(chapter['duration'], style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                      trailing: const Icon(Icons.play_circle_fill, color: Colors.amberAccent),
-                      onTap: () {
-                        _loadNewVideo(chapter['videoId'], chapter['name']);
-                      },
-                    );
-                  },
-                ),
+                      child: const Icon(
+                        Icons.play_arrow,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 12,
+                    left: 12,
+                    right: 12,
+                    child: Text(
+                      'Tap to Play: $currentVideoTitle',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        backgroundColor: Colors.black54,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        );
-      },
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Text(
+              'Now Playing: $currentVideoTitle',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.amberAccent),
+            ),
+          ),
+          const Divider(color: Colors.white24, height: 1),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+            child: Text('Course Lessons', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: chapters.length,
+              itemBuilder: (context, index) {
+                final chapter = chapters[index];
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.deepPurple.withOpacity(0.4),
+                    child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  ),
+                  title: Text(chapter['name'], style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  subtitle: Text(chapter['duration'], style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                  trailing: const Icon(Icons.play_circle_fill, color: Colors.amberAccent),
+                  onTap: () {
+                    setState(() {
+                      currentVideoId = chapter['videoId'];
+                      currentVideoTitle = chapter['name'];
+                    });
+                    _playYouTubeVideo(currentVideoId);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
