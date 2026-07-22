@@ -54,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // --- WORKER NODE BACKGROUND SERVER ---
   Future<void> _startWorkerServer() async {
     try {
+      if (_workerServer != null) return;
       _workerServer = await HttpServer.bind(InternetAddress.anyIPv4, workerPort);
       _workerServer!.listen((HttpRequest request) async {
         if (request.uri.path == '/request_chunk') {
@@ -88,14 +89,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (value) {
       await _startWorkerServer();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Worker Node Active: Ready to serve peers')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Worker Node Active: Ready to serve peers')),
+        );
+      }
     } else {
       await _stopWorkerServer();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Worker Node Stopped')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Worker Node Stopped')),
+        );
+      }
     }
   }
 
@@ -122,9 +127,17 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // --- NATIVE DOWNLOAD (No External Package Needed) ---
+  // --- NATIVE DOWNLOAD (Directly checks isWorkerMode) ---
   Future<void> startPeerDownload(String movieName, String peerUrl) async {
     if (activeDownloadingMovie != null) return;
+
+    // Fixed check: Ensures download proceeds smoothly when worker mode is active
+    if (!isWorkerMode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Turn on Worker Mode first!')),
+      );
+      return;
+    }
 
     setState(() {
       activeDownloadingMovie = movieName;
@@ -174,8 +187,8 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       } else {
         setState(() {
-              activeDownloadingMovie = null;
-              downloadStatusText = "Worker Busy";
+          activeDownloadingMovie = null;
+          downloadStatusText = "Worker Busy";
         });
       }
     } catch (e) {
@@ -184,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
         downloadStatusText = "Worker Offline";
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: Turn on Worker Mode first!')),
+        SnackBar(content: Text('Download Error: $e')),
       );
     }
   }
