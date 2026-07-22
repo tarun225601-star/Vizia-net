@@ -1,8 +1,7 @@
-             import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:io';
-import 'package:http/http.dart' as http;
-import 'package:permission_handler/permission_handler.dart';
+import 'dart:convert';
 
 void main() {
   runApp(const ViziaNetworkApp());
@@ -47,20 +46,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final int workerPort = 8080;
 
   @override
-  void initState() {
-    super.initState();
-    _requestPermissions();
-  }
-
-  @override
   void dispose() {
     _stopWorkerServer();
     super.dispose();
-  }
-
-  Future<void> _requestPermissions() async {
-    await Permission.storage.request();
-    await Permission.manageExternalStorage.request();
   }
 
   // --- WORKER NODE BACKGROUND SERVER ---
@@ -114,9 +102,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void performSearch(String query) {
     if (query.isEmpty) return;
 
-    setState({
-      isSearching = true,
-    } as VoidCallback);
+    setState(() {
+      isSearching = true;
+    });
 
     Timer(const Duration(milliseconds: 300), () {
       setState(() {
@@ -134,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // --- USER DOWNLOAD & PERMANENT STORAGE ---
+  // --- NATIVE DOWNLOAD (No External Package Needed) ---
   Future<void> startPeerDownload(String movieName, String peerUrl) async {
     if (activeDownloadingMovie != null) return;
 
@@ -145,12 +133,16 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final response = await http.get(Uri.parse(peerUrl)).timeout(const Duration(seconds: 4));
+      final httpClient = HttpClient();
+      final request = await httpClient.getUrl(Uri.parse(peerUrl));
+      final response = await request.close().timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         setState(() {
           downloadStatusText = "Downloading from Worker...";
         });
+
+        final bytes = await consolidateHttpClientResponseBytes(response);
 
         Directory directory;
         if (Platform.isAndroid) {
@@ -164,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         final file = File('${directory.path}/$movieName.mp4');
-        await file.writeAsBytes(response.bodyBytes);
+        await file.writeAsBytes(bytes);
 
         setState(() {
           downloadProgress = 1.0;
@@ -182,8 +174,8 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       } else {
         setState(() {
-          activeDownloadingMovie = null;
-          downloadStatusText = "Worker Busy";
+              activeDownloadingMovie = null;
+              downloadStatusText = "Worker Busy";
         });
       }
     } catch (e) {
@@ -195,6 +187,18 @@ class _HomeScreenState extends State<HomeScreen> {
         const SnackBar(content: Text('Error: Turn on Worker Mode first!')),
       );
     }
+  }
+
+  Future<List<int>> consolidateHttpClientResponseBytes(HttpClientResponse response) {
+    final completer = Completer<List<int>>();
+    final contents = <int>[];
+    response.listen(
+      (contents.addAll),
+      onDone: () => completer.complete(contents),
+      onError: completer.completeError,
+      cancelOnError: true,
+    );
+    return completer.future;
   }
 
   @override
