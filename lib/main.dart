@@ -1,10 +1,12 @@
-import 'package:flutter/material.dart';
+             import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 
-void main() => runApp(const ViziaNetworkApp());
+void main() {
+  runApp(const ViziaNetworkApp());
+}
 
 class ViziaNetworkApp extends StatelessWidget {
   const ViziaNetworkApp({super.key});
@@ -47,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _requestStoragePermissions();
+    _requestPermissions();
   }
 
   @override
@@ -56,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  Future<void> _requestStoragePermissions() async {
+  Future<void> _requestPermissions() async {
     await Permission.storage.request();
     await Permission.manageExternalStorage.request();
   }
@@ -71,9 +73,9 @@ class _HomeScreenState extends State<HomeScreen> {
           request.response.headers.contentType = ContentType.binary;
           request.response.statusCode = HttpStatus.ok;
 
-          for (int i = 1; i <= 15; i++) {
-            await Future.delayed(const Duration(milliseconds: 150));
-            request.response.add(utf8.encode('P2P Data Block $i for $movieName\n'));
+          for (int i = 1; i <= 10; i++) {
+            await Future.delayed(const Duration(milliseconds: 100));
+            request.response.add(utf8.encode('Data Chunk $i for $movieName\n'));
           }
           await request.response.close();
         } else {
@@ -82,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       });
     } catch (e) {
-      debugPrint('Worker Server Error: $e');
+      debugPrint('Server error: $e');
     }
   }
 
@@ -99,12 +101,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (value) {
       await _startWorkerServer();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Worker Mode Activated: Ready to relay via local network')),
+        const SnackBar(content: Text('Worker Node Active: Ready to serve peers')),
       );
     } else {
       await _stopWorkerServer();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Worker Mode Deactivated')),
+        const SnackBar(content: Text('Worker Node Stopped')),
       );
     }
   }
@@ -112,53 +114,44 @@ class _HomeScreenState extends State<HomeScreen> {
   void performSearch(String query) {
     if (query.isEmpty) return;
 
-    setState(() {
-      isSearching = true;
-    });
+    setState({
+      isSearching = true,
+    } as VoidCallback);
 
-    Timer(const Duration(milliseconds: 400), () {
+    Timer(const Duration(milliseconds: 300), () {
       setState(() {
         isSearching = false;
         searchResults = [
           {
-            'title': '$query - Local Mesh HD', 
-            'genre': 'Direct P2P Stream', 
-            'size': '2.4 GB',
+            'title': '$query - HD Local Peer', 
+            'genre': 'P2P Mesh', 
+            'size': '1.5 GB',
             'peerUrl': 'http://127.0.0.1:$workerPort/request_chunk?movie=$query',
             'image': 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=150'
-          },
-          {
-            'title': '$query (Remastered 4K)', 
-            'genre': 'Cluster Node 02', 
-            'size': '4.1 GB',
-            'peerUrl': 'http://127.0.0.1:$workerPort/request_chunk?movie=$query',
-            'image': 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=150'
           },
         ];
       });
     });
   }
 
-  // --- STRICT LOCAL PEER DOWNLOAD & PERMANENT STORAGE ---
+  // --- USER DOWNLOAD & PERMANENT STORAGE ---
   Future<void> startPeerDownload(String movieName, String peerUrl) async {
     if (activeDownloadingMovie != null) return;
 
     setState(() {
       activeDownloadingMovie = movieName;
       downloadProgress = 0.0;
-      downloadStatusText = "Connecting to Worker Node...";
+      downloadStatusText = "Connecting to Worker...";
     });
 
     try {
-      final uri = Uri.parse(peerUrl);
-      final streamedResponse = await http.get(uri).timeout(const Duration(seconds: 4));
+      final response = await http.get(Uri.parse(peerUrl)).timeout(const Duration(seconds: 4));
 
-      if (streamedResponse.statusCode == 200) {
+      if (response.statusCode == 200) {
         setState(() {
-          downloadStatusText = "Receiving from Worker...";
+          downloadStatusText = "Downloading from Worker...";
         });
 
-        // Direct Public Download Directory path for Android/Desktop
         Directory directory;
         if (Platform.isAndroid) {
           directory = Directory('/storage/emulated/0/Download');
@@ -170,18 +163,16 @@ class _HomeScreenState extends State<HomeScreen> {
           await directory.create(recursive: true);
         }
 
-        final filePath = '${directory.path}/$movieName.mp4';
-        final file = File(filePath);
-        
-        await file.writeAsBytes(streamedResponse.bodyBytes);
+        final file = File('${directory.path}/$movieName.mp4');
+        await file.writeAsBytes(response.bodyBytes);
 
         setState(() {
           downloadProgress = 1.0;
-          downloadStatusText = "Saved Permanently in Downloads!";
-          walletBalance -= 10; 
+          downloadStatusText = "Saved in Downloads!";
+          walletBalance -= 10;
         });
 
-        Future.delayed(const Duration(seconds: 2), () {
+        Timer(const Duration(seconds: 2), () {
           if (mounted) {
             setState(() {
               activeDownloadingMovie = null;
@@ -192,16 +183,16 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         setState(() {
           activeDownloadingMovie = null;
-          downloadStatusText = "Worker Node Offline";
+          downloadStatusText = "Worker Busy";
         });
       }
     } catch (e) {
       setState(() {
         activeDownloadingMovie = null;
-        downloadStatusText = "No Worker Found on Wi-Fi";
+        downloadStatusText = "Worker Offline";
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: Turn on Worker Mode first! ($e)')),
+        const SnackBar(content: Text('Error: Turn on Worker Mode first!')),
       );
     }
   }
@@ -210,11 +201,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vizia Net Hub (P2P Final)'),
+        title: const Text('Vizia Net Hub'),
         actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Center(
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
                 '₹$walletBalance',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.greenAccent),
@@ -226,11 +217,10 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             TextField(
               decoration: InputDecoration(
-                hintText: 'Search media index...',
+                hintText: 'Search media...',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white10,
@@ -239,10 +229,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              onSubmitted: (value) => performSearch(value),
+              onSubmitted: performSearch,
             ),
             const SizedBox(height: 10),
-
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -254,17 +243,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    isWorkerMode 
-                        ? 'Worker Mode: ACTIVE (Port $workerPort)\nReady to serve local peer requests.' 
-                        : 'Worker Mode: OFF\nEnable worker mode below to bridge files.', 
-                    style: TextStyle(fontSize: 11, color: isWorkerMode ? Colors.greenAccent : Colors.blueAccent, fontWeight: FontWeight.bold)
+                    isWorkerMode ? 'Worker Node: ACTIVE (Port $workerPort)' : 'Worker Node: OFF',
+                    style: TextStyle(fontSize: 12, color: isWorkerMode ? Colors.greenAccent : Colors.blueAccent, fontWeight: FontWeight.bold),
                   ),
                   Icon(isWorkerMode ? Icons.cell_tower : Icons.wifi_off, color: isWorkerMode ? Colors.greenAccent : Colors.blueAccent),
                 ],
               ),
             ),
             const SizedBox(height: 10),
-
             Expanded(
               child: isSearching
                   ? const Center(child: CircularProgressIndicator())
@@ -273,97 +259,31 @@ class _HomeScreenState extends State<HomeScreen> {
                           itemCount: searchResults.length,
                           itemBuilder: (context, index) {
                             final item = searchResults[index];
-                            final movieTitle = item['title']!;
-                            final posterUrl = item['image']!;
+                            final title = item['title']!;
                             final peerUrl = item['peerUrl']!;
-                            final isThisDownloading = activeDownloadingMovie == movieTitle;
-                            final isCompleted = isThisDownloading && downloadProgress >= 1.0;
+                            final isDownloading = activeDownloadingMovie == title;
 
                             return Card(
                               color: Colors.white10,
-                              margin: const EdgeInsets.only(bottom: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                leading: ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Image.network(
-                                    posterUrl,
-                                    width: 45,
-                                    height: 55,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.movie, size: 40, color: Colors.blueAccent),
-                                  ),
-                                ),
-                                title: Text(movieTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                subtitle: Text(
-                                  isThisDownloading ? downloadStatusText : '${item['genre']} | ${item['size']}', 
-                                  style: TextStyle(fontSize: 10, color: isThisDownloading ? Colors.greenAccent : Colors.white54)
-                                ),
-                                trailing: SizedBox(
-                                  height: 32,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: isCompleted ? Colors.green : Colors.blueAccent,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                                    ),
-                                    onPressed: activeDownloadingMovie != null 
-                                        ? null 
-                                        : () => startPeerDownload(movieTitle, peerUrl),
-                                    child: isThisDownloading
-                                        ? Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              SizedBox(
-                                                width: 12,
-                                                height: 12,
-                                                child: CircularProgressIndicator(
-                                                  value: isCompleted ? null : downloadProgress,
-                                                  strokeWidth: 2,
-                                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                isCompleted ? 'Done' : '${(downloadProgress * 100).toInt()}%',
-                                                style: const TextStyle(fontSize: 10),
-                                              ),
-                                            ],
-                                          )
-                                        : const Text('Download', style: TextStyle(fontSize: 10)),
-                                  ),
+                                title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                subtitle: Text(isDownloading ? downloadStatusText : '${item['genre']} | ${item['size']}', style: const TextStyle(fontSize: 11)),
+                                trailing: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+                                  onPressed: activeDownloadingMovie != null ? null : () => startPeerDownload(title, peerUrl),
+                                  child: Text(isDownloading ? 'Downloading...' : 'Download', style: const TextStyle(fontSize: 11)),
                                 ),
                               ),
                             );
                           },
                         )
-                      : Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.hub, size: 48, color: Colors.white24),
-                              SizedBox(height: 8),
-                              Text(
-                                'Search media above.\nFiles will download via local worker node to device storage.',
-                                style: TextStyle(color: Colors.white54, fontSize: 12),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        ),
+                      : const Center(child: Text('Search to view P2P media nodes', style: TextStyle(color: Colors.white54))),
             ),
-
-            const SizedBox(height: 10),
-
             Card(
               color: Colors.white10,
-              margin: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               child: SwitchListTile(
                 dense: true,
-                title: const Text('Worker Mode (Local P2P Node)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                subtitle: const Text('Keep active to relay media chunks & earn', style: TextStyle(fontSize: 9, color: Colors.white54)),
+                title: const Text('Worker Mode Switch', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 value: isWorkerMode,
                 activeColor: Colors.greenAccent,
                 onChanged: toggleWorkerMode,
