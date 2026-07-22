@@ -98,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'rating': '4.9',
       'image': 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800',
       'chapterList': [
-        {'name': 'Science: Chemical Reactions & Equations', 'duration': '25 mins', 'videoId': '2Vv-BfVoq4g' = 'A3s9v6W5n1I'}, // Verified Indian Science Tutorial
+        {'name': 'Science: Chemical Reactions & Equations', 'duration': '25 mins', 'videoId': 'A3s9v6W5n1I'},
         {'name': 'Maths: Real Numbers (Class 10 CBSE)', 'duration': '30 mins', 'videoId': '1k8h7G6F540'},
         {'name': 'Social Science: Nationalism in India', 'duration': '22 mins', 'videoId': '9J8k7L6m540'},
         {'name': 'English: A Letter to God (First Flight)', 'duration': '18 mins', 'videoId': '4L3k2J1h090'},
@@ -422,7 +422,7 @@ class ProfileScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: const [
-            CircleAvatar(radius: 40, backgroundColor: Colors.deepPurple, child: Icon(Icons.admin_panel_settings, size: 40, color: Colors.white)),
+          CircleAvatar(radius: 40, backgroundColor: Colors.deepPurple, child: Icon(Icons.admin_panel_settings, size: 40, color: Colors.white)),
           SizedBox(height: 12),
           Center(child: Text('Tarun (EdTech Founder)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white))),
           SizedBox(height: 4),
