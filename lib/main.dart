@@ -382,7 +382,7 @@ class AIChatScreen extends StatelessWidget {
 }
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileSchema({super.key});
+  const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
