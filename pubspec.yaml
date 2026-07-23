@@ -1,7 +1,6 @@
-name: margtasni
-description: "A new Flutter application for Margtasni social and video platform."
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
-
+name: vizia_net
+description: "A new Flutter project."
+publish_to: 'none'
 version: 1.0.0+1
 
 environment:
@@ -10,7 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.6
+  image_picker: ^1.1.2
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:
@@ -19,13 +19,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
-  # If you add assets or fonts later, you can uncomment below:
-  # assets:
-  #   - assets/images/
-dependencies:
-  flutter:
-    sdk: flutter
-  image_picker: ^1.1.2
-  http: ^1.2.0
-  
