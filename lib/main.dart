@@ -155,34 +155,22 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                     minimumSize: const Size(double.infinity, 50),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: () {
-                    if (!otpSent) {
-                      if (_phoneController.text.length == 10) {
-                        setState(() {
-                          otpSent = true;
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('OTP sent successfully! Use 1234'), backgroundColor: Colors.indigo),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please enter a valid 10-digit mobile number'), backgroundColor: Colors.redAccent),
-                        );
-                      }
-                    } else {
-                      if (_otpController.text == '1234') {
-                        setState(() {
-                          isUserLoggedIn = true;
-                          loggedInMobile = _phoneController.text;
-                        });
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Invalid OTP! Please enter 1234'), backgroundColor: Colors.redAccent),
-                        );
-                      }
-                    }
-                  },
-                  child: Text(
+                       onPressed: () {
+      if (_phoneController.text.length == 10) {
+        setState(() {
+          isUserLoggedIn = true;
+          loggedInMobile = _phoneController.text;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid 10-digit mobile number'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    },
+    child: Text(
                     otpSent ? 'Verify & Login' : 'Get OTP',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
