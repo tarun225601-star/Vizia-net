@@ -35,13 +35,13 @@ List<Map<String, dynamic>> globalFeedItems = [
   {
     'username': 'Tarun Business',
     'handle': '@tarun_vizia',
-    'caption': 'Margtasni पर अब रील्स और असली गाने प्ले भी होंगे! 🚀🔥',
+    'caption': 'Margtasni पर अब गाने 100% बजेंगे! 🚀🔥',
     'mediaPath': 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800',
     'songName': 'Radhe Radhe - Live Track',
     'previewUrl': '',
     'likes': 520,
     'isLiked': false,
-    'comments': ['भाई अब आया असली मज़ा!'],
+    'comments': ['भाई अब एकदम मस्त चल रहा है!'],
     'isLocalFile': false,
   },
 ];
@@ -98,6 +98,54 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
+  VideoPlayerController? _audioPlayerController;
+  String? _currentlyPlayingUrl;
+  bool _isPlayingAudio = false;
+
+  @override
+  void dispose() {
+    _audioPlayerController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggleAudioPlay(String url) async {
+    if (url.isEmpty) return;
+    try {
+      if (_isPlayingAudio && _currentlyPlayingUrl == url) {
+        await _audioPlayerController?.pause();
+        setState(() {
+          _isPlayingAudio = false;
+        });
+      } else {
+        if (_audioPlayerController != null) {
+          await _audioPlayerController!.dispose();
+        }
+        _audioPlayerController = VideoPlayerController.networkUrl(Uri.parse(url));
+        await _audioPlayerController!.initialize();
+        await _audioPlayerController!.play();
+        _audioPlayerController!.setLooping(false);
+        
+        setState(() {
+          _currentlyPlayingUrl = url;
+          _isPlayingAudio = true;
+        });
+
+        _audioPlayerController!.addListener(() {
+          if (_audioPlayerController!.value.position >= _audioPlayerController!.value.duration) {
+            setState(() {
+              _isPlayingAudio = false;
+              _currentlyPlayingUrl = null;
+            });
+          }
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Audio play error: $e')),
+      );
+    }
+  }
+
   void _openComments(Map<String, dynamic> post) {
     final TextEditingController commentController = TextEditingController();
 
@@ -189,6 +237,8 @@ class _FeedScreenState extends State<FeedScreen> {
         itemBuilder: (context, index) {
           final post = globalFeedItems[index];
           bool isLocal = post['isLocalFile'];
+          String songUrl = post['previewUrl'] ?? '';
+          bool isThisPlaying = _isPlayingAudio && _currentlyPlayingUrl == songUrl;
 
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -207,12 +257,41 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
                 if (post['songName'] != 'No Music Selected')
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
                     child: Row(
                       children: [
-                        const Icon(Icons.audiotrack, size: 12, color: Colors.amberAccent),
-                        const SizedBox(width: 4),
-                        Text(post['songName'], style: const TextStyle(color: Colors.amberAccent, fontSize: 10, fontStyle: FontStyle.italic)),
+                        GestureDetector(
+                          onTap: () => _toggleAudioPlay(songUrl),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.deepPurpleAccent,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isThisPlaying ? Icons.pause : Icons.play_arrow,
+                                  size: 16,
+                                  color: Colors.amberAccent,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isThisPlaying ? 'Playing...' : 'Play Song',
+                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            post['songName'],
+                            style: const TextStyle(color: Colors.amberAccent, fontSize: 10, fontStyle: FontStyle.italic),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -364,7 +443,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // अब यह असली गाने का नाम और प्ले होने वाला ऑडियो लिंक (previewUrl) दोनों रिटर्न करेगा
   Future<Map<String, dynamic>?> _showRealOnlineMusicSearchDialog(BuildContext context) async {
     TextEditingController searchController = TextEditingController();
     List<dynamic> apiSearchResults = [];
@@ -437,7 +515,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                       final song = apiSearchResults[index];
                                       final String trackName = song['trackName'] ?? 'Unknown Track';
                                       final String artistName = song['artistName'] ?? 'Unknown Artist';
-                                      final String previewUrl = song['previewUrl'] ?? ''; // असली प्लेबल गाना लिंक!
+                                      final String previewUrl = song['previewUrl'] ?? '';
                                       
                                       return ListTile(
                                         leading: const Icon(Icons.play_circle_fill, color: Colors.amberAccent, size: 30),
