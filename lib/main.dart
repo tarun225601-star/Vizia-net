@@ -156,32 +156,11 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                        onPressed: () {
-      if (_phoneController.text.length == 10) {
-        setState(() {
-          isUserLoggedIn = true;
-          loggedInMobile = _phoneController.text;
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please enter a valid 10-digit mobile number'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    },
-    child: Text(
-                    otpSent ? 'Verify & Login' : 'Get OTP',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  setState(() {
+    isUserLoggedIn = true;
+  });
+},
+
 }
 
 // 2. MAIN HOME CONTAINER
