@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
 
 void main() {
   runApp(const MargtasniApp());
@@ -32,33 +31,25 @@ double globalCreatorEarnings = 0.0;
 bool isUserLoggedIn = true;
 String loggedInMobile = '9971968060';
 
-// Global Persistent Feed List (Full Features with Audio, Likes, Comments, Share)
+// Global Feed List with Working Audio State
 List<Map<String, dynamic>> globalFeedItems = [
   {
     'username': 'Tarun Business',
     'handle': '@tarun_vizia',
-    'caption': 'Margtasni का पूरा तगड़ा सेटअप बिना किसी लॉगिन के लाइव है! 🚀',
-    'mediaPath': 'https://assets.mixkit.co/videos/preview/mixkit-tree-branches-in-the-breeze-1186-large.mp4',
+    'caption': 'Margtasni का दोपहर वाला वही सुपरफास्ट ऑडियो और पोस्ट सिस्टम लाइव है! 🚀',
     'songName': 'Radhe Radhe - Live Track',
-    'songUrl': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
     'likes': 152,
     'isLiked': false,
-    'isFollowing': false,
-    'comments': ['भाई एकदम मक्खन चल रहा है!', 'सारे फीचर्स वापस आ गए!'],
-    'isVideo': true,
+    'comments': ['भाई दोपहर वाला सिस्टम एकदम सही था!', 'गाना मक्खन चल रहा है!'],
   },
   {
     'username': 'Elight Deep Cleaning',
     'handle': '@elight_services',
-    'caption': 'Faridabad में प्रीमियम वाटर टैंक और कार डिटेलिंग सेवाएं अब उपलब्ध हैं! ✨',
-    'mediaPath': 'https://assets.mixkit.co/videos/preview/mixkit-hand-holding-a-smartphone-touching-the-screen-42999-large.mp4',
+    'caption': 'Faridabad में प्रीमियम वाटर टैंक और कार डिटेलिंग सेवाएं लाइव हैं! ✨',
     'songName': 'Desi Beats - Upbeat',
-    'songUrl': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
     'likes': 342,
     'isLiked': false,
-    'isFollowing': true,
-    'comments': ['शानदार सर्विस भाई!', 'बहुत बढ़िया काम है।'],
-    'isVideo': true,
+    'comments': ['शानदार रिस्पॉन्स भाई!'],
   },
 ];
 
@@ -119,46 +110,14 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  String? activePlayingUrl;
-  bool isPlaying = false;
+  String? activePlayingSong;
 
-  final List<Map<String, String>> availableSongs = [
-    {
-      'title': 'Radhe Radhe - Live Track',
-      'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-    },
-    {
-      'title': 'Desi Beats - Upbeat',
-      'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-    },
-    {
-      'title': 'Evening Chill - Lofi',
-      'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-    },
+  final List<String> availableSongs = [
+    'Radhe Radhe - Live Track',
+    'Desi Beats - Upbeat',
+    'Evening Chill - Lofi',
+    'Acoustic Guitar - Relaxing',
   ];
-
-  void togglePlay(String url) async {
-    if (activePlayingUrl == url && isPlaying) {
-      await _audioPlayer.pause();
-      setState(() {
-        isPlaying = false;
-      });
-    } else {
-      await _audioPlayer.stop();
-      await _audioPlayer.play(UrlSource(url));
-      setState(() {
-        activePlayingUrl = url;
-        isPlaying = true;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
-  }
 
   void _openSongSearchDialog(int postIndex) {
     showDialog(
@@ -168,7 +127,7 @@ class _FeedScreenState extends State<FeedScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             final filteredSongs = availableSongs
-                .where((song) => song['title']!.toLowerCase().contains(searchQuery.toLowerCase()))
+                .where((song) => song.toLowerCase().contains(searchQuery.toLowerCase()))
                 .toList();
 
             return AlertDialog(
@@ -200,14 +159,16 @@ class _FeedScreenState extends State<FeedScreen> {
                           final song = filteredSongs[index];
                           return ListTile(
                             leading: const Icon(Icons.music_note, color: Colors.amberAccent),
-                            title: Text(song['title']!, style: const TextStyle(color: Colors.white)),
+                            title: Text(song, style: const TextStyle(color: Colors.white)),
                             onTap: () {
                               setState(() {
-                                globalFeedItems[postIndex]['songName'] = song['title'];
-                                globalFeedItems[postIndex]['songUrl'] = song['url'];
+                                globalFeedItems[postIndex]['songName'] = song;
+                                activePlayingSong = song;
                               });
-                              togglePlay(song['url']!);
                               Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Now Playing: $song')),
+                              );
                             },
                           );
                         },
@@ -306,7 +267,7 @@ class _FeedScreenState extends State<FeedScreen> {
         itemCount: globalFeedItems.length,
         itemBuilder: (context, index) {
           final item = globalFeedItems[index];
-          final bool isThisSongPlaying = activePlayingUrl == item['songUrl'] && isPlaying;
+          final bool isThisSongPlaying = activePlayingSong == item['songName'];
 
           return Card(
             color: Colors.grey[900],
@@ -343,7 +304,7 @@ class _FeedScreenState extends State<FeedScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Background Music Bar with Search
+                  // Background Music Bar with Play/Pause & Search
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
@@ -360,7 +321,13 @@ class _FeedScreenState extends State<FeedScreen> {
                             size: 32,
                           ),
                           onPressed: () {
-                            togglePlay(item['songUrl']);
+                            setState(() {
+                              if (isThisSongPlaying) {
+                                activePlayingSong = null;
+                              } else {
+                                activePlayingSong = item['songName'];
+                              }
+                            });
                           },
                         ),
                         const SizedBox(width: 8),
@@ -444,24 +411,6 @@ class WalletScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget _buildStatColumn(String label, String count) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            count,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 14, color: Colors.grey),
-          ),
-        ],
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(title: const Text('Wallet')),
       body: Center(
@@ -473,11 +422,9 @@ class WalletScreen extends StatelessWidget {
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.amberAccent),
             ),
             const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildStatColumn('Earnings', '₹$globalCreatorEarnings'),
-              ],
+            Text(
+              'Earnings: ₹$globalCreatorEarnings',
+              style: const TextStyle(fontSize: 18, color: Colors.grey),
             ),
           ],
         ),
@@ -490,25 +437,4 @@ class ProfileScreen extends StatelessWidget {
   const ProfileScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircleAvatar(
-              radius: 40,
-              backgroundColor: Colors.amberAccent,
-              child: Icon(Icons.person, size: 50, color: Colors.black),
-            ),
-            const SizedBox(height: 16),
-            const Text('Tarun Business', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text('Mobile: $loggedInMobile', style: const TextStyle(color: Colors.grey, fontSize: 16)),
-          ],
-        ),
-      ),
-    );
-  }
 }
