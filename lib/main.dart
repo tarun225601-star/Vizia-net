@@ -4,10 +4,28 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:video_player/video_player.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import 'package:video_player/video_player.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://tinnpdgnzteoltrysjax.supabase.co',
+    anonKey: 
+  );'sbp_0590a35d2a5553911c658c2f4aba9c18d9d9e003',
+
   runApp(const MargtasniApp());
 }
+
+
+  
+
 
 class MargtasniApp extends StatelessWidget {
   const MargtasniApp({super.key});
