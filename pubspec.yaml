@@ -1,5 +1,5 @@
 name: margtasni
-description: A new Flutter project.
+description: "A new Flutter project."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,7 +9,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  supabase_flutter: ^2.5.0
+  image_picker: ^1.0.7
+  video_player: ^2.8.2
+
+dev_dependencies:
+  flutter_lints: ^3.0.0
 
 flutter:
   uses-material-design: true
