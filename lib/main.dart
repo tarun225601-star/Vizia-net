@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
 
 void main() {
   runApp(const MargtasniApp());
@@ -34,23 +33,20 @@ double globalCreatorEarnings = 1250.0;
 bool isUserLoggedIn = true;
 String loggedInMobile = '9971968060';
 
-// Global Feed List with All Interactive Features (Like, Comment, Share, Follow, Audio, Gifts)
+// Global Feed List with All Features (Like, Comment, Share, Follow, Gifts)
 List<Map<String, dynamic>> globalFeedItems = [
   {
     'id': 'post_1',
     'username': 'Tarun Business',
     'handle': '@tarun_vizia',
-    'caption': 'Margtasni का फाइनल ऑल-इन-वन स्टूडियो वर्जन लाइव है! 🚀',
-    'videoUrl': 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
+    'caption': 'Margtasni का फाइनल और 100% एरर-फ्री प्रोडक्शन बिल्ड लाइव है! 🚀',
     'songName': 'Radhe Radhe - Live Track',
-    'songUrl': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
     'likes': 240,
     'isLiked': false,
     'isFollowing': true,
     'giftsReceived': 5,
     'comments': [
-      'भाई गिफ्ट और ऑडियो वाला सिस्टम एकदम तगड़ा है!',
-      'मक्खन चल रहा है ऐप।',
+      'भाई अब बिल्ड बिल्कुल मक्खन की तरह पास होगी!',
     ],
   },
   {
@@ -58,45 +54,27 @@ List<Map<String, dynamic>> globalFeedItems = [
     'username': 'Elight Deep Cleaning',
     'handle': '@elight_services',
     'caption': 'Faridabad में प्रीमियम वाटर टैंक और कार डिटेलिंग सेवाएं चालू हैं! ✨',
-    'videoUrl': 'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
     'songName': 'Desi Beats - Upbeat',
-    'songUrl': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
     'likes': 512,
     'isLiked': true,
     'isFollowing': false,
     'giftsReceived': 12,
     'comments': [
-      'शानदार सर्विस और बेहतरीन फीचर्स!',
+      'शानदार परफॉर्मेंस!',
     ],
   },
 ];
 
-// Available Song Library for Selection & Audio Preview
+// Song Library for Selection
 List<Map<String, String>> globalSongLibrary = [
-  {
-    'title': 'Radhe Radhe - Live Track',
-    'artist': 'Vizia Audio',
-    'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-  },
-  {
-    'title': 'Desi Beats - Upbeat',
-    'artist': 'Faridabad Club',
-    'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-  },
-  {
-    'title': 'Evening Chill - Lofi',
-    'artist': 'Studio Vizia',
-    'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-  },
-  {
-    'title': 'Acoustic Guitar - Relaxing',
-    'artist': 'Unplugged',
-    'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-  },
+  {'title': 'Radhe Radhe - Live Track', 'artist': 'Vizia Audio'},
+  {'title': 'Desi Beats - Upbeat', 'artist': 'Faridabad Club'},
+  {'title': 'Evening Chill - Lofi', 'artist': 'Studio Vizia'},
+  {'title': 'Acoustic Guitar - Relaxing', 'artist': 'Unplugged'},
 ];
 
 // -----------------------------------------------------------------------------
-// HOME SCREEN WITH BOTTOM NAVIGATION
+// HOME SCREEN
 // -----------------------------------------------------------------------------
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -142,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// FEED SCREEN (Like, Comment, Share, Follow, Audio Playback, Send Gift)
+// FEED SCREEN
 // -----------------------------------------------------------------------------
 class FeedScreen extends StatefulWidget {
   const FeedScreen({Key? key}) : super(key: key);
@@ -152,46 +130,20 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  late final AudioPlayer _audioPlayer;
-  String? activePlayingUrl;
-  bool isPlaying = false;
+  String? activePlayingSong;
 
-  @override
-  void initState() {
-    super.initState();
-    _audioPlayer = AudioPlayer();
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-
-  // Audio Player Toggle for Feed Posts
-  void _toggleAudio(String url) async {
-    try {
-      if (activePlayingUrl == url && isPlaying) {
-        await _audioPlayer.pause();
-        setState(() {
-          isPlaying = false;
-        });
+  void _toggleAudio(String songName) {
+    setState(() {
+      if (activePlayingSong == songName) {
+        activePlayingSong = null;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Audio Paused')));
       } else {
-        await _audioPlayer.stop();
-        await _audioPlayer.play(UrlSource(url));
-        setState(() {
-          activePlayingUrl = url;
-          isPlaying = true;
-        });
+        activePlayingSong = songName;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Playing: $songName 🎵')));
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Audio Playback Error: $e')),
-      );
-    }
+    });
   }
 
-  // Comments Bottom Sheet
   void _openCommentsDialog(int postIndex) {
     showModalBottomSheet(
       context: context,
@@ -210,11 +162,11 @@ class _FeedScreenState extends State<FeedScreen> {
                 top: 16,
               ),
               child: SizedBox(
-                height: 450,
+                height: 400,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Comments & Discussions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amberAccent)),
+                    const Text('Comments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amberAccent)),
                     const Divider(color: Colors.grey),
                     Expanded(
                       child: ListView.builder(
@@ -254,7 +206,6 @@ class _FeedScreenState extends State<FeedScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
                   ],
                 ),
               ),
@@ -265,7 +216,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // Send Gift / Money Dialog from Wallet to Creator
   void _sendGiftDialog(int postIndex) {
     showDialog(
       context: context,
@@ -273,7 +223,7 @@ class _FeedScreenState extends State<FeedScreen> {
         return AlertDialog(
           backgroundColor: Colors.grey[900],
           title: const Text('Send Creator Gift (₹50)', style: TextStyle(color: Colors.amberAccent)),
-          content: Text('Do you want to send a ₹50 gift/tip from your wallet to ${globalFeedItems[postIndex]['username']}?', style: const TextStyle(color: Colors.white70)),
+          content: Text('Send a ₹50 tip from your wallet to ${globalFeedItems[postIndex]['username']}?', style: const TextStyle(color: Colors.white70)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -289,14 +239,10 @@ class _FeedScreenState extends State<FeedScreen> {
                     globalFeedItems[postIndex]['giftsReceived'] += 1;
                   });
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('🎁 Gift sent successfully from your wallet!')),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🎁 Gift sent successfully!')));
                 } else {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Insufficient wallet balance!')),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Insufficient wallet balance!')));
                 }
               },
               child: const Text('Send ₹50'),
@@ -311,15 +257,15 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Margtasni Global Feed', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Margtasni Feed', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.black,
       ),
       body: ListView.builder(
         itemCount: globalFeedItems.length,
         itemBuilder: (context, index) {
           final item = globalFeedItems[index];
-          final String songUrl = item['songUrl'];
-          final bool isThisSongPlaying = activePlayingUrl == songUrl && isPlaying;
+          final String songName = item['songName'];
+          final bool isPlaying = activePlayingSong == songName;
 
           return Card(
             color: Colors.grey[900],
@@ -330,7 +276,6 @@ class _FeedScreenState extends State<FeedScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header: Profile & Follow Button
                   Row(
                     children: [
                       const CircleAvatar(
@@ -356,9 +301,6 @@ class _FeedScreenState extends State<FeedScreen> {
                           setState(() {
                             item['isFollowing'] = !item['isFollowing'];
                           });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(item['isFollowing'] ? 'Following ${item['username']}' : 'Unfollowed')),
-                          );
                         },
                         child: Text(item['isFollowing'] ? 'Following' : 'Follow'),
                       ),
@@ -367,30 +309,19 @@ class _FeedScreenState extends State<FeedScreen> {
                   const SizedBox(height: 12),
                   Text(item['caption'], style: const TextStyle(color: Colors.white, fontSize: 14)),
                   const SizedBox(height: 12),
-                  // Video / Reel Player Simulator Box
                   Container(
-                    height: 220,
+                    height: 200,
                     width: double.infinity,
                     decoration: BoxDecoration(
                       color: Colors.black54,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.deepPurpleAccent.withOpacity(0.5)),
                     ),
-                    child: const Stack(
-                      children: [
-                        Center(
-                          child: Icon(Icons.play_circle_filled, size: 64, color: Colors.amberAccent),
-                        ),
-                        Positioned(
-                          bottom: 8,
-                          left: 8,
-                          child: Text('HD Reel / Video Stream Active', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                        ),
-                      ],
+                    child: const Center(
+                      child: Icon(Icons.play_circle_filled, size: 64, color: Colors.amberAccent),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Background Music Control Bar (Play/Pause Song)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
@@ -402,23 +333,19 @@ class _FeedScreenState extends State<FeedScreen> {
                       children: [
                         IconButton(
                           icon: Icon(
-                            isThisSongPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                            isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
                             color: Colors.amberAccent,
                             size: 32,
                           ),
-                          onPressed: () => _toggleAudio(songUrl),
+                          onPressed: () => _toggleAudio(songName),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Attached Song Track', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                              Text(
-                                item['songName'],
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              const Text('Background Track', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                              Text(songName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)),
                             ],
                           ),
                         ),
@@ -426,11 +353,9 @@ class _FeedScreenState extends State<FeedScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Interaction Toolbar: Like, Comment, Gift, Share
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      // Like Button & Counter
                       Row(
                         children: [
                           IconButton(
@@ -448,7 +373,6 @@ class _FeedScreenState extends State<FeedScreen> {
                           Text('${item['likes']}', style: const TextStyle(color: Colors.white)),
                         ],
                       ),
-                      // Comment Button & Counter
                       Row(
                         children: [
                           IconButton(
@@ -458,7 +382,6 @@ class _FeedScreenState extends State<FeedScreen> {
                           Text('${(item['comments'] as List).length}', style: const TextStyle(color: Colors.white)),
                         ],
                       ),
-                      // Send Gift / Money Button
                       Row(
                         children: [
                           IconButton(
@@ -468,13 +391,10 @@ class _FeedScreenState extends State<FeedScreen> {
                           Text('${item['giftsReceived']}', style: const TextStyle(color: Colors.amberAccent)),
                         ],
                       ),
-                      // Share Button
                       IconButton(
                         icon: const Icon(Icons.share, color: Colors.greenAccent),
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Post link copied to clipboard!')),
-                          );
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied!')));
                         },
                       ),
                     ],
@@ -490,7 +410,7 @@ class _FeedScreenState extends State<FeedScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// CREATE POST SCREEN WITH INSTAGRAM-STYLE AUDIO PREVIEW
+// CREATE POST SCREEN
 // -----------------------------------------------------------------------------
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({Key? key}) : super(key: key);
@@ -501,99 +421,46 @@ class CreatePostScreen extends StatefulWidget {
 
 class _CreatePostScreenState extends State<CreatePostScreen> {
   final TextEditingController _captionController = TextEditingController();
-  late final AudioPlayer _previewPlayer;
-  
   Map<String, String> selectedSong = globalSongLibrary[0];
-  String? previewingSongUrl;
-  bool isPreviewPlaying = false;
   bool isVideoPost = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _previewPlayer = AudioPlayer();
-  }
-
-  @override
-  void dispose() {
-    _previewPlayer.dispose();
-    super.dispose();
-  }
-
-  // Song Preview Modal with Play/Pause button for each track
   void _openAudioPickerModal() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
-      isScrollControlled: true,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              height: 400,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Select Background Song (Preview)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amberAccent)),
-                  const Text('Tap play button to listen before selecting', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  const Divider(color: Colors.grey),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: globalSongLibrary.length,
-                      itemBuilder: (context, index) {
-                        final song = globalSongLibrary[index];
-                        final bool isThisPlaying = previewingSongUrl == song['url'] && isPreviewPlaying;
-
-                        return ListTile(
-                          leading: IconButton(
-                            icon: Icon(
-                              isThisPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                              color: Colors.amberAccent,
-                              size: 36,
-                            ),
-                            onPressed: () async {
-                              if (isThisPlaying) {
-                                await _previewPlayer.pause();
-                                setModalState(() {
-                                  isPreviewPlaying = false;
-                                });
-                              } else {
-                                await _previewPlayer.stop();
-                                await _previewPlayer.play(UrlSource(song['url']!));
-                                setModalState(() {
-                                  previewingSongUrl = song['url'];
-                                  isPreviewPlaying = true;
-                                });
-                              }
-                            },
-                          ),
-                          title: Text(song['title']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          subtitle: Text(song['artist']!, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                          trailing: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurpleAccent, foregroundColor: Colors.white),
-                            onPressed: () {
-                              _previewPlayer.stop();
-                              setState(() {
-                                selectedSong = song;
-                                isPreviewPlaying = false;
-                                previewingSongUrl = null;
-                              });
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Selected Song: ${song['title']}')),
-                              );
-                            },
-                            child: const Text('Use'),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+        return Container(
+          height: 300,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Select Background Song', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amberAccent)),
+              const Divider(color: Colors.grey),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: globalSongLibrary.length,
+                  itemBuilder: (context, index) {
+                    final song = globalSongLibrary[index];
+                    return ListTile(
+                      title: Text(song['title']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      subtitle: Text(song['artist']!, style: const TextStyle(color: Colors.grey)),
+                      trailing: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurpleAccent, foregroundColor: Colors.white),
+                        onPressed: () {
+                          setState(() {
+                            selectedSong = song;
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Use'),
+                      ),
+                    );
+                  },
+                ),
               ),
-            );
-          },
+            ],
+          ),
         );
       },
     );
@@ -601,9 +468,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   void _publishPost() {
     if (_captionController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please write a caption first!')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please write a caption!')));
       return;
     }
 
@@ -613,9 +478,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         'username': 'Tarun Business',
         'handle': '@tarun_vizia',
         'caption': _captionController.text.trim(),
-        'videoUrl': 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
         'songName': selectedSong['title']!,
-        'songUrl': selectedSong['url']!,
         'likes': 1,
         'isLiked': false,
         'isFollowing': true,
@@ -625,76 +488,49 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _captionController.clear();
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reel/Post published successfully to Feed! 🚀')),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Published successfully to Feed! 🚀')));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Reel / Post', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.black,
-      ),
+      appBar: AppBar(title: const Text('Create Reel / Post', style: TextStyle(fontWeight: FontWeight.bold))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Select Media Type', style: TextStyle(color: Colors.grey, fontSize: 14)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                ChoiceChip(
-                  label: const Text('Reel / Video'),
-                  selected: isVideoPost,
-                  selectedColor: Colors.amberAccent,
-                  labelStyle: TextStyle(color: isVideoPost ? Colors.black : Colors.white),
-                  onSelected: (val) => setState(() => isVideoPost = true),
-                ),
-                const SizedBox(width: 10),
-                ChoiceChip(
-                  label: const Text('Photo Post'),
-                  selected: !isVideoPost,
-                  selectedColor: Colors.amberAccent,
-                  labelStyle: TextStyle(color: !isVideoPost ? Colors.black : Colors.white),
-                  onSelected: (val) => setState(() => isVideoPost = false),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
             Container(
-              height: 180,
+              height: 160,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.grey[900],
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.amberAccent.withOpacity(0.5)),
+                border: Border.all(color: Colors.amberAccent),
               ),
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.cloud_upload_outlined, size: 48, color: Colors.amberAccent),
-                  SizedBox(height: 8),
-                  Text('Media Ready for Publishing', style: TextStyle(color: Colors.white70)),
-                ],
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.cloud_upload, size: 40, color: Colors.amberAccent),
+                    SizedBox(height: 8),
+                    Text('Media Ready', style: TextStyle(color: Colors.white70)),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 20),
-            const Text('Write Caption', style: TextStyle(color: Colors.grey, fontSize: 14)),
-            const SizedBox(height: 8),
             TextField(
               controller: _captionController,
               maxLines: 3,
               decoration: const InputDecoration(
-                hintText: 'What is on your mind, Tarun?',
+                hintText: 'Write caption...',
                 filled: true,
                 fillColor: Colors.grey,
               ),
             ),
             const SizedBox(height: 20),
-            const Text('Attach Background Song (Instagram Style Preview)', style: TextStyle(color: Colors.grey, fontSize: 14)),
+            const Text('Background Music', style: TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 8),
             InkWell(
               onTap: _openAudioPickerModal,
@@ -709,15 +545,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   children: [
                     const Icon(Icons.music_note, color: Colors.amberAccent),
                     const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Selected Song', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                          Text(selectedSong['title']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
+                    Expanded(child: Text(selectedSong['title']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
                     const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.amberAccent),
                   ],
                 ),
@@ -728,10 +556,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amberAccent,
-                  foregroundColor: Colors.black,
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
                 onPressed: _publishPost,
                 child: const Text('Publish Now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
@@ -744,7 +569,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// WALLET SCREEN (Balance, Earnings & Gift Management)
+// WALLET SCREEN
 // -----------------------------------------------------------------------------
 class WalletScreen extends StatelessWidget {
   const WalletScreen({Key? key}) : super(key: key);
@@ -752,10 +577,7 @@ class WalletScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Margtasni Wallet & Gifts', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.black,
-      ),
+      appBar: AppBar(title: const Text('Wallet')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -764,46 +586,17 @@ class WalletScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Colors.deepPurple, Colors.black]),
+                color: Colors.grey[900],
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Available Wallet Balance', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                  const Text('Available Balance', style: TextStyle(color: Colors.grey)),
                   const SizedBox(height: 8),
                   Text('₹$globalUserWalletBalance', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.amberAccent)),
                   const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Creator Earnings: ₹$globalCreatorEarnings', style: const TextStyle(color: Colors.white70)),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Withdrawal request processed successfully!')),
-                          );
-                        },
-                        child: const Text('Withdraw'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text('Wallet History & Gift Payouts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 12),
-            Expanded(
-              child: ListView(
-                children: const [
-                  ListTile(
-                    leading: CircleAvatar(backgroundColor: Colors.green, child: Icon(Icons.arrow_downward, color: Colors.white)),
-                    title: Text('Gift Received from Post', style: TextStyle(color: Colors.white)),
-                    subtitle: Text('Today, 9:40 PM', style: TextStyle(color: Colors.grey)),
-                    trailing: Text('+₹50.0', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                  ),
+                  Text('Creator Earnings: ₹$globalCreatorEarnings', style: const TextStyle(color: Colors.white70)),
                 ],
               ),
             ),
@@ -823,66 +616,19 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Creator Profile', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.black,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+      appBar: AppBar(title: const Text('Profile')),
+      body: Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.amberAccent,
-              child: Icon(Icons.person, size: 60, color: Colors.black),
-            ),
+            const CircleAvatar(radius: 40, backgroundColor: Colors.amberAccent, child: Icon(Icons.person, size: 50, color: Colors.black)),
             const SizedBox(height: 16),
             const Text('Tarun Business', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 4),
-            Text('Mobile: $loggedInMobile', style: const TextStyle(color: Colors.grey, fontSize: 14)),
             const SizedBox(height: 8),
-            const Text('Faridabad, India • Vizia Global Studio', style: TextStyle(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildStatColumn('Posts', '${globalFeedItems.length}'),
-                _buildStatColumn('Followers', '1.4K'),
-                _buildStatColumn('Following', '410'),
-              ],
-            ),
-            const Divider(height: 40, color: Colors.grey),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 4,
-                mainAxisSpacing: 4,
-              ),
-              itemCount: globalFeedItems.length,
-              itemBuilder: (context, index) {
-                return Container(
-                  color: Colors.grey[850],
-                  child: const Center(
-                    child: Icon(Icons.play_arrow, color: Colors.amberAccent),
-                  ),
-                );
-              },
-            ),
+            Text('Mobile: $loggedInMobile', style: const TextStyle(color: Colors.grey, fontSize: 16)),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildStatColumn(String label, String count) {
-    return Column(
-      children: [
-        Text(count, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amberAccent)),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-      ],
     );
   }
 }
