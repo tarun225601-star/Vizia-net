@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:video_player/video_player.dart';
 
 void main() {
   runApp(const MargtasniApp());
@@ -29,17 +30,17 @@ class MargtasniApp extends StatelessWidget {
   }
 }
 
-// Global Persistent Feed List (पोस्ट्स कभी नहीं उड़ेंगी)
+// Global Persistent Feed List
 List<Map<String, dynamic>> globalFeedItems = [
   {
     'username': 'Tarun Business',
     'handle': '@tarun_vizia',
-    'caption': 'Margtasni पर अब रियल गैलरी फाइल और लाइव ऑनलाइन गाने! 🚀',
+    'caption': 'Margtasni पर अब रील्स और रियल ऑनलाइन गाने लाइव हैं! 🚀🔥',
     'mediaPath': 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800',
     'songName': 'Radhe Radhe - Live Track',
     'likes': 520,
     'isLiked': false,
-    'comments': ['भाई अब एकदम सही वर्शन है!'],
+    'comments': ['भाई अब बिल्कुल Instagram जैसा मज़ा आ रहा है!'],
     'isLocalFile': false,
   },
 ];
@@ -54,8 +55,10 @@ class MargtasniHomeScreen extends StatefulWidget {
 class _MargtasniHomeScreenState extends State<MargtasniHomeScreen> {
   int _currentIndex = 0;
 
+  // चारों टैब की लिस्ट (Feed, Reels, Requests, Profile)
   final List<Widget> _screens = [
     const FeedScreen(),
+    const ReelsScreen(), // यहाँ रील्स टैब जुड़ गया है!
     const RequestsScreen(),
     const ProfileScreen(),
   ];
@@ -77,6 +80,7 @@ class _MargtasniHomeScreenState extends State<MargtasniHomeScreen> {
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Feed'),
+          BottomNavigationBarItem(icon: Icon(Icons.video_library_rounded), label: 'Reels'), // रील्स आइकॉन
           BottomNavigationBarItem(icon: Icon(Icons.notifications_active), label: 'Requests'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
@@ -252,7 +256,7 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // --- सबसे नीचे जोड़े गए फाइल पिकर और लाइव म्यूजिक सर्च के फंक्शन्स ---
+  // गैलरी से फाइल और ऑनलाइन म्यूजिक सर्च के साथ पोस्ट क्रिएशन
   Future<void> _pickMediaAndPost(BuildContext context, StateSetter parentSetState) async {
     final ImagePicker picker = ImagePicker();
     final TextEditingController captionController = TextEditingController();
@@ -280,7 +284,6 @@ class _FeedScreenState extends State<FeedScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // 1. गैलरी से फोटो/वीडियो चुनने का बटन
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurpleAccent),
                       icon: const Icon(Icons.perm_media, color: Colors.white),
@@ -298,7 +301,6 @@ class _FeedScreenState extends State<FeedScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    // 2. रियल ऑनलाइन म्यूजिक सर्च बटन
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
                       icon: const Icon(Icons.music_note),
@@ -360,7 +362,7 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // 100% रियल ऑनलाइन म्यूजिक सर्च API फंक्शन
+  // 100% फ्री iTunes API के साथ असली गाने सर्च करने का डायलॉग
   Future<String?> _showRealOnlineMusicSearchDialog(BuildContext context) async {
     TextEditingController searchController = TextEditingController();
     List<dynamic> apiSearchResults = [];
@@ -370,7 +372,7 @@ class _FeedScreenState extends State<FeedScreen> {
       if (query.trim().isEmpty) return;
       setDialogState(() => isLoading = true);
       
-      final url = Uri.parse('https://api.jamendo.com/v3.5/tracks/?client_id=5992ded3&format=json&limit=15&search=$query');
+      final url = Uri.parse('https://itunes.apple.com/search?term=${Uri.encodeComponent(query)}&media=music&entity=song&limit=20');
       
       try {
         final response = await http.get(url);
@@ -405,7 +407,7 @@ class _FeedScreenState extends State<FeedScreen> {
                       controller: searchController,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: 'Type song name (e.g. Love, Rock)...',
+                        hintText: 'Type song name (e.g. Saiyara, Love)...',
                         hintStyle: const TextStyle(color: Colors.white54),
                         prefixIcon: const Icon(Icons.search, color: Colors.amberAccent),
                         suffixIcon: IconButton(
@@ -431,8 +433,8 @@ class _FeedScreenState extends State<FeedScreen> {
                                     itemCount: apiSearchResults.length,
                                     itemBuilder: (context, index) {
                                       final song = apiSearchResults[index];
-                                      final String trackName = song['name'] ?? 'Unknown Track';
-                                      final String artistName = song['artist_name'] ?? 'Unknown Artist';
+                                      final String trackName = song['trackName'] ?? 'Unknown Track';
+                                      final String artistName = song['artistName'] ?? 'Unknown Artist';
                                       
                                       return ListTile(
                                         leading: const Icon(Icons.audiotrack, color: Colors.amberAccent),
@@ -463,7 +465,143 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 }
 
-// 2. REQUESTS SCREEN
+// 2. REELS SCREEN (इंस्टाग्राम जैसी फुल-स्क्रीन रील्स फीड)
+class ReelsScreen extends StatefulWidget {
+  const ReelsScreen({super.key});
+
+  @override
+  State<ReelsScreen> createState() => _ReelsScreenState();
+}
+
+class _ReelsScreenState extends State<ReelsScreen> {
+  final List<String> _reelVideos = [
+    'https://assets.mixkit.co/videos/preview/mixkit-tree-branches-in-the-breeze-1185-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-sea-ocean-waves-background-video-1216-large.mp4',
+    'https://assets.mixkit.co/videos/preview/mixkit-neon-lights-tunnel-background-33454-large.mp4',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: PageView.builder(
+        scrollDirection: Axis.vertical,
+        itemCount: _reelVideos.length,
+        itemBuilder: (context, index) {
+          return ReelItemWidget(videoUrl: _reelVideos[index]);
+        },
+      ),
+    );
+  }
+}
+
+class ReelItemWidget extends StatefulWidget {
+  final String videoUrl;
+  const ReelItemWidget({super.key, required this.videoUrl});
+
+  @override
+  State<ReelItemWidget> createState() => _ReelItemWidgetState();
+}
+
+class _ReelItemWidgetState extends State<ReelItemWidget> {
+  late VideoPlayerController _controller;
+  bool _isPlaying = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+      ..initialize().then((_) {
+        setState(() {});
+        _controller.setLooping(true);
+        _controller.play();
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _togglePlayPause() {
+    setState(() {
+      if (_controller.value.isPlaying) {
+        _controller.pause();
+        _isPlaying = false;
+      } else {
+        _controller.play();
+        _isPlaying = true;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        SizedBox.expand(
+          child: _controller.value.isInitialized
+              ? GestureDetector(
+                  onTap: _togglePlayPause,
+                  child: FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: _controller.value.size.width,
+                      height: _controller.value.size.height,
+                      child: VideoPlayer(_controller),
+                    ),
+                  ),
+                )
+              : const Center(
+                  child: CircularProgressIndicator(color: Colors.amberAccent),
+                ),
+        ),
+        if (!_isPlaying)
+          const Center(
+            child: Icon(Icons.play_arrow, size: 80, color: Colors.white54),
+          ),
+        Positioned(
+          right: 15,
+          bottom: 80,
+          child: Column(
+            children: const [
+              Icon(Icons.favorite, color: Colors.white, size: 32),
+              Text("12.4K", style: TextStyle(color: Colors.white, fontSize: 12)),
+              SizedBox(height: 20),
+              Icon(Icons.comment, color: Colors.white, size: 30),
+              Text("420", style: TextStyle(color: Colors.white, fontSize: 12)),
+              SizedBox(height: 20),
+              Icon(Icons.share, color: Colors.white, size: 30),
+              Text("Share", style: TextStyle(color: Colors.white, fontSize: 12)),
+            ],
+          ),
+        ),
+        Positioned(
+          left: 15,
+          bottom: 30,
+          right: 70,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                "@tarun_vizia",
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              SizedBox(height: 6),
+              Text(
+                "Margtasni रील्स फीड वर्शन! 🚀🔥 #margtasni #vizia",
+                style: TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// 3. REQUESTS SCREEN
 class RequestsScreen extends StatelessWidget {
   const RequestsScreen({super.key});
 
@@ -476,7 +614,7 @@ class RequestsScreen extends StatelessWidget {
   }
 }
 
-// 3. PROFILE SCREEN
+// 4. PROFILE SCREEN
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
