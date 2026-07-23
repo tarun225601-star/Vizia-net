@@ -23,3 +23,9 @@ flutter:
   # If you add assets or fonts later, you can uncomment below:
   # assets:
   #   - assets/images/
+dependencies:
+  flutter:
+    sdk: flutter
+  image_picker: ^1.1.2
+  http: ^1.2.0
+  
