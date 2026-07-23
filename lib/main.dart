@@ -35,12 +35,13 @@ List<Map<String, dynamic>> globalFeedItems = [
   {
     'username': 'Tarun Business',
     'handle': '@tarun_vizia',
-    'caption': 'Margtasni पर अब रील्स और रियल ऑनलाइन गाने लाइव हैं! 🚀🔥',
+    'caption': 'Margtasni पर अब रील्स और असली गाने प्ले भी होंगे! 🚀🔥',
     'mediaPath': 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800',
     'songName': 'Radhe Radhe - Live Track',
+    'previewUrl': '',
     'likes': 520,
     'isLiked': false,
-    'comments': ['भाई अब बिल्कुल Instagram जैसा मज़ा आ रहा है!'],
+    'comments': ['भाई अब आया असली मज़ा!'],
     'isLocalFile': false,
   },
 ];
@@ -55,10 +56,9 @@ class MargtasniHomeScreen extends StatefulWidget {
 class _MargtasniHomeScreenState extends State<MargtasniHomeScreen> {
   int _currentIndex = 0;
 
-  // चारों टैब की लिस्ट (Feed, Reels, Requests, Profile)
   final List<Widget> _screens = [
     const FeedScreen(),
-    const ReelsScreen(), // यहाँ रील्स टैब जुड़ गया है!
+    const ReelsScreen(),
     const RequestsScreen(),
     const ProfileScreen(),
   ];
@@ -80,7 +80,7 @@ class _MargtasniHomeScreenState extends State<MargtasniHomeScreen> {
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Feed'),
-          BottomNavigationBarItem(icon: Icon(Icons.video_library_rounded), label: 'Reels'), // रील्स आइकॉन
+          BottomNavigationBarItem(icon: Icon(Icons.video_library_rounded), label: 'Reels'),
           BottomNavigationBarItem(icon: Icon(Icons.notifications_active), label: 'Requests'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
@@ -256,11 +256,11 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // गैलरी से फाइल और ऑनलाइन म्यूजिक सर्च के साथ पोस्ट क्रिएशन
   Future<void> _pickMediaAndPost(BuildContext context, StateSetter parentSetState) async {
     final ImagePicker picker = ImagePicker();
     final TextEditingController captionController = TextEditingController();
     String selectedSongName = 'No Music Selected';
+    String selectedSongUrl = '';
     XFile? pickedFile;
 
     await showDialog(
@@ -309,10 +309,11 @@ class _FeedScreenState extends State<FeedScreen> {
                         style: const TextStyle(fontSize: 12),
                       ),
                       onPressed: () async {
-                        String? chosenSong = await _showRealOnlineMusicSearchDialog(context);
-                        if (chosenSong != null) {
+                        Map<String, dynamic>? chosenSongData = await _showRealOnlineMusicSearchDialog(context);
+                        if (chosenSongData != null) {
                           setDialogState(() {
-                            selectedSongName = chosenSong;
+                            selectedSongName = chosenSongData['name'];
+                            selectedSongUrl = chosenSongData['url'];
                           });
                         }
                       },
@@ -336,6 +337,7 @@ class _FeedScreenState extends State<FeedScreen> {
                           'caption': captionController.text,
                           'mediaPath': pickedFile!.path,
                           'songName': selectedSongName,
+                          'previewUrl': selectedSongUrl,
                           'likes': 0,
                           'isLiked': false,
                           'comments': [],
@@ -362,8 +364,8 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // 100% फ्री iTunes API के साथ असली गाने सर्च करने का डायलॉग
-  Future<String?> _showRealOnlineMusicSearchDialog(BuildContext context) async {
+  // अब यह असली गाने का नाम और प्ले होने वाला ऑडियो लिंक (previewUrl) दोनों रिटर्न करेगा
+  Future<Map<String, dynamic>?> _showRealOnlineMusicSearchDialog(BuildContext context) async {
     TextEditingController searchController = TextEditingController();
     List<dynamic> apiSearchResults = [];
     bool isLoading = false;
@@ -390,14 +392,14 @@ class _FeedScreenState extends State<FeedScreen> {
       }
     }
 
-    return showDialog<String>(
+    return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: const Color(0xFF1E1E1E),
-              title: const Text('Search Real Online Songs', style: TextStyle(color: Colors.amberAccent, fontSize: 16)),
+              title: const Text('Search & Play Online Songs', style: TextStyle(color: Colors.amberAccent, fontSize: 16)),
               content: SizedBox(
                 width: double.maxFinite,
                 height: 350,
@@ -407,7 +409,7 @@ class _FeedScreenState extends State<FeedScreen> {
                       controller: searchController,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: 'Type song name (e.g. Saiyara, Love)...',
+                        hintText: 'Type song name (e.g. Saiyara)...',
                         hintStyle: const TextStyle(color: Colors.white54),
                         prefixIcon: const Icon(Icons.search, color: Colors.amberAccent),
                         suffixIcon: IconButton(
@@ -424,7 +426,7 @@ class _FeedScreenState extends State<FeedScreen> {
                             child: apiSearchResults.isEmpty
                                 ? const Center(
                                     child: Text(
-                                      'Type a keyword above & search real online tracks',
+                                      'Type a keyword & search real playable tracks',
                                       style: TextStyle(color: Colors.white54, fontSize: 12),
                                       textAlign: TextAlign.center,
                                     ),
@@ -435,14 +437,18 @@ class _FeedScreenState extends State<FeedScreen> {
                                       final song = apiSearchResults[index];
                                       final String trackName = song['trackName'] ?? 'Unknown Track';
                                       final String artistName = song['artistName'] ?? 'Unknown Artist';
+                                      final String previewUrl = song['previewUrl'] ?? ''; // असली प्लेबल गाना लिंक!
                                       
                                       return ListTile(
-                                        leading: const Icon(Icons.audiotrack, color: Colors.amberAccent),
+                                        leading: const Icon(Icons.play_circle_fill, color: Colors.amberAccent, size: 30),
                                         title: Text(trackName, style: const TextStyle(color: Colors.white, fontSize: 13)),
                                         subtitle: Text(artistName, style: const TextStyle(color: Colors.white54, fontSize: 11)),
                                         trailing: const Icon(Icons.check_circle_outline, color: Colors.greenAccent),
                                         onTap: () {
-                                          Navigator.pop(context, '$trackName - $artistName');
+                                          Navigator.pop(context, {
+                                            'name': '$trackName - $artistName',
+                                            'url': previewUrl,
+                                          });
                                         },
                                       );
                                     },
@@ -465,7 +471,7 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 }
 
-// 2. REELS SCREEN (इंस्टाग्राम जैसी फुल-स्क्रीन रील्स फीड)
+// 2. REELS SCREEN
 class ReelsScreen extends StatefulWidget {
   const ReelsScreen({super.key});
 
