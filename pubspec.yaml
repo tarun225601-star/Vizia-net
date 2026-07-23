@@ -11,10 +11,5 @@ dependencies:
     sdk: flutter
   supabase_flutter: ^2.5.0
 
-dev_dependencies:
-  flutter_test:
-    sdk: flutter_test
-  flutter_lints: ^3.0.0
-
 flutter:
   uses-material-design: true
