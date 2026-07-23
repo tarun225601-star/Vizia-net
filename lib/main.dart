@@ -1,5 +1,4 @@
-# Python code to generate the complete 1100+ line production-ready main.dart file for Margtasni app
-code_content = """import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 void main() {
@@ -513,7 +512,3 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 }
-"""
-
-with open("main_complete.dart", "w", encoding="utf-8") as f:
-    f.write(code_content)
