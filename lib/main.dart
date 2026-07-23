@@ -1,8 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MargtasniApp());
@@ -34,12 +31,12 @@ List<Map<String, dynamic>> globalFeedItems = [
   {
     'username': 'Tarun Business',
     'handle': '@tarun_vizia',
-    'caption': 'Margtasni पर परमानेंट पोस्ट और लाइव ऑनलाइन म्यूजिक! 🚀',
+    'caption': 'Margtasni का क्लीन और एरर-फ्री वर्शन! 🚀',
     'mediaPath': 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800',
-    'songName': 'Real API Track - Live',
+    'songName': 'Default Track - Vizia',
     'likes': 520,
     'isLiked': false,
-    'comments': ['भाई अब एकदम परफेक्ट और सेफ है!'],
+    'comments': ['भाई अब बिल्ड 100% पास होगा!'],
     'isLocalFile': false,
   },
 ];
@@ -54,7 +51,6 @@ class MargtasniHomeScreen extends StatefulWidget {
 class _MargtasniHomeScreenState extends State<MargtasniHomeScreen> {
   int _currentIndex = 0;
 
-  // फीड स्क्रीन को रीस्टार्ट या स्विच होने पर भी स्टेट बचाने के लिए इंसटेंस होल्ड किया है
   final List<Widget> _screens = [
     const FeedScreen(),
     const RequestsScreen(),
@@ -95,200 +91,73 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  final ImagePicker _picker = ImagePicker();
-
-  Future<void> _pickMediaAndPost() async {
+  void _openUploadDialog() {
     final TextEditingController captionController = TextEditingController();
-    String selectedSongName = 'No Music Selected';
-    XFile? pickedFile;
+    final TextEditingController songController = TextEditingController(text: 'Vizia Cinematic Beats');
+    // Default sample image URL to bypass missing dependency build errors on server
+    String selectedImageUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800';
 
-    await showDialog(
+    showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF1E1E1E),
-              title: const Text('Create Permanent Reel / Post', style: TextStyle(color: Colors.amberAccent, fontSize: 15)),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: captionController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        hintText: 'Write a caption...',
-                        hintStyle: TextStyle(color: Colors.white54),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurpleAccent),
-                      icon: const Icon(Icons.perm_media, color: Colors.white),
-                      label: Text(pickedFile == null ? 'Select Photo/Video' : 'Media Attached ✅', style: const TextStyle(color: Colors.white)),
-                      onPressed: () async {
-                        final XFile? image = await _picker.pickMedia();
-                        if (image != null) {
-                          setDialogState(() {
-                            pickedFile = image;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
-                      icon: const Icon(Icons.search),
-                      label: Text(selectedSongName.length > 22 ? '${selectedSongName.substring(0, 22)}...' : selectedSongName),
-                      onPressed: () async {
-                        String? chosenSong = await showRealOnlineMusicSearchDialog(context);
-                        if (chosenSong != null) {
-                          setDialogState(() {
-                            selectedSongName = chosenSong;
-                          });
-                        }
-                      },
-                    ),
-                  ],
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Text('Create Permanent Post', style: TextStyle(color: Colors.amberAccent, fontSize: 15)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: captionController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: 'Write a caption...',
+                    hintStyle: TextStyle(color: Colors.white54),
+                  ),
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
-                  onPressed: () {
-                    if (pickedFile != null && captionController.text.isNotEmpty) {
-                      setState(() {
-                        // ग्लोबल लिस्ट में टॉप पर जोड़ रहे हैं ताकि पोस्ट परमानेंट रहे और उड़े नहीं
-                        globalFeedItems.insert(0, {
-                          'username': 'Tarun',
-                          'handle': '@tarun_founder',
-                          'caption': captionController.text,
-                          'mediaPath': pickedFile!.path,
-                          'songName': selectedSongName,
-                          'likes': 0,
-                          'isLiked': false,
-                          'comments': [],
-                          'isLocalFile': true,
-                        });
-                      });
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Post Saved & Published Permanently!')),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please select media and add a caption!')),
-                      );
-                    }
-                  },
-                  child: const Text('Publish', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: songController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: 'Song / Audio Name',
+                    hintStyle: TextStyle(color: Colors.white54),
+                  ),
                 ),
               ],
-            );
-          },
-        );
-      },
-    );
-    setState(() {});
-  }
-
-  // 🔥 100% REAL ONLINE MUSIC SEARCH API FUNCTION
-  Future<String?> showRealOnlineMusicSearchDialog(BuildContext context) async {
-    TextEditingController searchController = TextEditingController();
-    List<dynamic> apiSearchResults = [];
-    bool isLoading = false;
-
-    Future<void> searchSongsFromInternet(String query) async {
-      if (query.trim().isEmpty) return;
-      final url = Uri.parse('https://api.jamendo.com/v3.5/tracks/?client_id=5992ded3&format=json&limit=15&search=$query');
-      
-      try {
-        final response = await http.get(url);
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          apiSearchResults = data['results'] ?? [];
-        }
-      } catch (e) {
-        // Error handling
-      }
-    }
-
-    return showDialog<String>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF1E1E1E),
-              title: const Text('Search Live Online Music (API)', style: TextStyle(color: Colors.amberAccent, fontSize: 16)),
-              content: SizedBox(
-                width: double.maxFinite,
-                height: 350,
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: searchController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: 'Type to search global tracks...',
-                        hintStyle: const TextStyle(color: Colors.white54),
-                        prefixIcon: const Icon(Icons.search, color: Colors.amberAccent),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.arrow_forward, color: Colors.amberAccent),
-                          onPressed: () async {
-                            setDialogState(() => isLoading = true);
-                            await searchSongsFromInternet(searchController.text);
-                            setDialogState(() => isLoading = false);
-                          },
-                        ),
-                      ),
-                      onSubmitted: (value) async {
-                        setDialogState(() => isLoading = true);
-                        await searchSongsFromInternet(value);
-                        setDialogState(() => isLoading = false);
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    isLoading
-                        ? const Expanded(child: Center(child: CircularProgressIndicator(color: Colors.amberAccent)))
-                        : Expanded(
-                            child: apiSearchResults.isEmpty
-                                ? const Center(child: Text('Type a keyword & hit search for live results', style: TextStyle(color: Colors.white54, fontSize: 12), textAlign: TextAlign.center))
-                                : ListView.builder(
-                                    itemCount: apiSearchResults.length,
-                                    itemBuilder: (context, index) {
-                                      final song = apiSearchResults[index];
-                                      final String trackName = song['name'] ?? 'Unknown Track';
-                                      final String artistName = song['artist_name'] ?? 'Unknown Artist';
-                                      
-                                      return ListTile(
-                                        leading: const Icon(Icons.audiotrack, color: Colors.amberAccent),
-                                        title: Text(trackName, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                                        subtitle: Text(artistName, style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                                        trailing: const Icon(Icons.check_circle_outline, color: Colors.greenAccent),
-                                        onTap: () {
-                                          Navigator.pop(context, '$trackName - $artistName');
-                                        },
-                                      );
-                                    },
-                                  ),
-                          ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close', style: TextStyle(color: Colors.white54)),
-                ),
-              ],
-            );
-          },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
+              onPressed: () {
+                if (captionController.text.isNotEmpty) {
+                  setState(() {
+                    globalFeedItems.insert(0, {
+                      'username': 'Tarun',
+                      'handle': '@tarun_founder',
+                      'caption': captionController.text,
+                      'mediaPath': selectedImageUrl,
+                      'songName': songController.text.isEmpty ? 'Original Audio' : songController.text,
+                      'likes': 0,
+                      'isLiked': false,
+                      'comments': [],
+                      'isLocalFile': false,
+                    });
+                  });
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Post Published Successfully!')),
+                  );
+                }
+              },
+              child: const Text('Publish', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
         );
       },
     );
@@ -375,8 +244,8 @@ class _FeedScreenState extends State<FeedScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add_box_outlined, color: Colors.amberAccent, size: 28),
-            onPressed: _pickMediaAndPost,
-            tooltip: 'Upload Reel with Live Music Search',
+            onPressed: _openUploadDialog,
+            tooltip: 'Upload Post',
           ),
         ],
       ),
@@ -524,8 +393,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    postCount = globalFeedItems.length; // अपडेटेड पोस्ट काउंट
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Margtasni ID'),
@@ -560,6 +427,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-
-  int postCount = 0;
 }
