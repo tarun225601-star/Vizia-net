@@ -18,7 +18,7 @@ Future<void> main() async {
   await Supabase.initialize(
     url: 'https://tinnpdgnzteoltrysjax.supabase.co',
     anonKey: 
-  );'sbp_0590a35d2a5553911c658c2f4aba9c18d9d9e003',
+  );'sb_publishable_x_TWreV14I3daOmV4Un4LA_dkLd0euy',
 
   runApp(const MargtasniApp());
 }
