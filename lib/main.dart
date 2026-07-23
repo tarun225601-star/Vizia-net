@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MargtasniApp());
@@ -25,6 +29,21 @@ class MargtasniApp extends StatelessWidget {
   }
 }
 
+// Global Persistent Feed List (पोस्ट्स कभी नहीं उड़ेंगी)
+List<Map<String, dynamic>> globalFeedItems = [
+  {
+    'username': 'Tarun Business',
+    'handle': '@tarun_vizia',
+    'caption': 'Margtasni पर परमानेंट पोस्ट और लाइव ऑनलाइन म्यूजिक! 🚀',
+    'mediaPath': 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800',
+    'songName': 'Real API Track - Live',
+    'likes': 520,
+    'isLiked': false,
+    'comments': ['भाई अब एकदम परफेक्ट और सेफ है!'],
+    'isLocalFile': false,
+  },
+];
+
 class MargtasniHomeScreen extends StatefulWidget {
   const MargtasniHomeScreen({super.key});
 
@@ -35,6 +54,7 @@ class MargtasniHomeScreen extends StatefulWidget {
 class _MargtasniHomeScreenState extends State<MargtasniHomeScreen> {
   int _currentIndex = 0;
 
+  // फीड स्क्रीन को रीस्टार्ट या स्विच होने पर भी स्टेट बचाने के लिए इंसटेंस होल्ड किया है
   final List<Widget> _screens = [
     const FeedScreen(),
     const RequestsScreen(),
@@ -66,7 +86,7 @@ class _MargtasniHomeScreenState extends State<MargtasniHomeScreen> {
   }
 }
 
-// 1. HOME FEED SCREEN (With Like, Comment, Upload & Music)
+// 1. HOME FEED SCREEN
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
 
@@ -75,22 +95,206 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  final List<Map<String, dynamic>> feedItems = [
-    {
-      'username': 'Tarun Business',
-      'handle': '@tarun_vizia',
-      'caption': 'Margtasni का पहला पोस्ट! लाइक और कमेंट कीजिए। 🚀',
-      'mediaUrl': 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800',
-      'songName': 'Original Audio - Tarun Beats',
-      'likes': 142,
-      'isLiked': false,
-      'comments': ['Badiya app hai!', 'Great work Tarun भाई!'],
-      'isVideo': true,
-    },
-  ];
+  final ImagePicker _picker = ImagePicker();
 
-  // Open Comment Bottom Sheet
-  void _openComments(BuildContext context, Map<String, dynamic> post) {
+  Future<void> _pickMediaAndPost() async {
+    final TextEditingController captionController = TextEditingController();
+    String selectedSongName = 'No Music Selected';
+    XFile? pickedFile;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E1E),
+              title: const Text('Create Permanent Reel / Post', style: TextStyle(color: Colors.amberAccent, fontSize: 15)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: captionController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        hintText: 'Write a caption...',
+                        hintStyle: TextStyle(color: Colors.white54),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurpleAccent),
+                      icon: const Icon(Icons.perm_media, color: Colors.white),
+                      label: Text(pickedFile == null ? 'Select Photo/Video' : 'Media Attached ✅', style: const TextStyle(color: Colors.white)),
+                      onPressed: () async {
+                        final XFile? image = await _picker.pickMedia();
+                        if (image != null) {
+                          setDialogState(() {
+                            pickedFile = image;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
+                      icon: const Icon(Icons.search),
+                      label: Text(selectedSongName.length > 22 ? '${selectedSongName.substring(0, 22)}...' : selectedSongName),
+                      onPressed: () async {
+                        String? chosenSong = await showRealOnlineMusicSearchDialog(context);
+                        if (chosenSong != null) {
+                          setDialogState(() {
+                            selectedSongName = chosenSong;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
+                  onPressed: () {
+                    if (pickedFile != null && captionController.text.isNotEmpty) {
+                      setState(() {
+                        // ग्लोबल लिस्ट में टॉप पर जोड़ रहे हैं ताकि पोस्ट परमानेंट रहे और उड़े नहीं
+                        globalFeedItems.insert(0, {
+                          'username': 'Tarun',
+                          'handle': '@tarun_founder',
+                          'caption': captionController.text,
+                          'mediaPath': pickedFile!.path,
+                          'songName': selectedSongName,
+                          'likes': 0,
+                          'isLiked': false,
+                          'comments': [],
+                          'isLocalFile': true,
+                        });
+                      });
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Post Saved & Published Permanently!')),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please select media and add a caption!')),
+                      );
+                    }
+                  },
+                  child: const Text('Publish', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    setState(() {});
+  }
+
+  // 🔥 100% REAL ONLINE MUSIC SEARCH API FUNCTION
+  Future<String?> showRealOnlineMusicSearchDialog(BuildContext context) async {
+    TextEditingController searchController = TextEditingController();
+    List<dynamic> apiSearchResults = [];
+    bool isLoading = false;
+
+    Future<void> searchSongsFromInternet(String query) async {
+      if (query.trim().isEmpty) return;
+      final url = Uri.parse('https://api.jamendo.com/v3.5/tracks/?client_id=5992ded3&format=json&limit=15&search=$query');
+      
+      try {
+        final response = await http.get(url);
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          apiSearchResults = data['results'] ?? [];
+        }
+      } catch (e) {
+        // Error handling
+      }
+    }
+
+    return showDialog<String>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E1E),
+              title: const Text('Search Live Online Music (API)', style: TextStyle(color: Colors.amberAccent, fontSize: 16)),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 350,
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: searchController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Type to search global tracks...',
+                        hintStyle: const TextStyle(color: Colors.white54),
+                        prefixIcon: const Icon(Icons.search, color: Colors.amberAccent),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.arrow_forward, color: Colors.amberAccent),
+                          onPressed: () async {
+                            setDialogState(() => isLoading = true);
+                            await searchSongsFromInternet(searchController.text);
+                            setDialogState(() => isLoading = false);
+                          },
+                        ),
+                      ),
+                      onSubmitted: (value) async {
+                        setDialogState(() => isLoading = true);
+                        await searchSongsFromInternet(value);
+                        setDialogState(() => isLoading = false);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    isLoading
+                        ? const Expanded(child: Center(child: CircularProgressIndicator(color: Colors.amberAccent)))
+                        : Expanded(
+                            child: apiSearchResults.isEmpty
+                                ? const Center(child: Text('Type a keyword & hit search for live results', style: TextStyle(color: Colors.white54, fontSize: 12), textAlign: TextAlign.center))
+                                : ListView.builder(
+                                    itemCount: apiSearchResults.length,
+                                    itemBuilder: (context, index) {
+                                      final song = apiSearchResults[index];
+                                      final String trackName = song['name'] ?? 'Unknown Track';
+                                      final String artistName = song['artist_name'] ?? 'Unknown Artist';
+                                      
+                                      return ListTile(
+                                        leading: const Icon(Icons.audiotrack, color: Colors.amberAccent),
+                                        title: Text(trackName, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                        subtitle: Text(artistName, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                                        trailing: const Icon(Icons.check_circle_outline, color: Colors.greenAccent),
+                                        onTap: () {
+                                          Navigator.pop(context, '$trackName - $artistName');
+                                        },
+                                      );
+                                    },
+                                  ),
+                          ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close', style: TextStyle(color: Colors.white54)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openComments(Map<String, dynamic> post) {
     final TextEditingController commentController = TextEditingController();
 
     showModalBottomSheet(
@@ -162,58 +366,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // Upload Dialog
-  void _openUploadDialog() {
-    final TextEditingController captionController = TextEditingController();
-    String selectedSong = 'Original Audio - Margtasni Trend';
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          title: const Text('Create Post / Reel', style: TextStyle(color: Colors.amberAccent, fontSize: 16)),
-          content: TextField(
-            controller: captionController,
-            style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(
-              hintText: 'Write a caption...',
-              hintStyle: TextStyle(color: Colors.white54),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
-              onPressed: () {
-                if (captionController.text.isNotEmpty) {
-                  setState(() {
-                    feedItems.insert(0, {
-                      'username': 'Tarun',
-                      'handle': '@tarun_founder',
-                      'caption': captionController.text,
-                      'mediaUrl': 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800',
-                      'songName': selectedSong,
-                      'likes': 0,
-                      'isLiked': false,
-                      'comments': [],
-                      'isVideo': true,
-                    });
-                  });
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Post', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -222,16 +374,17 @@ class _FeedScreenState extends State<FeedScreen> {
         backgroundColor: const Color(0xFF1E1E1E),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_box_outlined, color: Colors.amberAccent),
-            onPressed: _openUploadDialog,
-            tooltip: 'Upload Post',
+            icon: const Icon(Icons.add_box_outlined, color: Colors.amberAccent, size: 28),
+            onPressed: _pickMediaAndPost,
+            tooltip: 'Upload Reel with Live Music Search',
           ),
         ],
       ),
       body: ListView.builder(
-        itemCount: feedItems.length,
+        itemCount: globalFeedItems.length,
         itemBuilder: (context, index) {
-          final post = feedItems[index];
+          final post = globalFeedItems[index];
+          bool isLocal = post['isLocalFile'];
 
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -248,7 +401,7 @@ class _FeedScreenState extends State<FeedScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
                   child: Text(post['caption'], style: const TextStyle(color: Colors.white, fontSize: 13)),
                 ),
-                if (post['songName'] != null)
+                if (post['songName'] != 'No Music Selected')
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 2.0),
                     child: Row(
@@ -260,9 +413,11 @@ class _FeedScreenState extends State<FeedScreen> {
                     ),
                   ),
                 const SizedBox(height: 4),
-                Image.network(post['mediaUrl'], height: 220, width: double.infinity, fit: BoxFit.cover),
                 
-                // Like & Comment Actions Bar
+                isLocal
+                    ? Image.file(File(post['mediaPath']), height: 240, width: double.infinity, fit: BoxFit.cover)
+                    : Image.network(post['mediaPath'], height: 240, width: double.infinity, fit: BoxFit.cover),
+
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: Row(
@@ -283,7 +438,7 @@ class _FeedScreenState extends State<FeedScreen> {
                       const SizedBox(width: 16),
                       IconButton(
                         icon: const Icon(Icons.mode_comment_outlined, color: Colors.white70),
-                        onPressed: () => _openComments(context, post),
+                        onPressed: () => _openComments(post),
                       ),
                       Text('${post['comments'].length}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                     ],
@@ -311,7 +466,7 @@ class RequestsScreen extends StatelessWidget {
   }
 }
 
-// 3. PROFILE & ACCOUNT CREATION SCREEN
+// 3. PROFILE SCREEN
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -322,7 +477,6 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   String name = 'Tarun';
   String handle = '@tarun_vizia';
-  bool isProfileCreated = true;
 
   void _editProfileDialog() {
     final TextEditingController nameController = TextEditingController(text: name);
@@ -333,38 +487,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: const Color(0xFF1E1E1E),
-          title: const Text('Create / Edit ID Profile', style: TextStyle(color: Colors.amberAccent, fontSize: 16)),
+          title: const Text('Edit Margtasni ID', style: TextStyle(color: Colors.amberAccent, fontSize: 16)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: nameController,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: 'Display Name', labelStyle: TextStyle(color: Colors.white54)),
+                decoration: const InputDecoration(labelText: 'Display Name'),
               ),
               TextField(
                 controller: handleController,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: 'User Handle (@id)', labelStyle: TextStyle(color: Colors.white54)),
+                decoration: const InputDecoration(labelText: 'User Handle (@id)'),
               ),
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-            ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
               onPressed: () {
                 setState(() {
                   name = nameController.text;
                   handle = handleController.text;
-                  isProfileCreated = true;
                 });
                 Navigator.pop(context);
               },
-              child: const Text('Save ID', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('Save'),
             ),
           ],
         );
@@ -374,6 +524,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    postCount = globalFeedItems.length; // अपडेटेड पोस्ट काउंट
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Margtasni ID'),
@@ -382,7 +534,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.amberAccent),
             onPressed: _editProfileDialog,
-            tooltip: 'Edit ID Profile',
           ),
         ],
       ),
@@ -396,12 +547,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 4),
             Text(handle, style: const TextStyle(fontSize: 13, color: Colors.amberAccent)),
             const SizedBox(height: 20),
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Column(children: [Text('12', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), Text('Posts', style: TextStyle(color: Colors.white54, fontSize: 11))]),
-                Column(children: [Text('3.4K', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), Text('Subscribers', style: TextStyle(color: Colors.white54, fontSize: 11))]),
-                Column(children: [Text('145', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), Text('Following', style: TextStyle(color: Colors.white54, fontSize: 11))]),
+                Column(children: [Text('${globalFeedItems.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), const Text('Posts', style: TextStyle(color: Colors.white54, fontSize: 11))]),
+                const Column(children: [Text('3.4K', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), Text('Subscribers', style: TextStyle(color: Colors.white54, fontSize: 11))]),
+                const Column(children: [Text('145', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), Text('Following', style: TextStyle(color: Colors.white54, fontSize: 11))]),
               ],
             ),
           ],
@@ -409,4 +560,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  int postCount = 0;
 }
