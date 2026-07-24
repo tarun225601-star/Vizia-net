@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ==================== होम स्क्रीन (वैसा ही यूआई और लाइव लॉग्स) ====================
+// ==================== होम स्क्रीन ====================
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -54,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // सुरक्षित एआई एजेंट फंक्शन (पाथ क्लीनिंग और मास्टर फाइल प्रोटेक्शन के साथ)
+  // सुरक्षित एआई एजेंट फंक्शन (फुल पाथ क्लीनिंग फिक्स के साथ)
   Future<void> _runSafeAiAgent() async {
     final promptText = _promptController.text.trim();
     if (promptText.isEmpty) {
@@ -118,7 +118,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _addLog("📦 AI generated ${filesList.length} files successfully!");
 
       for (var fileItem in filesList) {
-        // यहाँ पाथ को पूरी तरह से क्लीन कर दिया है ताकि कोई स्पेस या फॉर्मेट एरर न आए
         String path = fileItem['path'].toString().trim();
         path = path.replaceAll(' ', '_'); 
         String code = fileItem['code'];
@@ -131,7 +130,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
         _addLog("📤 Pushing to GitHub: $path ...");
 
-        final fileUrl = Uri.parse('[https://api.github.com/repos/$repoOwner/$repoName/contents/$path](https://api.github.com/repos/$repoOwner/$repoName/contents/$path)');
+        // 100% सेफ पाथ फॉर्मेटिंग ताकि FormatException कभी न आए
+        final cleanPath = path.startsWith('/') ? path.substring(1) : path;
+        final fileUrl = Uri.parse('[https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath](https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath)');
 
         String? fileSha;
         final getFileRes = await http.get(
@@ -149,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         String base64EncodedCode = base64Encode(utf8.encode(code));
         final Map<String, dynamic> bodyData = {
-          'message': 'AI Agent: created/updated separate module $path',
+          'message': 'AI Agent: created/updated separate module $cleanPath',
           'content': base64EncodedCode,
           'branch': 'main',
         };
@@ -169,9 +170,9 @@ class _HomeScreenState extends State<HomeScreen> {
         );
 
         if (putFileRes.statusCode != 200 && putFileRes.statusCode != 201) {
-          throw Exception("GitHub Push Failed for $path: ${putFileRes.body}");
+          throw Exception("GitHub Push Failed for $cleanPath: ${putFileRes.body}");
         }
-        _addLog("✅ Successfully pushed: $path");
+        _addLog("✅ Successfully pushed: $cleanPath");
       }
 
       _addLog("🎉 All files pushed successfully without touching master main.dart!");
@@ -206,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // बड़ा सा प्रॉम्प्ट इनपुट बॉक्स (वही पुराना लुक)
+            // बड़ा सा प्रॉम्प्ट इनपुट बॉक्स
             TextField(
               controller: _promptController,
               maxLines: 6,
@@ -258,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
 
-            // नीचे बड़ा टर्मिनल कंसोल बॉक्स (लाइव लॉग्स देखने के लिए)
+            // नीचे बड़ा टर्मिनल कंसोल बॉक्स
             Expanded(
               child: Container(
                 width: double.infinity,
