@@ -25,7 +25,7 @@ jobs:
 
     - name: Fix Android Scaffold & Gradle
       run: |
-        flutter create . --platforms=android --org com.desi.app
+        flutter create . --project-name=desi_ai_app --platforms=android --org com.desi.app
 
     - name: Get Dependencies
       run: flutter pub get
