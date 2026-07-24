@@ -1,6 +1,7 @@
 name: desi_ai_app
-description: "A Desi AI Generated Mobile App"
+description: "A new Flutter project for Vizia AI Agent Studio."
 publish_to: 'none'
+
 version: 1.0.0+1
 
 environment:
@@ -9,7 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.2
+  supabase_flutter: ^2.5.4
+  shared_preferences: ^2.2.3
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:
