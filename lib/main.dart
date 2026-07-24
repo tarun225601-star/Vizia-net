@@ -1,3 +1,31 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Vizia AI Agent Studio',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        primarySwatch: Colors.blue,
+      ),
+      home: const HomeScreen(),
+    );
+  }
+}
+
+// ==================== होम स्क्रीन (जिसमें प्रॉम्प्ट और लाइव लॉग्स हैं) ====================
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -6,9 +34,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // बड़ा प्रॉम्प्ट कंट्रोलर
   final TextEditingController _promptController = TextEditingController();
-  
   final List<String> _logs = [];
   bool _isProcessing = false;
   final ScrollController _scrollController = ScrollController();
@@ -28,8 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // ऑटोनॉमस सेल्फ-हीलिंग और मल्टी-फाइल एजेंट फंक्शन
-  Future<void> _runAgentWithLiveLogs() async {
+  // सुरक्षित एआई एजेंट फंक्शन जो मास्टर फाइल को कभी नहीं छेड़ेगा, बल्कि नया प्रोजेक्ट/फाइल बनाएगा
+  Future<void> _runSafeAiAgent() async {
     final promptText = _promptController.text.trim();
     if (promptText.isEmpty) {
       _addLog("❌ Error: Please enter an app prompt first!");
@@ -57,113 +83,100 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _addLog("🔑 Credentials loaded for repository: $repoOwner/$repoName");
 
-    int maxRetries = 3;
-    int attempt = 0;
-    bool isSuccess = false;
-    String currentPrompt = promptText;
+    try {
+      _addLog("🤖 Asking Groq AI (Llama 3.3) to design the requested app...");
+      
+      // यहाँ एआई को सख्त निर्देश दिया गया है कि lib/main.dart को कभी मत छूना!
+      final groqUrl = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+      final groqResponse = await http.post(
+        groqUrl,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $groqKey',
+        },
+        body: jsonEncode({
+          'model': 'llama-3.3-70b-versatile',
+          'messages': [
+            {
+              'role': 'system',
+              'content': 'You are an autonomous senior Flutter developer. The user wants to build a new app feature based on their prompt. CRITICAL RULE: NEVER modify or rewrite "lib/main.dart". Instead, create new files with unique names (e.g., "lib/feature_app.dart") or a separate folder structure. Return ONLY a valid JSON list of objects with "path" and "code" keys. No markdown like ```json, raw JSON only.'
+            },
+            {'role': 'user', 'content': promptText}
+          ],
+          'temperature': 0.2,
+        }),
+      );
 
-    while (attempt < maxRetries && !isSuccess) {
-      attempt++;
-      _addLog("🔄 --- Attempt $attempt of$maxRetries ---");
+      if (groqResponse.statusCode != 200) {
+        throw Exception("Groq API Failed (${groqResponse.statusCode}): ${groqResponse.body}");
+      }
 
-      try {
-        _addLog("🤖 Asking Groq AI (Llama 3.3) to design all project files...");
-        
-        final groqUrl = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-        final groqResponse = await http.post(
-          groqUrl,
+      final groqData = jsonDecode(groqResponse.body);
+      String rawContent = groqData['choices'][0]['message']['content'];
+      rawContent = rawContent.replaceAll('```json', '').replaceAll('```', '').trim();
+
+      List<dynamic> filesList = jsonDecode(rawContent);
+      _addLog("📦 AI generated ${filesList.length} files successfully!");
+
+      for (var fileItem in filesList) {
+        String path = fileItem['path'];
+        String code = fileItem['code'];
+
+        // सुरक्षा चेक: अगर एआई गलती से भी main.dart लिखने की कोशिश करे तो उसे ब्लॉक कर दो!
+        if (path.contains('lib/main.dart') || path == 'main.dart') {
+          _addLog("🛡️ Safety Block: Ignored attempt to overwrite master main.dart file!");
+          continue;
+        }
+
+        _addLog("📤 Pushing to GitHub: $path ...");
+
+        final fileUrl = Uri.parse('[https://api.github.com/repos/$repoOwner/$repoName/contents/$path](https://api.github.com/repos/$repoOwner/$repoName/contents/$path)');
+
+        String? fileSha;
+        final getFileRes = await http.get(
+          fileUrl,
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $groqKey',
+            'Authorization': 'Bearer $githubToken',
+            'Accept': 'application/vnd.github+json',
           },
-          body: jsonEncode({
-            'model': 'llama-3.3-70b-versatile',
-            'messages': [
-              {
-                'role': 'system',
-                'content': 'You are an autonomous senior Flutter developer. Analyze the prompt and return ONLY a valid JSON list of objects with "path" and "code" keys. Make sure to include pubspec.yaml and lib/main.dart. No markdown like ```json, raw JSON only.'
-              },
-              {'role': 'user', 'content': currentPrompt}
-            ],
-            'temperature': 0.2,
-          }),
         );
 
-        if (groqResponse.statusCode != 200) {
-          throw Exception("Groq API Failed (${groqResponse.statusCode}): ${groqResponse.body}");
+        if (getFileRes.statusCode == 200) {
+          final fileData = jsonDecode(getFileRes.body);
+          fileSha = fileData['sha'];
         }
 
-        final groqData = jsonDecode(groqResponse.body);
-        String rawContent = groqData['choices'][0]['message']['content'];
-        rawContent = rawContent.replaceAll('```json', '').replaceAll('```', '').trim();
+        String base64EncodedCode = base64Encode(utf8.encode(code));
+        final Map<String, dynamic> bodyData = {
+          'message': 'AI Agent: created/updated separate module $path',
+          'content': base64EncodedCode,
+          'branch': 'main',
+        };
 
-        List<dynamic> filesList = jsonDecode(rawContent);
-        _addLog("📦 AI generated ${filesList.length} files successfully!");
-
-        for (var fileItem in filesList) {
-          String path = fileItem['path'];
-          String code = fileItem['code'];
-
-          _addLog("📤 Pushing to GitHub: $path ...");
-
-          final fileUrl = Uri.parse('[https://api.github.com/repos/$repoOwner/$repoName/contents/$path](https://api.github.com/repos/$repoOwner/$repoName/contents/$path)');
-
-          String? fileSha;
-          final getFileRes = await http.get(
-            fileUrl,
-            headers: {
-              'Authorization': 'Bearer $githubToken',
-              'Accept': 'application/vnd.github+json',
-            },
-          );
-
-          if (getFileRes.statusCode == 200) {
-            final fileData = jsonDecode(getFileRes.body);
-            fileSha = fileData['sha'];
-          }
-
-          String base64EncodedCode = base64Encode(utf8.encode(code));
-          final Map<String, dynamic> bodyData = {
-            'message': 'AI Agent Auto-Fix Attempt $attempt: updated $path',
-            'content': base64EncodedCode,
-            'branch': 'main',
-          };
-
-          if (fileSha != null) {
-            bodyData['sha'] = fileSha;
-          }
-
-          final putFileRes = await http.put(
-            fileUrl,
-            headers: {
-              'Authorization': 'Bearer $githubToken',
-              'Accept': 'application/vnd.github+json',
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode(bodyData),
-          );
-
-          if (putFileRes.statusCode != 200 && putFileRes.statusCode != 201) {
-            throw Exception("GitHub Push Failed for $path: ${putFileRes.body}");
-          }
-          _addLog("✅ Successfully pushed: $path");
+        if (fileSha != null) {
+          bodyData['sha'] = fileSha;
         }
 
-        _addLog("🎉 All files pushed! Triggering GitHub Actions build check...");
-        await Future.delayed(const Duration(seconds: 10));
+        final putFileRes = await http.put(
+          fileUrl,
+          headers: {
+            'Authorization': 'Bearer $githubToken',
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(bodyData),
+        );
 
-        isSuccess = true;
-        _addLog("✨ Success! App built and pushed successfully on attempt $attempt!");
-
-      } catch (e) {
-        _addLog("⚠️ Error on Attempt $attempt: ${e.toString()}");
-        if (attempt < maxRetries) {
-          _addLog("🛠️ Self-Healing: AI is analyzing the error and preparing fix...");
-          currentPrompt = "$promptText \n\nFIX ERROR REQUIRED: Previous attempt failed with: ${e.toString()}. Fix this bug.";
-        } else {
-          _addLog("🚨 Max retries reached. Process stopped.");
+        if (putFileRes.statusCode != 200 && putFileRes.statusCode != 201) {
+          throw Exception("GitHub Push Failed for $path: ${putFileRes.body}");
         }
+        _addLog("✅ Successfully pushed: $path");
       }
+
+      _addLog("🎉 All files pushed successfully without touching master main.dart!");
+
+    } catch (e) {
+      _addLog("⚠️ Error: ${e.toString()}");
     }
 
     setState(() {
@@ -192,13 +205,13 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // 1. बड़ा सा प्रॉम्प्ट इनपुट बॉक्स (जैसे पहले था)
+            // बड़ा सा प्रॉम्प्ट इनपुट बॉक्स
             TextField(
               controller: _promptController,
-              maxLines: 6, // बड़ा एरिया
+              maxLines: 6,
               style: const TextStyle(fontSize: 16),
               decoration: InputDecoration(
-                hintText: 'Enter your detailed app prompt here (e.g., Build a feature-rich Calculator app with history)...',
+                hintText: 'Enter your app prompt here (Agent will build it in a separate file safely)...',
                 hintStyle: TextStyle(color: Colors.grey.shade500),
                 filled: true,
                 fillColor: const Color(0xFF1E293B),
@@ -211,17 +224,17 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 16),
 
-            // 2. बड़ा सा शानदार एजेंट रन बटन
+            // बड़ा सा एजेंट रन बटन
             SizedBox(
               width: double.infinity,
-              height: 54, // बड़ा बटन
+              height: 54,
               child: ElevatedButton.icon(
-                onPressed: _isProcessing ? null : _runAgentWithLiveLogs,
+                onPressed: _isProcessing ? null : _runSafeAiAgent,
                 icon: _isProcessing 
                     ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)) 
                     : const Icon(Icons.auto_awesome, size: 24, color: Colors.amberAccent),
                 label: Text(
-                  _isProcessing ? 'AI Agent Working...' : 'Build App with AI Agent',
+                  _isProcessing ? 'AI Agent Working...' : 'Build App with AI Agent Safely',
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -235,7 +248,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 20),
 
-            // 3. लाइव लॉग्स की हेडिंग
             const Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -245,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
 
-            // 4. नीचे बड़ा टर्मिनल कंसोल बॉक्स (हर एक स्टेप दिखाने के लिए)
+            // नीचे बड़ा टर्मिनल कंसोल बॉक्स
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -269,6 +281,89 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================== सेटिंग्स स्क्रीन (API Keys और GitHub Details के लिए) ====================
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final TextEditingController _groqKeyController = TextEditingController();
+  final TextEditingController _githubTokenController = TextEditingController();
+  final TextEditingController _repoOwnerController = TextEditingController();
+  final TextEditingController _repoNameController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _groqKeyController.text = prefs.getString('groq_key') ?? '';
+      _githubTokenController.text = prefs.getString('github_token') ?? '';
+      _repoOwnerController.text = prefs.getString('repo_owner') ?? 'tarun225601-star';
+      _repoNameController.text = prefs.getString('repo_name') ?? '';
+    });
+  }
+
+  Future<void> _saveSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('groq_key', _groqKeyController.text.trim());
+    await prefs.setString('github_token', _githubTokenController.text.trim());
+    await prefs.setString('repo_owner', _repoOwnerController.text.trim());
+    await prefs.setString('repo_name', _repoNameController.text.trim());
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Settings saved successfully!')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('API & GitHub Settings')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: [
+            TextField(
+              controller: _groqKeyController,
+              decoration: const InputDecoration(labelText: 'Groq API Key', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _githubTokenController,
+              decoration: const InputDecoration(labelText: 'GitHub Personal Access Token', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _repoOwnerController,
+              decoration: const InputDecoration(labelText: 'Repository Owner (Username)', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _repoNameController,
+              decoration: const InputDecoration(labelText: 'Repository Name', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _saveSettings,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.all(14)),
+              child: const Text('Save Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
