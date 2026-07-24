@@ -1,5 +1,5 @@
-name: margtasni
-description: "A new Flutter project."
+name: desi_ai_app
+description: "A Desi AI Generated Mobile App"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,12 +9,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  image_picker: ^1.0.7
-  video_player: ^2.8.2
-  audioplayers: ^6.0.0
-  supabase_flutter: ^2.5.0    # <-- Supabase क्लाउड डेटाबेस
+  cupertino_icons: ^1.0.2
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   flutter_lints: ^3.0.0
 
 flutter:
