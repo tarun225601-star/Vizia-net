@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,7 +38,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> {
   bool _isLoading = false;
   String _statusLog = "System Ready. Open Settings to configure keys, then run your AI Agent.";
 
-  // 🚀 Full Replit-Style Agent Pipeline (OpenAI -> Supabase -> GitHub File Push -> GitHub Actions Build)
+  // 🚀 Full Replit-Style Agent Pipeline
   Future<void> _runReplitAgent() async {
     String prompt = _promptController.text.trim();
     if (prompt.isEmpty) return;
@@ -88,7 +88,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> {
       if (aiResponse.statusCode == 200) {
         final data = jsonDecode(aiResponse.body);
         generatedCode = data['choices'][0]['message']['content'];
-        // Clean markdown code blocks if OpenAI includes them
         generatedCode = generatedCode.replaceAll('```dart', '').replaceAll('```', '').trim();
       } else {
         throw Exception("OpenAI Error: ${aiResponse.body}");
@@ -116,7 +115,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> {
       const filePath = 'lib/main.dart';
       final fileUrl = Uri.parse('https://api.github.com/repos/$repoOwner/$repoName/contents/$filePath');
 
-      // First, get the current file SHA if it exists (required by GitHub API to update files)
       String? fileSha;
       final getFileRes = await http.get(
         fileUrl,
@@ -131,17 +129,15 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> {
         fileSha = fileData['sha'];
       }
 
-      // Encode the generated code to Base64 (Required by GitHub Contents API)
       String base64EncodedCode = base64Encode(utf8.encode(generatedCode));
 
-      // Push file content to GitHub
       final Map<String, dynamic> bodyData = {
         'message': 'AI Agent update: built app for prompt -> $prompt',
         'content': base64EncodedCode,
-        'branch': 'main', // ya 'master' jo bhi tera default branch ho
+        'branch': 'main',
       };
       if (fileSha != null) {
-        bodyData['sha'] = fileSha; // Needed if file already exists
+        bodyData['sha'] = fileSha;
       }
 
       final putFileRes = await http.put(
