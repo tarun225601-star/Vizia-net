@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ==================== होम स्क्रीन (जिसमें प्रॉम्प्ट और लाइव लॉग्स हैं) ====================
+// ==================== होम स्क्रीन (वैसा ही यूआई और लाइव लॉग्स) ====================
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -54,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // सुरक्षित एआई एजेंट फंक्शन जो मास्टर फाइल को कभी नहीं छेड़ेगा, बल्कि नया प्रोजेक्ट/फाइल बनाएगा
+  // सुरक्षित एआई एजेंट फंक्शन (पाथ क्लीनिंग और मास्टर फाइल प्रोटेक्शन के साथ)
   Future<void> _runSafeAiAgent() async {
     final promptText = _promptController.text.trim();
     if (promptText.isEmpty) {
@@ -86,7 +86,6 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       _addLog("🤖 Asking Groq AI (Llama 3.3) to design the requested app...");
       
-      // यहाँ एआई को सख्त निर्देश दिया गया है कि lib/main.dart को कभी मत छूना!
       final groqUrl = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       final groqResponse = await http.post(
         groqUrl,
@@ -99,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
           'messages': [
             {
               'role': 'system',
-              'content': 'You are an autonomous senior Flutter developer. The user wants to build a new app feature based on their prompt. CRITICAL RULE: NEVER modify or rewrite "lib/main.dart". Instead, create new files with unique names (e.g., "lib/feature_app.dart") or a separate folder structure. Return ONLY a valid JSON list of objects with "path" and "code" keys. No markdown like ```json, raw JSON only.'
+              'content': 'You are an autonomous senior Flutter developer. The user wants to build a new app feature based on their prompt. CRITICAL RULE: NEVER modify or rewrite "lib/main.dart". Instead, create new files with unique names (e.g., "lib/counter_app.dart") or a separate folder structure. Return ONLY a valid JSON list of objects with "path" and "code" keys. No markdown like ```json, raw JSON only.'
             },
             {'role': 'user', 'content': promptText}
           ],
@@ -119,10 +118,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _addLog("📦 AI generated ${filesList.length} files successfully!");
 
       for (var fileItem in filesList) {
-        String path = fileItem['path'];
+        // यहाँ पाथ को पूरी तरह से क्लीन कर दिया है ताकि कोई स्पेस या फॉर्मेट एरर न आए
+        String path = fileItem['path'].toString().trim();
+        path = path.replaceAll(' ', '_'); 
         String code = fileItem['code'];
 
-        // सुरक्षा चेक: अगर एआई गलती से भी main.dart लिखने की कोशिश करे तो उसे ब्लॉक कर दो!
+        // सुरक्षा चेक: मास्टर फाइल को ओवरराइट होने से बचाना
         if (path.contains('lib/main.dart') || path == 'main.dart') {
           _addLog("🛡️ Safety Block: Ignored attempt to overwrite master main.dart file!");
           continue;
@@ -205,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // बड़ा सा प्रॉम्प्ट इनपुट बॉक्स
+            // बड़ा सा प्रॉम्प्ट इनपुट बॉक्स (वही पुराना लुक)
             TextField(
               controller: _promptController,
               maxLines: 6,
@@ -224,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 16),
 
-            // बड़ा सा एजेंट रन बटन
+            // बड़ा सा शानदार एजेंट रन बटन
             SizedBox(
               width: double.infinity,
               height: 54,
@@ -257,7 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
 
-            // नीचे बड़ा टर्मिनल कंसोल बॉक्स
+            // नीचे बड़ा टर्मिनल कंसोल बॉक्स (लाइव लॉग्स देखने के लिए)
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -289,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ==================== सेटिंग्स स्क्रीन (API Keys और GitHub Details के लिए) ====================
+// ==================== सेटिंग्स स्क्रीन ====================
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
