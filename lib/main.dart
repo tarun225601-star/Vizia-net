@@ -1,169 +1,163 @@
-Future<void> _runAutonomousAgentWithRetry(String userPrompt) async {
-  final prefs = await SharedPreferences.getInstance();
-  final groqKey = prefs.getString('groq_key') ?? '';
-  final githubToken = prefs.getString('github_token') ?? '';
-  final repoOwner = prefs.getString('repo_owner') ?? '';
-  final repoName = prefs.getString('repo_name') ?? '';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-  if (groqKey.isEmpty || githubToken.isEmpty || repoOwner.isEmpty || repoName.isEmpty) {
-    setState(() {
-      _statusLog = "Error: Please configure all API keys in Settings first!";
-    });
-    return;
-  }
+void main() {
+  runApp(const MyApp());
+}
 
-  int maxRetries = 3; // अधिकतम 3 बार खुद कोशिश करेगा
-  int attempt = 0;
-  bool isSuccess = false;
-  String currentPrompt = userPrompt;
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
-  while (attempt < maxRetries && !isSuccess) {
-    attempt++;
-    setState(() {
-      _statusLog = "Attempt $attn: Asking Groq AI & pushing files to GitHub...";
-      // यहाँ 'attn' की जगह attempt है
-      _statusLog = "Attempt $attempt of $maxRetries: Generating and pushing code...";
-    });
-
-    try {
-      // 1. Groq API Call
-      final groqUrl = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-      final groqResponse = await http.post(
-        groqUrl,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $groqKey',
-        },
-        body: jsonEncode({
-          'model': 'llama-3.3-70b-versatile',
-          'messages': [
-            {
-              'role': 'system',
-              'content': 'You are an autonomous senior Flutter developer. Analyze the prompt and return ONLY a valid JSON list of objects with "path" and "code" keys. Make sure the code is completely bug-free so the build never fails. Format: [{"path": "pubspec.yaml", "code": "..."}, {"path": "lib/main.dart", "code": "..."}]'
-            },
-            {'role': 'user', 'content': currentPrompt}
-          ],
-          'temperature': 0.2,
-        }),
-      );
-
-      if (groqResponse.statusCode != 200) {
-        throw Exception("Groq API Error: ${groqResponse.body}");
-      }
-
-      final groqData = jsonDecode(groqResponse.body);
-      String rawContent = groqData['choices'][0]['message']['content'];
-      rawContent = rawContent.replaceAll('```json', '').replaceAll('```', '').trim();
-
-      List<dynamic> filesList = jsonDecode(rawContent);
-
-      // 2. Push all files to GitHub
-      for (var fileItem in filesList) {
-        String path = fileItem['path'];
-        String code = fileItem['code'];
-
-        final fileUrl = Uri.parse('https://api.github.com/repos/$repoOwner/$repoName/contents/$path');
-
-        String? fileSha;
-        final getFileRes = await http.get(
-          fileUrl,
-          headers: {
-            'Authorization': 'Bearer $githubToken',
-            'Accept': 'application/vnd.github+json',
-          },
-        );
-
-        if (getFileRes.statusCode == 200) {
-          final fileData = jsonDecode(getFileRes.body);
-          fileSha = fileData['sha'];
-        }
-
-        String base64EncodedCode = base64Encode(utf8.encode(code));
-        final Map<String, dynamic> bodyData = {
-          'message': 'AI Agent Auto-Fix Attempt $attempt: updated $path',
-          'content': base64EncodedCode,
-          'branch': 'main',
-        };
-
-        if (fileSha != null) {
-          bodyData['sha'] = fileSha;
-        }
-
-        final putFileRes = await http.put(
-          fileUrl,
-          headers: {
-            'Authorization': 'Bearer $githubToken',
-            'Accept': 'application/vnd.github+json',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode(bodyData),
-        );
-
-        if (putFileRes.statusCode != 200 && putFileRes.statusCode != 201) {
-          throw Exception("GitHub Push Error for $path: ${putFileRes.body}");
-        }
-      }
-
-      setState(() {
-        _statusLog = "Attempt $attempt: Files pushed successfully! Triggering build check...";
-      });
-
-      // 3. GitHub Actions Build Status Check (Simulated / API Check)
-      // यहाँ हम गिटहब एक्शंस का रन चेक कर सकते हैं कि बिल्ड पास हुआ या फेल
-      await Future.delayed(const Duration(seconds: 5)); // एक्शन शुरू होने का वेट
-      
-      bool buildPassed = await _checkGitHubWorkflowStatus(repoOwner, repoName, githubToken);
-
-      if (buildPassed) {
-        isSuccess = true;
-        setState(() {
-          _statusLog = "Success! App build passed successfully on attempt $attempt!";
-        });
-      } else {
-        throw Exception("GitHub Actions Build Failed! Bug detected in code.");
-      }
-
-    } catch (e) {
-      if (attempt < maxRetries) {
-        setState(() {
-          _statusLog = "Build Failed on Attempt $attempt. AI is analyzing error and self-correcting...";
-        });
-        // एआई को अगला प्रॉम्प्ट देंगे जिसमें पिछला एरर भी बताएंगे ताकि वह सुधार कर सके
-        currentPrompt = "$userPrompt \n\nIMPORTANT FIX REQUIRED: The previous build failed with error: ${e.toString()}. Fix this bug and rewrite the files.";
-      } else {
-        setState(() {
-          _statusLog = "Max retries reached. Process stopped due to persistent errors: ${e.toString()}";
-        });
-      }
-    }
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Vizia AI Studio',
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        primaryColor: Colors.blueAccent,
+      ),
+      home: const HomeScreen(),
+    );
   }
 }
 
-// गिटहब एक्शन का स्टेटस चेक करने वाला फंक्शन
-Future<bool> _checkGitHubWorkflowStatus(String owner, String repo, String token) async {
-  try {
-    final url = Uri.parse('https://api.github.com/repos/$owner/$repo/actions/runs?per_page=1');
-    final response = await http.get(
-      url,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/vnd.github+json',
-      },
-    );
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['workflow_runs'] != null && data['workflow_runs'].isNotEmpty) {
-        String status = data['workflow_runs'][0]['status']; // completed, in_progress
-        String conclusion = data['workflow_runs'][0]['conclusion'] ?? ''; // success, failure
-        
-        if (status == 'completed' && conclusion == 'success') {
-          return true;
-        } else if (conclusion == 'failure') {
-          return false;
-        }
-      }
-    }
-  } catch (_) {}
-  return true; // अगर चेक न हो पाए तो मान लो पास हो गया या आगे बढ़ो
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController _promptController = TextEditingController();
+  String _statusLog = "Ready to build your app...";
+
+  // यहाँ पर तेरा एजेंट वाला फंक्शन आएगा जो गिटहब पर पुश करेगा
+  Future<void> _runAgent() async {
+    setState(() {
+      _statusLog = "Starting AI Agent...";
+    });
+    // अपना एजेंट कोड यहाँ रख सकते हैं
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Vizia AI Agent Studio'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: _promptController,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: 'Enter your app prompt here (e.g., Build a calculator app)...',
+                filled: true,
+                fillColor: Color(0xFF1E293B),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _runAgent,
+              child: const Text('Build App with AI'),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              _statusLog,
+              style: const TextStyle(color: Colors.greenAccent, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- Settings Screen ---
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final TextEditingController _supabaseUrlController = TextEditingController();
+  final TextEditingController _supabaseKeyController = TextEditingController();
+  final TextEditingController _groqKeyController = TextEditingController();
+  final TextEditingController _githubTokenController = TextEditingController();
+  final TextEditingController _repoOwnerController = TextEditingController();
+  final TextEditingController _repoNameController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadKeys();
+  }
+
+  Future<void> _loadKeys() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _supabaseUrlController.text = prefs.getString('supabase_url') ?? '';
+      _supabaseKeyController.text = prefs.getString('supabase_key') ?? '';
+      _groqKeyController.text = prefs.getString('groq_key') ?? '';
+      _githubTokenController.text = prefs.getString('github_token') ?? '';
+      _repoOwnerController.text = prefs.getString('repo_owner') ?? '';
+      _repoNameController.text = prefs.getString('repo_name') ?? '';
+    });
+  }
+
+  Future<void> _saveKeys() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('supabase_url', _supabaseUrlController.text.trim());
+    await prefs.setString('supabase_key', _supabaseKeyController.text.trim());
+    await prefs.setString('groq_key', _groqKeyController.text.trim());
+    await prefs.setString('github_token', _githubTokenController.text.trim());
+    await prefs.setString('repo_owner', _repoOwnerController.text.trim());
+    await prefs.setString('repo_name', _repoNameController.text.trim());
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('All API Keys Saved Successfully!')),
+    );
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('API Keys & Repository Settings')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          TextField(controller: _groqKeyController, decoration: const InputDecoration(labelText: 'Groq API Key', filled: true, fillColor: Color(0xFF1E293B))),
+          const SizedBox(height: 12),
+          TextField(controller: _githubTokenController, decoration: const InputDecoration(labelText: 'GitHub Personal Access Token', filled: true, fillColor: Color(0xFF1E293B))),
+          const SizedBox(height: 12),
+          TextField(controller: _repoOwnerController, decoration: const InputDecoration(labelText: 'Repository Owner (username)', filled: true, fillColor: Color(0xFF1E293B))),
+          const SizedBox(height: 12),
+          TextField(controller: _repoNameController, decoration: const InputDecoration(labelText: 'Repository Name', filled: true, fillColor: Color(0xFF1E293B))),
+          const SizedBox(height: 20),
+          ElevatedButton(onPressed: _saveKeys, child: const Text('Save Settings')),
+        ],
+      ),
+    );
+  }
 }
