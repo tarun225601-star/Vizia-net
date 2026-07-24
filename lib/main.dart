@@ -38,7 +38,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> {
   bool _isLoading = false;
   String _statusLog = "System Ready. Open Settings to configure keys, then run your AI Agent.";
 
-  // 🚀 Full Replit-Style Agent Pipeline
+  // 🚀 Groq-Powered Fast Agent Pipeline
   Future<void> _runReplitAgent() async {
     String prompt = _promptController.text.trim();
     if (prompt.isEmpty) return;
@@ -47,33 +47,33 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     String supabaseUrl = prefs.getString('supabase_url') ?? '';
     String supabaseKey = prefs.getString('supabase_key') ?? '';
-    String openAiKey = prefs.getString('openai_key') ?? '';
+    String groqKey = prefs.getString('groq_key') ?? '';
     String githubToken = prefs.getString('github_token') ?? '';
     String repoOwner = prefs.getString('repo_owner') ?? '';
     String repoName = prefs.getString('repo_name') ?? '';
 
-    if (supabaseUrl.isEmpty || openAiKey.isEmpty || githubToken.isEmpty || repoOwner.isEmpty || repoName.isEmpty) {
+    if (supabaseUrl.isEmpty || groqKey.isEmpty || githubToken.isEmpty || repoOwner.isEmpty || repoName.isEmpty) {
       setState(() {
-        _statusLog = "Error: Please configure all your API Keys & Repo details in Settings (Gear icon) first!";
+        _statusLog = "Error: Please configure all your Groq API Key & Repo details in Settings (Gear icon) first!";
       });
       return;
     }
 
     setState(() {
       _isLoading = true;
-      _statusLog = "Step 1: AI Agent generating Flutter code via OpenAI (GPT-4o)...";
+      _statusLog = "Step 1: AI Agent generating Flutter code via Groq (Llama 3)...";
     });
 
     try {
-      // 1. OpenAI API Call for Code Generation
+      // 1. Groq API Call (Ultra Fast & Free)
       final aiResponse = await http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
+        Uri.parse('https://api.groq.com/openai/v1/chat/completions'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $openAiKey',
+          'Authorization': 'Bearer $groqKey',
         },
         body: jsonEncode({
-          'model': 'gpt-4o',
+          'model': 'llama-3.3-70b-versatile',
           'messages': [
             {
               'role': 'system',
@@ -90,7 +90,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> {
         generatedCode = data['choices'][0]['message']['content'];
         generatedCode = generatedCode.replaceAll('```dart', '').replaceAll('```', '').trim();
       } else {
-        throw Exception("OpenAI Error: ${aiResponse.body}");
+        throw Exception("Groq Error: ${aiResponse.body}");
       }
 
       setState(() {
@@ -175,7 +175,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> {
 
       if (dispatchRes.statusCode == 204) {
         setState(() {
-          _statusLog = "Success! AI Agent wrote code, pushed 'lib/main.dart' to GitHub, saved to Supabase, and triggered APK Build!\nCheck your GitHub Actions tab.";
+          _statusLog = "Success! Groq AI Agent wrote code, pushed 'lib/main.dart' to GitHub, saved to Supabase, and triggered APK Build!\nCheck your GitHub Actions tab.";
           _isLoading = false;
         });
       } else {
@@ -272,7 +272,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> {
   }
 }
 
-// ⚙️ Settings Screen: To Enter OpenAI, Supabase & GitHub Keys
+// ⚙️ Settings Screen: Groq, Supabase & GitHub Keys
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -283,7 +283,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _supabaseUrlController = TextEditingController();
   final TextEditingController _supabaseKeyController = TextEditingController();
-  final TextEditingController _openAiKeyController = TextEditingController();
+  final TextEditingController _groqKeyController = TextEditingController();
   final TextEditingController _githubTokenController = TextEditingController();
   final TextEditingController _repoOwnerController = TextEditingController();
   final TextEditingController _repoNameController = TextEditingController();
@@ -299,7 +299,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _supabaseUrlController.text = prefs.getString('supabase_url') ?? '';
       _supabaseKeyController.text = prefs.getString('supabase_key') ?? '';
-      _openAiKeyController.text = prefs.getString('openai_key') ?? '';
+      _groqKeyController.text = prefs.getString('groq_key') ?? '';
       _githubTokenController.text = prefs.getString('github_token') ?? '';
       _repoOwnerController.text = prefs.getString('repo_owner') ?? '';
       _repoNameController.text = prefs.getString('repo_name') ?? '';
@@ -310,7 +310,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('supabase_url', _supabaseUrlController.text.trim());
     await prefs.setString('supabase_key', _supabaseKeyController.text.trim());
-    await prefs.setString('openai_key', _openAiKeyController.text.trim());
+    await prefs.setString('groq_key', _groqKeyController.text.trim());
     await prefs.setString('github_token', _githubTokenController.text.trim());
     await prefs.setString('repo_owner', _repoOwnerController.text.trim());
     await prefs.setString('repo_name', _repoNameController.text.trim());
@@ -333,7 +333,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: ListView(
           children: [
             const Text(
-              'Enter your keys below. They are saved securely on your device.',
+              'Enter your keys below. OpenAI is replaced with Groq API.',
               style: TextStyle(color: Colors.grey, fontSize: 13),
             ),
             const SizedBox(height: 16),
@@ -341,11 +341,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 12),
             TextField(controller: _supabaseKeyController, decoration: const InputDecoration(labelText: 'Supabase Anon Key', filled: true, fillColor: Color(0xFF1E293B))),
             const SizedBox(height: 12),
-            TextField(controller: _openAiKeyController, decoration: const InputDecoration(labelText: 'OpenAI API Key (GPT-4o)', filled: true, fillColor: Color(0xFF1E293B))),
+            TextField(controller: _groqKeyController, decoration: const InputDecoration(labelText: 'Groq API Key (gsk_...)', filled: true, fillColor: Color(0xFF1E293B))),
             const SizedBox(height: 12),
             TextField(controller: _githubTokenController, decoration: const InputDecoration(labelText: 'GitHub Personal Access Token', filled: true, fillColor: Color(0xFF1E293B))),
             const SizedBox(height: 12),
-            TextField(controller: _repoOwnerController, decoration: const InputDecoration(labelText: 'GitHub Username', filled: true, fillColor: Color(0xFF1E293B))),
+            TextField(controller: _repoOwnerController, decoration: const InputDecoration(labelText: 'GitHub Username (tarun)', filled: true, fillColor: Color(0xFF1E293B))),
             const SizedBox(height: 12),
             TextField(controller: _repoNameController, decoration: const InputDecoration(labelText: 'GitHub Repository Name', filled: true, fillColor: Color(0xFF1E293B))),
             const SizedBox(height: 24),
