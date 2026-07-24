@@ -11,7 +11,8 @@ dependencies:
     sdk: flutter
   image_picker: ^1.0.7
   video_player: ^2.8.2
-  audioplayers: ^6.0.0    # <-- ये नया जोड़ दिया है भाई, अब गाने बजेंगे!
+  audioplayers: ^6.0.0
+  supabase_flutter: ^2.5.0    # <-- Supabase क्लाउड डेटाबेस
 
 dev_dependencies:
   flutter_lints: ^3.0.0
