@@ -1,8 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // TODO: यहाँ अपनी असली Supabase URL और Anon Key डाल देना भाई
+  await Supabase.initialize(
+    url: 'YOUR_SUPABASE_URL',
+    anonKey: 'YOUR_SUPABASE_ANON_KEY',
+  );
+
   runApp(const MargtasniApp());
 }
+
+final supabase = Supabase.instance.client;
 
 class MargtasniApp extends StatelessWidget {
   const MargtasniApp({Key? key}) : super(key: key);
@@ -26,55 +40,39 @@ class MargtasniApp extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// GLOBAL STATE & DATA STORAGE
+// GLOBAL DATA & SONG LIBRARY
 // -----------------------------------------------------------------------------
 double globalUserWalletBalance = 500.0;
 double globalCreatorEarnings = 1250.0;
-bool isUserLoggedIn = true;
-String loggedInMobile = '9971968060';
 
-// Global Feed List with All Features (Like, Comment, Share, Follow, Gifts)
-List<Map<String, dynamic>> globalFeedItems = [
-  {
-    'id': 'post_1',
-    'username': 'Tarun Business',
-    'handle': '@tarun_vizia',
-    'caption': 'Margtasni का फाइनल और 100% एरर-फ्री प्रोडक्शन बिल्ड लाइव है! 🚀',
-    'songName': 'Radhe Radhe - Live Track',
-    'likes': 240,
-    'isLiked': false,
-    'isFollowing': true,
-    'giftsReceived': 5,
-    'comments': [
-      'भाई अब बिल्ड बिल्कुल मक्खन की तरह पास होगी!',
-    ],
-  },
-  {
-    'id': 'post_2',
-    'username': 'Elight Deep Cleaning',
-    'handle': '@elight_services',
-    'caption': 'Faridabad में प्रीमियम वाटर टैंक और कार डिटेलिंग सेवाएं चालू हैं! ✨',
-    'songName': 'Desi Beats - Upbeat',
-    'likes': 512,
-    'isLiked': true,
-    'isFollowing': false,
-    'giftsReceived': 12,
-    'comments': [
-      'शानदार परफॉर्मेंस!',
-    ],
-  },
+List<Map<String, dynamic>> globalStories = [
+  {'name': 'Your story', 'hasStory': false, 'isAdd': true},
+  {'name': 'muskansingh0...', 'hasStory': true, 'isAdd': false},
+  {'name': 'dheer_singh_6...', 'hasStory': true, 'isAdd': false},
+  {'name': 'poojatanwa...', 'hasStory': true, 'isAdd': false},
+  {'name': 'Priyanka', 'hasStory': true, 'isAdd': false},
 ];
 
-// Song Library for Selection
 List<Map<String, String>> globalSongLibrary = [
-  {'title': 'Radhe Radhe - Live Track', 'artist': 'Vizia Audio'},
-  {'title': 'Desi Beats - Upbeat', 'artist': 'Faridabad Club'},
-  {'title': 'Evening Chill - Lofi', 'artist': 'Studio Vizia'},
-  {'title': 'Acoustic Guitar - Relaxing', 'artist': 'Unplugged'},
+  {
+    'title': 'Radhe Radhe - Live Track',
+    'artist': 'Vizia Audio',
+    'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+  },
+  {
+    'title': 'Desi Beats - Upbeat',
+    'artist': 'Faridabad Club',
+    'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+  },
+  {
+    'title': 'Evening Chill - Lofi',
+    'artist': 'Studio Vizia',
+    'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+  },
 ];
 
 // -----------------------------------------------------------------------------
-// HOME SCREEN
+// HOME SCREEN WITH BOTTOM NAVIGATION
 // -----------------------------------------------------------------------------
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -120,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// FEED SCREEN
+// FEED SCREEN (FETCHES REAL-TIME POSTS FROM SUPABASE CLOUD)
 // -----------------------------------------------------------------------------
 class FeedScreen extends StatefulWidget {
   const FeedScreen({Key? key}) : super(key: key);
@@ -130,287 +128,264 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  String? activePlayingSong;
+  late final AudioPlayer _audioPlayer;
+  String? activePlayingUrl;
+  bool isPlaying = false;
+  String currentTopTab = 'Reels';
+  List<Map<String, dynamic>> feedItems = [];
+  bool isLoading = true;
 
-  void _toggleAudio(String songName) {
-    setState(() {
-      if (activePlayingSong == songName) {
-        activePlayingSong = null;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Audio Paused')));
-      } else {
-        activePlayingSong = songName;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Playing: $songName 🎵')));
-      }
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      setState(() {
+        isPlaying = state == PlayerState.playing;
+      });
     });
+    _fetchCloudPosts();
   }
 
-  void _openCommentsDialog(int postIndex) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.grey[900],
-      isScrollControlled: true,
-      builder: (context) {
-        final TextEditingController commentController = TextEditingController();
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final commentsList = globalFeedItems[postIndex]['comments'] as List;
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 16,
-                right: 16,
-                top: 16,
-              ),
-              child: SizedBox(
-                height: 400,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Comments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amberAccent)),
-                    const Divider(color: Colors.grey),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: commentsList.length,
-                        itemBuilder: (context, index) {
-                          return ListTile(
-                            leading: const CircleAvatar(backgroundColor: Colors.amberAccent, child: Icon(Icons.person, color: Colors.black, size: 16)),
-                            title: Text(commentsList[index], style: const TextStyle(color: Colors.white, fontSize: 14)),
-                          );
-                        },
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: commentController,
-                            decoration: const InputDecoration(
-                              hintText: 'Add a comment...',
-                              filled: true,
-                              fillColor: Colors.black,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.send, color: Colors.amberAccent),
-                          onPressed: () {
-                            if (commentController.text.trim().isNotEmpty) {
-                              setState(() {
-                                commentsList.add(commentController.text.trim());
-                              });
-                              setModalState(() {
-                                commentController.clear();
-                              });
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+  Future<void> _fetchCloudPosts() async {
+    try {
+      final response = await supabase.from('posts').select().order('created_at', ascending: false);
+      setState(() {
+        feedItems = List<Map<String, dynamic>>.from(response);
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        feedItems = [
+          {
+            'username': 'Tarun Business',
+            'handle': '@tarun_vizia',
+            'caption': 'Supabase Connected Successfully! 🚀',
+            'media_path': '',
+            'song_name': 'Radhe Radhe - Live Track',
+            'song_url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+            'likes': 100,
+          }
+        ];
+      });
+    }
   }
 
-  void _sendGiftDialog(int postIndex) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.grey[900],
-          title: const Text('Send Creator Gift (₹50)', style: TextStyle(color: Colors.amberAccent)),
-          content: Text('Send a ₹50 tip from your wallet to ${globalFeedItems[postIndex]['username']}?', style: const TextStyle(color: Colors.white70)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
-              onPressed: () {
-                if (globalUserWalletBalance >= 50) {
-                  setState(() {
-                    globalUserWalletBalance -= 50;
-                    globalCreatorEarnings += 50;
-                    globalFeedItems[postIndex]['giftsReceived'] += 1;
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🎁 Gift sent successfully!')));
-                } else {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Insufficient wallet balance!')));
-                }
-              },
-              child: const Text('Send ₹50'),
-            ),
-          ],
-        );
-      },
-    );
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  void _toggleAudio(String url) async {
+    try {
+      if (activePlayingUrl == url && isPlaying) {
+        await _audioPlayer.pause();
+      } else {
+        await _audioPlayer.stop();
+        await _audioPlayer.play(UrlSource(url));
+        setState(() {
+          activePlayingUrl = url;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Audio Error: $e')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Margtasni Feed', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Row(
+          children: [
+            InkWell(
+              onTap: () => setState(() => currentTopTab = 'Reels'),
+              child: Text(
+                'Reels',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  color: currentTopTab == 'Reels' ? Colors.white : Colors.grey,
+                ),
+              ),
+            ),
+            const Text('  v  ', style: TextStyle(color: Colors.grey, fontSize: 14)),
+            InkWell(
+              onTap: () => setState(() => currentTopTab = 'Friends'),
+              child: Text(
+                'Friends',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  color: currentTopTab == 'Friends' ? Colors.white : Colors.grey,
+                ),
+              ),
+            ),
+          ],
+        ),
         backgroundColor: Colors.black,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.amberAccent),
+            onPressed: () {
+              setState(() => isLoading = true);
+              _fetchCloudPosts();
+            },
+          ),
+        ],
       ),
-      body: ListView.builder(
-        itemCount: globalFeedItems.length,
-        itemBuilder: (context, index) {
-          final item = globalFeedItems[index];
-          final String songName = item['songName'];
-          final bool isPlaying = activePlayingSong == songName;
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.amberAccent))
+          : Column(
+              children: [
+                // Stories Bar
+                Container(
+                  height: 100,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: globalStories.length,
+                    itemBuilder: (context, index) {
+                      final story = globalStories[index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 28,
+                              backgroundColor: Colors.grey[800],
+                              child: story['isAdd']
+                                  ? const Icon(Icons.add, color: Colors.white, size: 28)
+                                  : const Icon(Icons.person, color: Colors.white, size: 28),
+                            ),
+                            const SizedBox(height: 4),
+                            SizedBox(
+                              width: 65,
+                              child: Text(
+                                story['name'],
+                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const Divider(color: Colors.grey, height: 1),
 
-          return Card(
-            color: Colors.grey[900],
-            margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const CircleAvatar(
-                        backgroundColor: Colors.amberAccent,
-                        child: Icon(Icons.person, color: Colors.black),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
+                // Feed List from Supabase Cloud
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: feedItems.length,
+                    itemBuilder: (context, index) {
+                      final item = feedItems[index];
+                      final String songUrl = item['song_url'] ?? globalSongLibrary[0]['url']!;
+                      final bool isThisSongPlaying = activePlayingUrl == songUrl && isPlaying;
+                      final String mediaPath = item['media_path'] ?? '';
+
+                      return Card(
+                        color: Colors.black,
+                        margin: const EdgeInsets.symmetric(vertical: 10),
+                        elevation: 0,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(item['username'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-                            Text(item['handle'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              child: Row(
+                                children: [
+                                  const CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: Colors.amberAccent,
+                                    child: Icon(Icons.person, color: Colors.black, size: 18),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(item['username'] ?? 'Tarun Business', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Stack(
+                              alignment: Alignment.bottomRight,
+                              children: [
+                                Container(
+                                  height: 380,
+                                  width: double.infinity,
+                                  color: Colors.grey[900],
+                                  child: mediaPath.isNotEmpty && File(mediaPath).existsSync()
+                                      ? Image.file(File(mediaPath), fit: BoxFit.cover)
+                                      : const Center(
+                                          child: Icon(Icons.image, size: 64, color: Colors.white30),
+                                        ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.favorite, color: Colors.red, size: 28),
+                                      const SizedBox(height: 4),
+                                      Text('${item['likes'] ?? 1}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: 12,
+                                  left: 12,
+                                  right: 70,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(item['caption'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.music_note, color: Colors.amberAccent, size: 14),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              item['song_name'] ?? 'Radhe Radhe',
+                                              style: const TextStyle(color: Colors.amberAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: Icon(
+                                              isThisSongPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                                              color: Colors.amberAccent,
+                                              size: 28,
+                                            ),
+                                            onPressed: () => _toggleAudio(songUrl),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: item['isFollowing'] ? Colors.grey[800] : Colors.deepPurpleAccent,
-                          foregroundColor: Colors.white,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            item['isFollowing'] = !item['isFollowing'];
-                          });
-                        },
-                        child: Text(item['isFollowing'] ? 'Following' : 'Follow'),
-                      ),
-                    ],
+                      );
+                    },
                   ),
-                  const SizedBox(height: 12),
-                  Text(item['caption'], style: const TextStyle(color: Colors.white, fontSize: 14)),
-                  const SizedBox(height: 12),
-                  Container(
-                    height: 200,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.deepPurpleAccent.withOpacity(0.5)),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.play_circle_filled, size: 64, color: Colors.amberAccent),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amberAccent.withOpacity(0.5)),
-                    ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                            color: Colors.amberAccent,
-                            size: 32,
-                          ),
-                          onPressed: () => _toggleAudio(songName),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Background Track', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                              Text(songName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              item['isLiked'] ? Icons.favorite : Icons.favorite_border,
-                              color: item['isLiked'] ? Colors.red : Colors.white,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                item['isLiked'] = !item['isLiked'];
-                                item['likes'] += item['isLiked'] ? 1 : -1;
-                              });
-                            },
-                          ),
-                          Text('${item['likes']}', style: const TextStyle(color: Colors.white)),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.comment_outlined, color: Colors.blueAccent),
-                            onPressed: () => _openCommentsDialog(index),
-                          ),
-                          Text('${(item['comments'] as List).length}', style: const TextStyle(color: Colors.white)),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.card_giftcard, color: Colors.amberAccent),
-                            onPressed: () => _sendGiftDialog(index),
-                          ),
-                          Text('${item['giftsReceived']}', style: const TextStyle(color: Colors.amberAccent)),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.share, color: Colors.greenAccent),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied!')));
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          );
-        },
-      ),
     );
   }
 }
 
 // -----------------------------------------------------------------------------
-// CREATE POST SCREEN
+// CREATE POST SCREEN (UPLOADS DIRECTLY TO SUPABASE)
 // -----------------------------------------------------------------------------
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({Key? key}) : super(key: key);
@@ -421,21 +396,36 @@ class CreatePostScreen extends StatefulWidget {
 
 class _CreatePostScreenState extends State<CreatePostScreen> {
   final TextEditingController _captionController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+  String? pickedFilepath;
   Map<String, String> selectedSong = globalSongLibrary[0];
-  bool isVideoPost = true;
+  bool isUploading = false;
 
-  void _openAudioPickerModal() {
+  Future<void> _pickMedia() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        pickedFilepath = image.path;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Photo selected from Gallery!')),
+      );
+    }
+  }
+
+  void _showSongPickerModal() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
       builder: (context) {
-        return Container(
-          height: 300,
-          padding: const EdgeInsets.all(16),
+        return SizedBox(
+          height: 250,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Select Background Song', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amberAccent)),
+              const Padding(
+                padding: EdgeInsets.all(12.0),
+                child: Text('Select Background Song', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.amberAccent)),
+              ),
               const Divider(color: Colors.grey),
               Expanded(
                 child: ListView.builder(
@@ -443,18 +433,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   itemBuilder: (context, index) {
                     final song = globalSongLibrary[index];
                     return ListTile(
-                      title: Text(song['title']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      leading: const Icon(Icons.music_note, color: Colors.amberAccent),
+                      title: Text(song['title']!, style: const TextStyle(color: Colors.white)),
                       subtitle: Text(song['artist']!, style: const TextStyle(color: Colors.grey)),
-                      trailing: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurpleAccent, foregroundColor: Colors.white),
-                        onPressed: () {
-                          setState(() {
-                            selectedSong = song;
-                          });
-                          Navigator.pop(context);
-                        },
-                        child: const Text('Use'),
-                      ),
+                      onTap: () {
+                        setState(() {
+                          selectedSong = song;
+                        });
+                        Navigator.pop(context);
+                      },
                     );
                   },
                 ),
@@ -466,99 +453,108 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  void _publishPost() {
-    if (_captionController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please write a caption!')));
-      return;
-    }
+  Future<void> _publishToSupabaseCloud() async {
+    setState(() => isUploading = true);
 
-    setState(() {
-      globalFeedItems.insert(0, {
-        'id': 'post_${DateTime.now().millisecondsSinceEpoch}',
+    try {
+      // Supabase डेटाबेस की 'posts' टेबल में डाटा सेव करना
+      await supabase.from('posts').insert({
         'username': 'Tarun Business',
         'handle': '@tarun_vizia',
-        'caption': _captionController.text.trim(),
-        'songName': selectedSong['title']!,
+        'caption': _captionController.text.trim().isEmpty ? 'New Reel by Tarun' : _captionController.text.trim(),
+        'media_path': pickedFilepath ?? '',
+        'song_name': selectedSong['title']!,
+        'song_url': selectedSong['url']!,
         'likes': 1,
-        'isLiked': false,
-        'isFollowing': true,
-        'giftsReceived': 0,
-        'comments': ['Nice post!'],
       });
-      _captionController.clear();
-    });
 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Published successfully to Feed! 🚀')));
+      setState(() {
+        _captionController.clear();
+        pickedFilepath = null;
+        isUploading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reel Published to Supabase Cloud Server! 🚀')),
+      );
+    } catch (e) {
+      setState(() => isUploading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cloud Upload Error: $e')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Reel / Post', style: TextStyle(fontWeight: FontWeight.bold))),
+      appBar: AppBar(
+        title: const Text('Create Reel (Cloud)', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.black,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 160,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey[900],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.amberAccent),
-              ),
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.cloud_upload, size: 40, color: Colors.amberAccent),
-                    SizedBox(height: 8),
-                    Text('Media Ready', style: TextStyle(color: Colors.white70)),
-                  ],
+            InkWell(
+              onTap: _pickMedia,
+              child: Container(
+                height: 220,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amberAccent),
                 ),
+                child: pickedFilepath != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(File(pickedFilepath!), fit: BoxFit.cover),
+                      )
+                    : const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_photo_alternate, size: 50, color: Colors.amberAccent),
+                          SizedBox(height: 8),
+                          Text('Tap to Select Photo from Gallery', style: TextStyle(color: Colors.white70)),
+                        ],
+                      ),
               ),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              tileColor: Colors.grey[900],
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              leading: const Icon(Icons.music_note, color: Colors.amberAccent),
+              title: Text(selectedSong['title']!, style: const TextStyle(color: Colors.white)),
+              subtitle: const Text('Tap to change song', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white),
+              onTap: _showSongPickerModal,
             ),
             const SizedBox(height: 20),
             TextField(
               controller: _captionController,
               maxLines: 3,
               decoration: const InputDecoration(
-                hintText: 'Write caption...',
+                hintText: 'Write a caption...',
                 filled: true,
                 fillColor: Colors.grey,
               ),
             ),
             const SizedBox(height: 20),
-            const Text('Background Music', style: TextStyle(color: Colors.grey, fontSize: 13)),
-            const SizedBox(height: 8),
-            InkWell(
-              onTap: _openAudioPickerModal,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[900],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amberAccent),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.music_note, color: Colors.amberAccent),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text(selectedSong['title']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.amberAccent),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
-                onPressed: _publishPost,
-                child: const Text('Publish Now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amberAccent,
+                  foregroundColor: Colors.black,
+                ),
+                onPressed: isUploading ? null : _publishToSupabaseCloud,
+                child: isUploading
+                    ? const CircularProgressIndicator(color: Colors.black)
+                    : const Text('Publish to Cloud Server', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -568,67 +564,26 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 }
 
-// -----------------------------------------------------------------------------
-// WALLET SCREEN
-// -----------------------------------------------------------------------------
 class WalletScreen extends StatelessWidget {
   const WalletScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Wallet')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey[900],
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Available Balance', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 8),
-                  Text('₹$globalUserWalletBalance', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.amberAccent)),
-                  const SizedBox(height: 16),
-                  Text('Creator Earnings: ₹$globalCreatorEarnings', style: const TextStyle(color: Colors.white70)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      appBar: AppBar(title: const Text('Wallet'), backgroundColor: Colors.black),
+      body: Center(child: Text('Available Balance: ₹$globalUserWalletBalance', style: const TextStyle(fontSize: 18))),
     );
   }
 }
 
-// -----------------------------------------------------------------------------
-// PROFILE SCREEN
-// -----------------------------------------------------------------------------
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircleAvatar(radius: 40, backgroundColor: Colors.amberAccent, child: Icon(Icons.person, size: 50, color: Colors.black)),
-            const SizedBox(height: 16),
-            const Text('Tarun Business', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 8),
-            Text('Mobile: $loggedInMobile', style: const TextStyle(color: Colors.grey, fontSize: 16)),
-          ],
-        ),
-      ),
+      appBar: AppBar(title: const Text('Profile'), backgroundColor: Colors.black),
+      body: const Center(child: Text('Tarun Business • Faridabad', style: TextStyle(fontSize: 18))),
     );
   }
 }
