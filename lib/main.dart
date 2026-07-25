@@ -101,14 +101,15 @@ class _HomeScreenState extends State<HomeScreen> {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $groqKey',
           },
-                body: jsonEncode({
+                      body: jsonEncode({
         "model": "llama-3.3-70b-versatile",
         "messages": [
-          {"role": "system", "content": "Create Flutter multi-file apps including lib/ files and .github/workflows/flutter_build.yml. Return raw JSON array of paths and codes only. Use Node.js version 20."},
+          {"role": "system", "content": "Create Flutter multi-file apps including lib/ files and .github/workflows/flutter_build.yml. CRITICAL FOR WORKFLOW: Use Node.js version 20 ('node-version: \"20.x\"') and always use 'flutter pub get' for Flutter projects, never 'dart pub get'. Return raw JSON array of paths and codes only."},
           {"role": "user", "content": currentContextPrompt}
         ],
         "temperature": 0.2
       }),
+
 
         );
 
