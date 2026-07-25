@@ -272,7 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Run Agent Button
+            // Run Agent Button (Corrected Syntax)
             ElevatedButton.icon(
               onPressed: _isProcessing ? null : _runSafeAiAgent,
               style: ElevatedButton.styleFrom(
@@ -283,7 +283,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               icon: _isProcessing
-                  const SizedBox(
+                  ? const SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
