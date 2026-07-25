@@ -104,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 body: jsonEncode({
         "model": "llama-3.3-70b-versatile",
         "messages": [
-          {"role": "system", "content": "Create Flutter multi-file apps including lib/ files and .github/workflows/flutter_build.yml. Return raw JSON array of paths and codes only."},
+          {"role": "system", "content": "Create Flutter multi-file apps including lib/ files and .github/workflows/flutter_build.yml. Return raw JSON array of paths and codes only. Use Node.js version 20."},
           {"role": "user", "content": currentContextPrompt}
         ],
         "temperature": 0.2
