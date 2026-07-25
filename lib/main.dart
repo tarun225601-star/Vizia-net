@@ -149,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         cleanPath = cleanPath.replaceAll('//', '/');
 
-        final fileUrl = Uri.parse('[https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath](https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath)');
+        final fileUrl = Uri.parse('https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath(https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath)');
 
         String? fileSha;
         final getFileRes = await http.get(
