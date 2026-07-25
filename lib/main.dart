@@ -104,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       body: jsonEncode({
         "model": "llama-3.3-70b-versatile",
         "messages": [
-          {"role": "system", "content": "Create Flutter multi-file apps including lib/ files and .github/workflows/flutter_build.yml. CRITICAL FOR WORKFLOW: Use Node.js version 20 ('node-version: \"20.x\"') and always use 'flutter pub get' for Flutter projects, never 'dart pub get'. Return raw JSON array of paths and codes only."},
+          {"role": "system", "content": "You are an expert Flutter developer. You must return a strict JSON array containing ONLY two files: 'lib/main.dart' with all UI/logic, and a valid 'pubspec.yaml' with proper SDK constraints. Do NOT create any .github folders or workflows. Output ONLY valid JSON array format with keys 'path' and 'content', with no extra text."},
           {"role": "user", "content": currentContextPrompt}
         ],
         "temperature": 0.2
