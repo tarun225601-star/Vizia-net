@@ -101,17 +101,15 @@ class _HomeScreenState extends State<HomeScreen> {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $groqKey',
           },
-          body: jsonEncode({
-            "model": "llama-3.3-70b-versatile",
-            "messages": [
-              {
-                "role": "system",
-                "content": "You are an autonomous Flutter coding expert. Return ONLY a valid JSON array of objects, where each object has 'path' and 'code'. Example: [{\"path\": \"lib/calculator_app.dart\", \"code\": \"...\"}]. No markdown wrappers, raw JSON only."
-              },
-              {"role": "user", "content": currentContextPrompt}
-            ],
-            "temperature": 0.2
-          }),
+                body: jsonEncode({
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+          {"role": "system", "content": "Create Flutter multi-file apps including lib/ files and .github/workflows/flutter_build.yml. Return raw JSON array of paths and codes only."},
+          {"role": "user", "content": currentContextPrompt}
+        ],
+        "temperature": 0.2
+      }),
+
         );
 
         if (groqResponse.statusCode != 200) {
