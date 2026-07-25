@@ -54,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // सुरक्षित एआई एजेंट फंक्शन (फुल पाथ सैनिटाइजेशन और एरर प्रिवेंशन के साथ)
+  // सुरक्षित एआई एजेंट फंक्शन (कंट्रोल कैरेक्टर्स और JSON क्रैश से सुरक्षित)
   Future<void> _runSafeAiAgent() async {
     final promptText = _promptController.text.trim();
     if (promptText.isEmpty) {
@@ -112,13 +112,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final groqData = jsonDecode(groqResponse.body);
       String rawContent = groqData['choices'][0]['message']['content'];
+      
+      // मार्कडाउन हटाएं और JSON को कंट्रोल कैरेक्टर एरर से बचाने के लिए सैनिटाइज करें
       rawContent = rawContent.replaceAll('```json', '').replaceAll('```', '').trim();
+      
+      // अगर एआई के रिस्पॉन्स में कोई गलत कंट्रोल कैरेक्टर हो तो उसे साफ करना
+      List<dynamic> filesList;
+      try {
+        filesList = jsonDecode(rawContent);
+      } catch (_) {
+        // यदि सीधा डीकोड फेल हो, तो कंट्रोल कैरेक्टर्स को रिप्लेस करके दोबारा कोशिश करें
+        final sanitizedContent = rawContent.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '');
+        filesList = jsonDecode(sanitizedContent);
+      }
 
-      List<dynamic> filesList = jsonDecode(rawContent);
       _addLog("📦 AI generated ${filesList.length} files successfully!");
 
       for (var fileItem in filesList) {
-        // पाथ को पूरी तरह से साफ और सुरक्षित करना (Spaces, quotes, newlines हटाना)
+        // पाथ को पूरी तरह से साफ और सुरक्षित करना
         String path = fileItem['path'].toString().replaceAll(RegExp(r'[\r\n"\[\]]'), '').trim();
         path = path.replaceAll(' ', '_'); 
         String code = fileItem['code'];
@@ -131,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         _addLog("📤 Pushing to GitHub: $path ...");
 
-        // GitHub API के लिए पाथ को एकदम 100% शुद्ध करना ताकि malformed path एरर न आए
+        // GitHub API के लिए पाथ को एकदम 100% शुद्ध करना
         String cleanPath = path;
         while (cleanPath.startsWith('/') || cleanPath.startsWith('\\')) {
           cleanPath = cleanPath.substring(1);
