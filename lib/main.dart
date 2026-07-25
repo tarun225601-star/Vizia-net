@@ -145,15 +145,6 @@ class _HomeScreenState extends State<HomeScreen> {
           while (path.startsWith('/') || path.startsWith('\\')) {
             path = path.substring(1);
           }
-          if (!path.startsWith('lib/')) {
-            path = 'lib/$path';
-          }
-
-          // Prevent main.dart override
-          if (path.contains('lib/main.dart') || path == 'main.dart') {
-            _addLog("🛡️ Safety Block: main.dart को ओवरराइड करने से बचाया गया। पाथ बदलकर lib/custom_screen.dart कर दिया।");
-            path = 'lib/custom_screen.dart';
-          }
 
           _addLog("📤 GitHub पर पुश कर रहे हैं: $path ...");
 
