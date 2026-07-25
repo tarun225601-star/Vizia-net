@@ -54,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // सुरक्षित एआई एजेंट फंक्शन (फुल पाथ क्लीनिंग फिक्स के साथ)
+  // सुरक्षित एआई एजेंट फंक्शन (फुल पाथ सैनिटाइजेशन और एरर प्रिवेंशन के साथ)
   Future<void> _runSafeAiAgent() async {
     final promptText = _promptController.text.trim();
     if (promptText.isEmpty) {
@@ -98,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
           'messages': [
             {
               'role': 'system',
-              'content': 'You are an autonomous senior Flutter developer. The user wants to build a new app feature based on their prompt. CRITICAL RULE: NEVER modify or rewrite "lib/main.dart". Instead, create new files with unique names (e.g., "lib/counter_app.dart") or a separate folder structure. Return ONLY a valid JSON list of objects with "path" and "code" keys. No markdown like ```json, raw JSON only.'
+              'content': 'You are an autonomous senior Flutter developer. The user wants to build a new app feature based on their prompt. CRITICAL RULE: NEVER modify or rewrite "lib/main.dart". Instead, create new files with unique names (e.g., "lib/counter_app.dart" or "lib/calculator_app.dart"). Return ONLY a valid JSON list of objects with "path" and "code" keys. No markdown like ```json, raw JSON only.'
             },
             {'role': 'user', 'content': promptText}
           ],
@@ -118,7 +118,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _addLog("📦 AI generated ${filesList.length} files successfully!");
 
       for (var fileItem in filesList) {
-        String path = fileItem['path'].toString().trim();
+        // पाथ को पूरी तरह से साफ और सुरक्षित करना (Spaces, quotes, newlines हटाना)
+        String path = fileItem['path'].toString().replaceAll(RegExp(r'[\r\n"\[\]]'), '').trim();
         path = path.replaceAll(' ', '_'); 
         String code = fileItem['code'];
 
@@ -130,9 +131,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
         _addLog("📤 Pushing to GitHub: $path ...");
 
-        // 100% सेफ पाथ फॉर्मेटिंग ताकि FormatException कभी न आए
-        final cleanPath = path.startsWith('/') ? path.substring(1) : path;
-        final fileUrl = Uri.parse('https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath](https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath)');
+        // GitHub API के लिए पाथ को एकदम 100% शुद्ध करना ताकि malformed path एरर न आए
+        String cleanPath = path;
+        while (cleanPath.startsWith('/') || cleanPath.startsWith('\\')) {
+          cleanPath = cleanPath.substring(1);
+        }
+        cleanPath = cleanPath.replaceAll('//', '/');
+
+        final fileUrl = Uri.parse('[https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath](https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath)');
 
         String? fileSha;
         final getFileRes = await http.get(
