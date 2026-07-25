@@ -132,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // 100% सेफ पाथ फॉर्मेटिंग ताकि FormatException कभी न आए
         final cleanPath = path.startsWith('/') ? path.substring(1) : path;
-        final fileUrl = Uri.parse('[https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath](https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath)');
+        final fileUrl = Uri.parse('https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath](https://api.github.com/repos/$repoOwner/$repoName/contents/$cleanPath)');
 
         String? fileSha;
         final getFileRes = await http.get(
