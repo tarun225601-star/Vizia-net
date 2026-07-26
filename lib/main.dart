@@ -175,12 +175,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // 4. GitHub API: Put/Commit file
           final Map<String, dynamic> bodyData = {
-            "message": "Autonomous Agent Self-Healing Commit for $path",
-            "content": base64Encode(utf8.encode(code)),
-          };
-          if (fileSha != null) {
-            bodyData["sha"] = fileSha;
-          }
+  "message": "Autonomous Agent Self-Healing Commit for $path",
+  "content": base64Encode(utf8.encode(code)),
+  if (fileSha != null) "sha": fileSha,
+};
+
 
           final putRes = await http.put(
             fileUrl,
