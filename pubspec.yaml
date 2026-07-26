@@ -1,5 +1,5 @@
 name: desi_ai_app
-description: "A new Flutter project for Vizia AI Agent Studio."
+description: "A new Flutter project for AI Agent & Studio"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -13,6 +13,7 @@ dependencies:
   supabase_flutter: ^2.5.4
   shared_preferences: ^2.2.3
   http: ^1.2.0
+  image_picker: ^1.0.7  # <--- यह नया पैकेज यहाँ जोड़ दिया है!
 
 dev_dependencies:
   flutter_test:
