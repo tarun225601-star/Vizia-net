@@ -1,4 +1,4 @@
-import 'io';
+import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -112,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                // इमेज पिकर बटन (अब यह काम करेगा क्योंकि पैकेज जुड़ गया है)
+                // इमेज पिकर बटन
                 IconButton(
                   style: IconButton.styleFrom(backgroundColor: Colors.grey[800]),
                   icon: const Icon(Icons.image, color: Colors.greenAccent),
@@ -399,8 +399,6 @@ Future<void> pickErrorImageAndFix(Function(String) logCallback, TextEditingContr
     }
 
     logCallback("🖼️ एरर स्क्रीनशॉट चुन लिया गया है!");
-    
-    // इमेज पाथ को प्रॉम्प्ट बॉक्स में हिंट के तौर पर जोड़ सकते हैं या विजन मॉडल को भेज सकते हैं
     promptController.text = "इस स्क्रीनशॉट में दिख रहे एरर को देखकर कोड ठीक करो (इमेज पाथ: ${image.path})";
     logCallback("💡 प्रॉम्प्ट में एरर फिक्स करने का निर्देश जोड़ दिया गया है, अब 'एजेंट शुरू करें' दबाएं।");
   } catch (e) {
