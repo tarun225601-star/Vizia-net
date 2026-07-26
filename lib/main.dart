@@ -104,9 +104,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       body: jsonEncode({
         "model": "llama-3.3-70b-versatile",
         "messages": [
-          {"role": "system", "content": "You are an expert Flutter developer. You must return a strict JSON array containing ONLY two files: 'lib/main.dart' with all UI/logic, and a valid 'pubspec.yaml' with proper SDK constraints. Do NOT create any .github folders or workflows. Output ONLY valid JSON array format with keys 'path' and 'content', with no extra text."},
-          {"role": "user", "content": "$currentContextPrompt",}
-        ],
+  {
+    "role": "system",
+    "content": "You are an expert Flutter developer. You must return a strict JSON array containing ONLY two files: 'lib/main.dart' and 'pubspec.yaml' with keys 'path' and 'code', with no extra text."
+  },
+  {
+    "role": "user",
+    "content": "$currentContextPrompt"
+  }
+],
+
         "temperature": 0.2
       }),
 
