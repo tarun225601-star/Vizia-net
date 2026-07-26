@@ -86,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     String currentContextPrompt = promptText;
-    int maxSelfHealingRetries = 3;
+    int maxSelfHealingRetries = 20;
     bool overallSuccess = false;
 
     for (int attempt = 1; attempt <= maxSelfHealingRetries; attempt++) {
@@ -105,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
         "model": "llama-3.3-70b-versatile",
         "messages": [
           {"role": "system", "content": "You are an expert Flutter developer. You must return a strict JSON array containing ONLY two files: 'lib/main.dart' with all UI/logic, and a valid 'pubspec.yaml' with proper SDK constraints. Do NOT create any .github folders or workflows. Output ONLY valid JSON array format with keys 'path' and 'content', with no extra text."},
-          {"role": "user", "content": currentContextPrompt}
+          {"role": "user", "content": "$currentContextPrompt",}
         ],
         "temperature": 0.2
       }),
