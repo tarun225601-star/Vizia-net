@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _promptController = TextEditingController();
   final List<String> _logs = [];
   bool _isLoading = false;
+  String? _selectedImagePath; // चुनी गई इमेज का रास्ता स्टोर करने के लिए
 
   void _addLog(String message) {
     setState(() {
@@ -47,8 +48,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // एजेंटिक लूप स्टार्ट करने वाला बटन फंक्शन
   Future<void> _startProcess() async {
     String prompt = _promptController.text.trim();
-    if (prompt.isEmpty) {
-      _addLog("⚠️ कृपया पहले कोई प्रॉम्प्ट दर्ज करें!");
+    if (prompt.isEmpty && _selectedImagePath == null) {
+      _addLog("⚠️ कृपया पहले कोई प्रॉम्प्ट दर्ज करें या एरर स्क्रीनशॉट चुनें!");
       return;
     }
 
@@ -66,9 +67,22 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    await startAgenticLoop(prompt, 'lib/generated_app.dart', repoOwner, repoName, githubToken, groqKey, _addLog);
+    await startAgenticLoop(
+      prompt: prompt.isEmpty ? "इस स्क्रीनशॉट में दिए गए एरर को देखकर Flutter कोड को पूरी तरह ठीक करो।" : prompt, 
+      imagePath: _selectedImagePath,
+      path: 'lib/generated_app.dart', 
+      repoOwner: repoOwner, 
+      repoName: repoName, 
+      githubToken: githubToken, 
+      groqKey: groqKey, 
+      logCallback: _addLog
+    );
 
-    setState(() => _isLoading = false);
+    // काम पूरा होने पर इमेज पाथ साफ़ कर दें
+    setState(() {
+      _selectedImagePath = null;
+      _isLoading = false;
+    });
   }
 
   @override
@@ -95,11 +109,22 @@ class _HomeScreenState extends State<HomeScreen> {
             TextField(
               controller: _promptController,
               maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'आप क्या ऐप बनवाना चाहते हैं?',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: 'आप क्या ऐप बनवाना चाहते हैं या एरर सुधारना है?',
+                border: const OutlineInputBorder(),
+                suffixIcon: _selectedImagePath != null 
+                    ? const Icon(Icons.check_circle, color: Colors.green) 
+                    : null,
               ),
             ),
+            if (_selectedImagePath != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  "📷 स्क्रीनशॉट जुड़ा हुआ है: ${_selectedImagePath!.split('/').last}",
+                  style: const TextStyle(color: Colors.greenAccent, fontSize: 12),
+                ),
+              ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -112,12 +137,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                // इमेज पिकर बटन
+                // इमेज पिकर बटन (अब यह इमेज को एआई के पास भेजेगा)
                 IconButton(
                   style: IconButton.styleFrom(backgroundColor: Colors.grey[800]),
                   icon: const Icon(Icons.image, color: Colors.greenAccent),
                   tooltip: 'एरर स्क्रीनशॉट अपलोड करें',
-                  onPressed: () => pickErrorImageAndFix(_addLog, _promptController),
+                  onPressed: () async {
+                    final ImagePicker picker = ImagePicker();
+                    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+                    if (image != null) {
+                      setState(() {
+                        _selectedImagePath = image.path;
+                      });
+                      _addLog("🖼️ एरर स्क्रीनशॉट सेलेक्ट हो गया है! अब 'एजेंट शुरू करें' दबाएं।");
+                    }
+                  },
                 ),
                 const SizedBox(width: 5),
                 // APK डाउनलोड बटन
@@ -262,18 +296,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 // ==========================================
-// एजेंटिक लूप और लॉजिक फंक्शन्स
+// एजेंटिक लूप और लॉजिक फंक्शन्स (Vision Enabled)
 // ==========================================
-Future<void> startAgenticLoop(
-    String initialPrompt, 
-    String path, 
-    String repoOwner, 
-    String repoName, 
-    String githubToken, 
-    String groqKey,
-    Function(String) logCallback) async {
+Future<void> startAgenticLoop({
+  required String prompt,
+  String? imagePath,
+  required String path,
+  required String repoOwner,
+  required String repoName,
+  required String githubToken,
+  required String groqKey,
+  required Function(String) logCallback,
+}) async {
   
-  String currentPrompt = initialPrompt;
+  String currentPrompt = prompt;
   bool isBuildSuccessful = false;
   int maxRetries = 3;
   int attempt = 0;
@@ -282,7 +318,14 @@ Future<void> startAgenticLoop(
     attempt++;
     logCallback("🔄 कोशिश नंबर $attempt जारी है...");
 
-    String aiGeneratedCode = await callGroqApi(currentPrompt, groqKey, logCallback);
+    // अब यह विजन API को कॉल करेगा ताकि इमेज और टेक्स्ट दोनों समझ आ सकें
+    String aiGeneratedCode = await callGroqVisionApi(
+      prompt: currentPrompt, 
+      imagePath: attempt == 1 ? imagePath : null, // पहली कोशिश में इमेज साथ जाएगी
+      apiKey: groqKey, 
+      logCallback: logCallback
+    );
+    
     if (aiGeneratedCode.isEmpty) break;
 
     var gitHubResult = await pushCodeToGitHubAndCheckBuild(
@@ -295,15 +338,15 @@ Future<void> startAgenticLoop(
       break;
     } else {
       String capturedError = gitHubResult['errorLog'];
-      logCallback("⚠️ एजेंट को एरर मिला, ऑटो-सुधार कर रहा है...");
+      logCallback("⚠️ एजेंट को बिल्ड एरर मिला, ऑटो-सुधार कर रहा है...");
 
       currentPrompt = """
-      $initialPrompt
+      $prompt
       
-      [SYSTEM ERROR FEEDBACK]:
+      [SYSTEM BUILD ERROR FEEDBACK]:
       $capturedError
       
-      पिछला कोड इस एरर की वजह से फेल हो गया। इसे ठीक कर और नया सही कोड दे।
+      पिछला कोड इस एरर की वजह से फेल हो गया। इसे पूरी तरह ठीक कर और नया सही raw Dart कोड दे।
       """;
       await Future.delayed(const Duration(seconds: 2));
     }
@@ -314,21 +357,50 @@ Future<void> startAgenticLoop(
   }
 }
 
-Future<String> callGroqApi(String prompt, String apiKey, Function(String) logCallback) async {
+// Groq Vision API कॉल करने का फंक्शन (जो इमेज और टेक्स्ट दोनों पढ़ेगा)
+Future<String> callGroqVisionApi({
+  required String prompt,
+  String? imagePath,
+  required String apiKey,
+  required Function(String) logCallback,
+}) async {
   try {
-    logCallback("🤖 Groq AI से कोड लिखवा रहे हैं...");
+    logCallback("🤖 Groq AI (Vision) से कोड विश्लेषण और सुधार करवा रहे हैं...");
     final url = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
     
+    List<dynamic> contentList = [
+      {
+        "type": "text",
+        "text": "You are an expert Flutter developer. Output ONLY valid raw Dart code inside the file without markdown backticks. $prompt"
+      }
+    ];
+
+    // अगर यूजर ने स्क्रीनशॉट दिया है, तो उसे Base64 में बदलकर विजन मॉडल को भेजें
+    if (imagePath != null && File(imagePath).existsSync()) {
+      logCallback("🖼️ एरर स्क्रीनशॉट को एआई विजन के पास भेजा जा रहा है...");
+      List<int> imageBytes = File(imagePath).readAsBytesSync();
+      String base64Image = base64Encode(imageBytes);
+      contentList.add({
+        "type": "image_url",
+        "image_url": {
+          "url": "data:image/jpeg;base64,$base64Image"
+        }
+      });
+    }
+
     final response = await http.post(
       url,
       headers: {'Authorization': 'Bearer $apiKey', 'Content-Type': 'application/json'},
       body: jsonEncode({
-        "model": "llama-3.3-70b-versatile",
+        "model": "meta-llama/llama-3.2-90b-vision-preview", // विजन मॉडल का उपयोग
         "messages": [
-          {"role": "system", "content": "You are an expert Flutter developer. Output ONLY valid raw Dart code inside the file without markdown backticks."},
-          {"role": "user", "content": prompt}
+          {
+            "role": "user",
+            "content": contentList
+          }
         ],
-        "temperature": 0.3
+        "temperature": 0.3,
+        "max_tokens": 4096
       }),
     );
 
@@ -363,7 +435,7 @@ Future<Map<String, dynamic>> pushCodeToGitHubAndCheckBuild(
     }
 
     final Map<String, dynamic> bodyData = {
-      "message": "AI Agent Auto-Commit",
+      "message": "AI Agent Auto-Commit (Vision Fixed)",
       "content": base64Encode(utf8.encode(code)),
       if (fileSha != null) "sha": fileSha,
     };
@@ -382,27 +454,6 @@ Future<Map<String, dynamic>> pushCodeToGitHubAndCheckBuild(
     }
   } catch (e) {
     return {'success': false, 'errorLog': e.toString()};
-  }
-}
-
-// ==========================================
-// गैलरी से एरर स्क्रीनशॉट पिक करने का फंक्शन
-// ==========================================
-Future<void> pickErrorImageAndFix(Function(String) logCallback, TextEditingController promptController) async {
-  try {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    
-    if (image == null) {
-      logCallback("⚠️ कोई इमेज सेलेक्ट नहीं की गई।");
-      return;
-    }
-
-    logCallback("🖼️ एरर स्क्रीनशॉट चुन लिया गया है!");
-    promptController.text = "इस स्क्रीनशॉट में दिख रहे एरर को देखकर कोड ठीक करो (इमेज पाथ: ${image.path})";
-    logCallback("💡 प्रॉम्प्ट में एरर फिक्स करने का निर्देश जोड़ दिया गया है, अब 'एजेंट शुरू करें' दबाएं।");
-  } catch (e) {
-    logCallback("❌ इमेज पिक करने में एरर: $e");
   }
 }
 
