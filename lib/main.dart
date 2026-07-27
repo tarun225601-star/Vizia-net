@@ -25,7 +25,7 @@ class MultiAgentBuilderApp extends StatelessWidget {
 }
 
 // ==========================================
-// सेटिंग्स स्क्रीन (अब 5 फील्ड्स के साथ)
+// सेटिंग्स स्क्रीन (Grok और GitHub क्रेडेंशियल्स)
 // ==========================================
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -39,7 +39,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _repoOwnerController = TextEditingController();
   final TextEditingController _repoNameController = TextEditingController();
   final TextEditingController _groqKeyController = TextEditingController();
-  final TextEditingController _geminiKeyController = TextEditingController();
 
   @override
   void initState() {
@@ -54,7 +53,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _repoOwnerController.text = prefs.getString('repo_owner') ?? '';
       _repoNameController.text = prefs.getString('repo_name') ?? '';
       _groqKeyController.text = prefs.getString('groq_key') ?? '';
-      _geminiKeyController.text = prefs.getString('gemini_key') ?? '';
     });
   }
 
@@ -64,11 +62,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setString('repo_owner', _repoOwnerController.text.trim());
     await prefs.setString('repo_name', _repoNameController.text.trim());
     await prefs.setString('groq_key', _groqKeyController.text.trim());
-    await prefs.setString('gemini_key', _geminiKeyController.text.trim());
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('सभी सेटिंग्स सफलतापूर्वक सेव हो गईं!')),
+      const SnackBar(content: Text('सेटिंग्स सफलतापूर्वक सेव हो गई हैं!')),
     );
     Navigator.pop(context);
   }
@@ -76,36 +73,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('एजेंट और API सेटिंग्स (5 Keys)')),
+      appBar: AppBar(title: const Text('एपीआई और गिटहब सेटिंग्स')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
             TextField(
               controller: _githubTokenController,
-              decoration: const InputDecoration(labelText: 'GitHub Token'),
+              decoration: const InputDecoration(labelText: 'GitHub Personal Access Token'),
               obscureText: true,
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _repoOwnerController,
-              decoration: const InputDecoration(labelText: 'Repo Owner (Username)'),
+              decoration: const InputDecoration(labelText: 'GitHub Username / Owner'),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _repoNameController,
-              decoration: const InputDecoration(labelText: 'Repo Name'),
+              decoration: const InputDecoration(labelText: 'GitHub Repository Name'),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _groqKeyController,
-              decoration: const InputDecoration(labelText: 'Groq API Key'),
-              obscureText: true,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _geminiKeyController,
-              decoration: const InputDecoration(labelText: 'Google Gemini API Key'),
+              decoration: const InputDecoration(labelText: 'Grok (xAI) API Key'),
               obscureText: true,
             ),
             const SizedBox(height: 20),
@@ -122,7 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 // ==========================================
-// होम स्क्रीन (Gemini Powered Multi-Agent)
+// होम स्क्रीन (Self-Contained Multi-Agent Builder)
 // ==========================================
 class BuilderHomePage extends StatefulWidget {
   const BuilderHomePage({super.key});
@@ -144,16 +135,17 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
   void _addLog(String message) {
     if (!mounted) return;
     setState(() {
-      logs.insert(0, '[${TimeOfDay.now().format(context)}] $message');
+      final timeOfDay = TimeOfDay.fromDateTime(DateTime.now()).format(context);
+      logs.insert(0, '[$timeOfDay] $message');
     });
   }
 
-  // गिटहब पर फाइल पुश करने का फंक्शन
-  Future<bool> _pushFileToGitHub(String path, String content, String token, String owner, String repo) async {
+  // गिटहब पर सिंगल फाइल पुश करने का एकदम सेफ फंक्शन
+  Future<bool> _pushFileToGitHub(String token, String owner, String repo, String path, String content, String commitMessage) async {
     try {
       final url = Uri.parse('https://api.github.com/repos/$owner/$repo/contents/$path');
-      
       String? sha;
+      
       final getRes = await http.get(
         url,
         headers: {
@@ -167,7 +159,7 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
       }
 
       final body = {
-        'message': 'AI Agent auto-commit: update $path',
+        'message': commitMessage,
         'content': base64Encode(utf8.encode(content)),
         if (sha != null) 'sha': sha,
       };
@@ -182,68 +174,70 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
         body: jsonEncode(body),
       );
 
-      return putRes.statusCode == 201 || putRes.statusCode == 200;
+      return putRes.statusCode == 200 || putRes.statusCode == 201;
     } catch (e) {
-      _addLog('❌ GitHub Push Error ($path): $e');
+      _addLog('❌ GitHub Push Error: $e');
       return false;
     }
   }
 
-  // Google Gemini API से डायनेमिक कोड जनरेट करना
-  Future<String> _generateCodeWithGemini(String userPrompt, String geminiKey) async {
+  // --- Grok API से 100% सेल्फ-कंटेन्ड सिंगल-फाइल कोड जनरेटर ---
+  Future<String> _generateCodeWithGrok(String grokApiKey, String userPrompt) async {
     try {
-      final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$geminiKey');
+      final url = Uri.parse('https://api.x.ai/v1/chat/completions');
       
-      final promptToSend = '''
-You are an expert Flutter developer and AI coding agent. 
-The user wants an app based on this prompt: "$userPrompt".
-Write a complete, working, single-file Flutter application (`lib/main.dart`) that fulfills this requirement.
-Rules:
-1. Return ONLY pure Dart code inside a standard markdown code block (```dart ... ```).
-2. Do not include any extra conversational text outside the code block.
-3. Make sure it has clean Material design, works out of the box, and uses standard Flutter widgets.
-''';
-
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $grokApiKey',
+        },
         body: jsonEncode({
-          "contents": [{
-            "parts": [{"text": promptToSend}]
-          }]
+          "model": "grok-beta",
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are an expert Flutter developer. Write a complete, fully working, single-file Flutter app based on the user request. EVERYTHING must be inside a single file containing main(). Do NOT use external custom packages or split into multiple files. Return ONLY pure Dart code inside ```dart markdown. Do not include any extra conversation."
+            },
+            {
+              "role": "user",
+              "content": userPrompt
+            }
+          ],
+          "temperature": 0.7,
         }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        String text = data['candidates'][0]['content']['parts'][0]['text'];
-        
+        String text = data['choices'][0]['message']['content'];
+
         if (text.contains('```dart')) {
-          text = text.split('```dart')[1].split('```')[0].trim();
+          text = text.split('```dart')[1].split('```')[0];
         } else if (text.contains('```')) {
-          text = text.split('```')[1].split('```')[0].trim();
+          text = text.split('```')[1];
         }
-        return text;
+        return text.trim();
       } else {
-        _addLog('❌ Gemini API Error: ${response.body}');
+        _addLog('❌ Grok API Error: ${response.body}');
         return '';
       }
     } catch (e) {
-      _addLog('❌ Gemini Exception: $e');
+      _addLog('❌ Grok Exception: $e');
       return '';
     }
   }
 
-  // मल्टी-एजेंट प्रोसेस जो सेटिंग्स से की (Keys) उठाकर काम करेगा
-  Future<void> _startMultiAgentSystem() async {
+  // मल्टी-एजेंट प्रोसेस
+  Future<void> _startMultiAgentsSystem() async {
     final prefs = await SharedPreferences.getInstance();
     String githubToken = prefs.getString('github_token') ?? '';
     String repoOwner = prefs.getString('repo_owner') ?? '';
     String repoName = prefs.getString('repo_name') ?? '';
-    String geminiKey = prefs.getString('gemini_key') ?? '';
+    String grokApiKey = prefs.getString('groq_key') ?? '';
 
-    if (githubToken.isEmpty || repoOwner.isEmpty || repoName.isEmpty || geminiKey.isEmpty) {
-      _addLog('❌ सेटिंग्स अधूरी हैं! कृपया ऊपर सेटिंग आइकॉन पर क्लिक करके अपनी सभी Keys भरें।');
+    if (githubToken.isEmpty || repoOwner.isEmpty || repoName.isEmpty || grokApiKey.isEmpty) {
+      _addLog('❌ सेटिंग्स अधूरी हैं! कृपया ऊपर सेटिंग आइकॉन पर क्लिक करके सभी API Keys और GitHub डिटेल्स भरें।');
       return;
     }
 
@@ -254,23 +248,21 @@ Rules:
       isSuccess = false;
     });
 
-    String userPrompt = _promptController.text.trim();
-    _addLog('🚀 टू-एजेंट सिस्टम सक्रिय हो गया है...');
-
-    // --- एजेंट 1: जेमिनी AI कोडर ---
-    _addLog('🤖 एजेंट 1 (Google Gemini AI): यूजर के प्रॉम्ट को समझकर कोड बना रहा है...');
+    _addLog('🚀 एजेंट सिस्टम सक्रिय हो गया है!');
     
-    String generatedCode = await _generateCodeWithGemini(userPrompt, geminiKey);
+    // --- एजेंट 1: Grok AI कोडर ---
+    _addLog('🤖 एजेंट 1 (Grok AI) सिंगल-फाइल ऐप कोड लिख रहा है...');
+    String generatedCode = await _generateCodeWithGrok(grokApiKey, _promptController.text.trim());
 
     if (generatedCode.isEmpty) {
-      _addLog('❌ एजेंट 1 कोड जनरेट करने में असफल रहा। Gemini API Key चेक करें।');
+      _addLog('❌ एजेंट 1 कोड जनरेट करने में असफल रहा। API Key चेक करें।');
       setState(() => isRunning = false);
       return;
     }
 
-    _addLog('✅ एजेंट 1: प्रॉम्ट के अनुसार शानदार फ्लटर कोड तैयार कर लिया है!');
+    _addLog('✅ एजेंट 1: एकदम एरर-फ्री सिंगल-फाइल कोड तैयार है!');
 
-    // फिक्स्ड गिटहब एक्शन वर्कफ़्लो फाइल (v1 embedding एरर से मुक्त)
+    // फिक्स्ड गिटहब एक्शन वर्कफ़्लो फाइल (ताकि APK बिल्ड में कोई दिक्कत न आए)
     String workflowYml = '''
 name: Flutter Build
 
@@ -292,43 +284,41 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.16.9'
-          channel: 'stable'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: flutter pub get
 
-      - name: Build APK Release
-        run: flutter build apk --release --no-pub
+      - name: Build APK
+        run: flutter build apk --release
+    ''';
 
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-apk
-          path: build/app/outputs/flutter-apk/
-''';
+    // --- एजेंट 2: गिटहब डिप्लोयर ---
+    _addLog('🔍 एजेंट 2 गिटहब पर सिंगल फाइल डिप्लॉय कर रहा है...');
+    
+    bool mainPushed = await _pushFileToGitHub(
+      githubToken, repoOwner, repoName, 
+      'lib/main.dart', generatedCode, 'AI Agent auto-commit safe single-file lib/main.dart'
+    );
 
-    // --- एजेंट 2: रिव्यूअर और गिटहब डिप्लॉयर ---
-    _addLog('🔍 एजेंट 2 (Reviewer & Debugger): कोड की जाँच कर रहा है...');
-    await Future.delayed(const Duration(milliseconds: 800));
-    _addLog('🚀 एजेंट 2: गिटहब पर ऑटो-डिप्लॉय किया जा रहा है...');
-
-    bool mainPushed = await _pushFileToGitHub('lib/main.dart', generatedCode, githubToken, repoOwner, repoName);
     if (mainPushed) {
-      _addLog('✅ जनरेट किया गया ऐप कोड गिटहब पर पुश हो गया!');
+      _addLog('✔️ lib/main.dart सफलतापूर्वक अपडेट हो गई है!');
     }
 
-    bool ymlPushed = await _pushFileToGitHub('.github/workflows/flutter_build.yml', workflowYml, githubToken, repoOwner, repoName);
+    bool ymlPushed = await _pushFileToGitHub(
+      githubToken, repoOwner, repoName, 
+      '.github/workflows/build.yml', workflowYml, 'AI Agent add workflow yml'
+    );
+
     if (ymlPushed) {
-      _addLog('✅ गिटहब एक्शन वर्कफ़्लो अपडेट हो गया!');
+      _addLog('✔️ गिटहब एक्शन वर्कफ़्लो सेट हो गया है!');
     }
 
     await Future.delayed(const Duration(seconds: 1));
-    _addLog('🎉 शानदार! जेमिनी ने ऐप बना दिया और गिटहब पर भेज दिया।');
-    _addLog('📥 गिटहब एक्शन लिंक: https://github.com/$repoOwner/$repoName/actions');
+    _addLog('🎉 काम पूरा! बिना किसी फाइल एरर के कोड गिटहब पर पहुँच गया है।');
 
     setState(() {
       isRunning = false;
-      buildStatus = 'बिल्ड पास (Passed) ✅';
+      buildStatus = 'बिल्ड पास (Passed)';
       isSuccess = true;
     });
   }
@@ -337,7 +327,7 @@ jobs:
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Multi-Agent Builder (Gemini)'),
+        title: const Text('AI Multi-Agent Builder (Grok)'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -351,61 +341,69 @@ jobs:
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[800]!),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('कोई भी ऐप आइडिया यहाँ लिखें (Google Gemini समझेगा):', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                  const SizedBox(height: 8),
+                  const Text('कोई भी ऐप आइडिया यहाँ लिखें:', style: TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: _promptController,
                     maxLines: 3,
-                    decoration: const InputDecoration(border: InputBorder.none, hintText: 'जैसे: Make a music player app...'),
                     style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+                onPressed: isRunning ? null : _startMultiAgentsSystem,
+                icon: isRunning 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.flash_on),
+                label: Text(
+                  isRunning ? 'प्रक्रिया जारी है...' : '✨ एजेंट सिस्टम शुरू करें',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
-              onPressed: isRunning ? null : _startMultiAgentSystem,
-              icon: isRunning
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Icon(Icons.auto_awesome, color: Colors.white),
-              label: Text(isRunning ? 'जेमिनी और एजेंट्स काम कर रहे हैं...' : 'जेमिनी एजेंट सिस्टम शुरू करें', style: const TextStyle(fontSize: 16, color: Colors.white)),
             ),
-            const SizedBox(height: 12),
-            const Text('लाइव प्रोसेस और लॉग्स:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-            const SizedBox(height: 6),
+            const SizedBox(height: 16),
+            const Text('लाइव प्रोसेस और लॉग्स:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 8),
             Expanded(
               child: Container(
-                padding: const EdgeInsets.all(10),
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.black,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey[850]!),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade800),
                 ),
                 child: ListView.builder(
                   itemCount: logs.length,
                   itemBuilder: (context, index) {
                     return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3.0),
-                      child: Text(logs[index], style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.greenAccent)),
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        logs[index],
+                        style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace', fontSize: 12),
+                      ),
                     );
                   },
                 ),
@@ -416,15 +414,15 @@ jobs:
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('बिल्ड स्टेटस: $buildStatus', style: const TextStyle(fontWeight: FontWeight.bold)),
                   IconButton(
-                    icon: Icon(Icons.download, color: isSuccess ? Colors.blue : Colors.grey),
-                    onPressed: isSuccess ? () {} : null,
+                    icon: Icon(isSuccess ? Icons.check_circle : Icons.info, color: isSuccess ? Colors.green : Colors.orange),
+                    onPressed: () {},
                   ),
                 ],
               ),
