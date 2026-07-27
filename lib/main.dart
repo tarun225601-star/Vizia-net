@@ -13,7 +13,7 @@ class MultiAgentBuilderApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AI Multi-Agent Builder',
+      title: 'AI Multi-Agent 6-File Builder',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF121212),
         primaryColor: Colors.deepPurple,
@@ -113,7 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 // ==========================================
-// होम स्क्रीन (Auto-Clean & 6-File Agent Builder)
+// होम स्क्रीन (Auto-Clean & Full 6-File Agent Builder)
 // ==========================================
 class BuilderHomePage extends StatefulWidget {
   const BuilderHomePage({super.key});
@@ -162,7 +162,7 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
             'Content-Type': 'application/json',
           },
           body: jsonEncode({
-            'message': 'Agent: clean old $path before fresh generation',
+            'message': 'Agent: clean old $path',
             'sha': sha,
           }),
         );
@@ -170,7 +170,7 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
     } catch (_) {}
   }
 
-  // गिटहब पर फाइल पुश करने का फंक्शन
+  // गिटहब पर फाइल पुश करने का सुरक्षित फंक्शन
   Future<bool> _pushFileToGitHub(String token, String owner, String repo, String path, String content, String commitMessage) async {
     try {
       final url = Uri.parse('https://api.github.com/repos/$owner/$repo/contents/$path');
@@ -258,7 +258,7 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
     }
   }
 
-  // मल्टी-एजेंट ऑटो-क्लीन और फ्रेश 6-फाइल डिप्लॉयमेंट प्रोसेस
+  // 6-File Multi-Agent System (Auto-Clean & Fresh Deploy)
   Future<void> _startMultiAgentsSystem() async {
     final prefs = await SharedPreferences.getInstance();
     String githubToken = prefs.getString('github_token') ?? '';
@@ -274,13 +274,12 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
     setState(() {
       isRunning = true;
       logs.clear();
-      buildStatus = 'पुराना डेटा साफ हो रहा है...';
+      buildStatus = 'पुराना डेटा साफ करके 6 फाइलें तैयार हो रही हैं...';
       isSuccess = false;
     });
 
-    _addLog('🧹 एजेंट 0: रिपॉजिटरी से पुराना कचरा/फाइलें साफ कर रहा है...');
+    _addLog('🧹 एजेंट 0: पुरानी सभी 6 संभावित फाइलें डिलीट कर रहा है...');
     
-    // पुरानी संभावित फाइलों को डिलीट करना ताकि नया फ्रेश बिल्ड बने
     List<String> filesToClean = [
       'lib/main.dart',
       'pubspec.yaml',
@@ -293,11 +292,11 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
     for (var filePath in filesToClean) {
       await _deleteFileFromGitHub(githubToken, repoOwner, repoName, filePath);
     }
-    _addLog('✨ पुरानी फाइलें सफलतापूर्वक हटा दी गई हैं!');
+    _addLog('✨ पुराना कबाड़ पूरी तरह साफ हो गया है!');
 
-    _addLog('🚀 फ्रेश 6-फाइल एजेंट सिस्टम शुरू हो गया है!');
+    _addLog('🚀 6-File एजेंट सिस्टम शुरू हो गया है!');
     
-    // --- 1. फाइल: lib/main.dart (नया जनरेटेड) ---
+    // --- 1. फाइल: lib/main.dart ---
     _addLog('🤖 एजेंट 1: Groq 70B से नया lib/main.dart कोड लिखवा रहा है...');
     String generatedCode = await _generateCodeWithGroq(grokApiKey, _promptController.text.trim());
 
@@ -376,11 +375,6 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
-def flutterRoot = localProperties.getProperty('flutter.sdk')
-if (flutterRoot == null) {
-    throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
-}
-
 android {
     namespace "com.example.ai_generated_app"
     compileSdkVersion flutter.compileSdkVersion
@@ -422,7 +416,7 @@ allprojects {
 
 rootProject.buildDir = '../build'
 subprojects {
-    project.buildDir = '${rootProject.buildDir}/${project.name}'
+    project.buildDir = '\${rootProject.buildDir}/\${project.name}'
 }
 subprojects {
     project.evaluationDependsOn(':app')
@@ -465,10 +459,10 @@ jobs:
 ''';
     _addLog('✔️ फाइल 6/6: workflow build.yml तैयार!');
 
-    // --- एजेंट 2: गिटहब पर नई 6 फाइलों को अपलोड करना ---
+    // --- गिटहब पर सभी 6 फाइलें फ्रेश अपलोड करना ---
     _addLog('🔍 एजेंट 2: गिटहब पर सभी 6 नई फाइलें फ्रेश अपलोड कर रहा है...');
 
-    bool f1 = await _pushFileToGitHub(githubToken, repoOwner, repoName, 'lib/main.dart', generatedCode, 'Agent: fresh update lib/main.dart');
+    bool f1 = await _pushFileToGitHub(githubToken, repoOwner, repoName, 'lib/main.dart', generatedCode, 'Agent: fresh update main.dart');
     bool f2 = await _pushFileToGitHub(githubToken, repoOwner, repoName, 'pubspec.yaml', pubspecYaml, 'Agent: fresh add pubspec.yaml');
     bool f3 = await _pushFileToGitHub(githubToken, repoOwner, repoName, 'android/app/src/main/AndroidManifest.xml', androidManifest, 'Agent: fresh add AndroidManifest.xml');
     bool f4 = await _pushFileToGitHub(githubToken, repoOwner, repoName, 'android/app/build.gradle', appBuildGradle, 'Agent: fresh add app build.gradle');
@@ -476,10 +470,10 @@ jobs:
     bool f6 = await _pushFileToGitHub(githubToken, repoOwner, repoName, '.github/workflows/build.yml', workflowYml, 'Agent: fresh add workflow yml');
 
     if (f1 && f2 && f3 && f4 && f5 && f6) {
-      _addLog('🎉 कमाल हो गया! पुराना सब साफ करके नया फ्रेश प्रोजेक्ट गिटहब पर डिप्लॉय हो गया है।');
+      _addLog('🎉 शानदार! पुराना सब साफ करके कुल 6 नई फाइलें गिटहब पर डिप्लॉय हो गई हैं।');
       setState(() {
         isRunning = false;
-        buildStatus = 'फ्रेश बिल्ड ट्रिगर हो गई (Actions चेक करें)';
+        buildStatus = 'बिल्ड ट्रिगर हो गई (Actions चेक करें)';
         isSuccess = true;
       });
     } else {
@@ -496,7 +490,7 @@ jobs:
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Auto-Clean Agent Builder'),
+        title: const Text('AI 6-File Agent Builder'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -545,9 +539,9 @@ jobs:
                 onPressed: isRunning ? null : _startMultiAgentsSystem,
                 icon: isRunning 
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.refresh),
+                    : const Icon(Icons.flash_on),
                 label: Text(
-                  isRunning ? 'पुराना साफ करके नया बना रहा है...' : '✨ पुराना साफ कर नया ऐप बनाएँ',
+                  isRunning ? '6 फाइलें तैयार हो रही हैं...' : '✨ पुराना साफ कर 6 नई फाइलें बनाएँ',
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
