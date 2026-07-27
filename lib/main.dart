@@ -13,7 +13,7 @@ class MultiAgentBuilderApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AI Multi-Agent Builder',
+      title: 'Fully Auto AI Agent Builder',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF121212),
         primaryColor: Colors.deepPurple,
@@ -25,7 +25,7 @@ class MultiAgentBuilderApp extends StatelessWidget {
 }
 
 // ==========================================
-// सेटिंग्स स्क्रीन (Groq API और GitHub क्रेडेंशियल्स)
+// सेटिंग्स स्क्रीन
 // ==========================================
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -113,7 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 // ==========================================
-// होम स्क्रीन (Stable 3-File Safe Agent Builder)
+// होम स्क्रीन (Fully Automated Agent Builder)
 // ==========================================
 class BuilderHomePage extends StatefulWidget {
   const BuilderHomePage({super.key});
@@ -124,7 +124,7 @@ class BuilderHomePage extends StatefulWidget {
 
 class _BuilderHomePageState extends State<BuilderHomePage> {
   final TextEditingController _promptController = TextEditingController(
-    text: 'make a professional weather app',
+    text: 'make a professional notes and tasks app',
   );
 
   List<String> logs = [];
@@ -140,37 +140,7 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
     });
   }
 
-  // गिटहब से पुरानी फाइल डिलीट करने का सुरक्षित फंक्शन
-  Future<void> _deleteFileFromGitHub(String token, String owner, String repo, String path) async {
-    try {
-      final url = Uri.parse('https://api.github.com/repos/$owner/$repo/contents/$path');
-      final getRes = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/vnd.github+json',
-        },
-      );
-
-      if (getRes.statusCode == 200) {
-        final sha = jsonDecode(getRes.body)['sha'];
-        await http.delete(
-          url,
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/vnd.github+json',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode({
-            'message': 'Agent: clean old $path',
-            'sha': sha,
-          }),
-        );
-      }
-    } catch (_) {}
-  }
-
-  // गिटहब पर फाइल पुश करने का फंक्शन
+  // गिटहब पर फाइल पुश करने का स्मार्ट फंक्शन (अगर फाइल है तो अपडेट, नहीं है तो नई बनेगी)
   Future<bool> _pushFileToGitHub(String token, String owner, String repo, String path, String content, String commitMessage) async {
     try {
       final url = Uri.parse('https://api.github.com/repos/$owner/$repo/contents/$path');
@@ -211,7 +181,7 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
     }
   }
 
-  // --- Groq Cloud API से केवल lib/main.dart का कोड जनरेटर ---
+  // --- Groq Cloud API से ऐप कोड जनरेटर ---
   Future<String> _generateCodeWithGroq(String grokApiKey, String userPrompt) async {
     try {
       final url = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
@@ -258,8 +228,8 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
     }
   }
 
-  // --- असली 3-फाइल एजेंट प्रोसेस (Clean & Error-Free) ---
-  Future<void> _startMultiAgentsSystem() async {
+  // --- पूरी तरह ऑटोमैटिक मल्टी-एजेंट प्रोसेस ---
+  Future<void> _startFullyAutomatedSystem() async {
     final prefs = await SharedPreferences.getInstance();
     String githubToken = prefs.getString('github_token') ?? '';
     String repoOwner = prefs.getString('repo_owner') ?? '';
@@ -274,59 +244,15 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
     setState(() {
       isRunning = true;
       logs.clear();
-      buildStatus = 'पुराना कचरा साफ करके केवल 3 जरूरी फाइलें बन रही हैं...';
+      buildStatus = 'ऑटो-एजेंट काम कर रहा है...';
       isSuccess = false;
     });
 
-    _addLog('🧹 पुराना गलत Gradle/Android स्ट्रक्चर साफ किया जा रहा है...');
-    // केवल 3 फाइलों पर फोकस और पुराने एंड्रॉइड फोल्डर का कचरा हटाना
-    await _deleteFileFromGitHub(githubToken, repoOwner, repoName, 'lib/main.dart');
-    await _deleteFileFromGitHub(githubToken, repoOwner, repoName, 'pubspec.yaml');
-    await _deleteFileFromGitHub(githubToken, repoOwner, repoName, '.github/workflows/build.yml');
-    await _deleteFileFromGitHub(githubToken, repoOwner, repoName, 'android/app/build.gradle');
-    await _deleteFileFromGitHub(githubToken, repoOwner, repoName, 'android/build.gradle');
-    await _deleteFileFromGitHub(githubToken, repoOwner, repoName, 'android/app/src/main/AndroidManifest.xml');
+    _addLog('🚀 Fully Automated AI Agent शुरू हो गया है!');
 
-    _addLog('🚀 3-File Agent System शुरू हो गया है!');
+    // --- स्टेप 1: ऑटोमैटिक GitHub Workflow Setup (अगर नहीं है तो खुद बनाएगा) ---
+    _addLog('⚙️ एजेंट 1: गिटहब एक्शंस (Workflow) चेक और सेटअप कर रहा है...');
     
-    // --- 1. फाइल: lib/main.dart ---
-    _addLog('🤖 एजेंट 1: Groq 70B से नया ऐप कोड लिखवा रहा है...');
-    String generatedCode = await _generateCodeWithGroq(grokApiKey, _promptController.text.trim());
-
-    if (generatedCode.isEmpty) {
-      _addLog('❌ कोड जनरेशन असफल रहा।');
-      setState(() => isRunning = false);
-      return;
-    }
-    _addLog('✔️ फाइल 1/3: lib/main.dart तैयार!');
-
-    // --- 2. फाइल: pubspec.yaml ---
-    String pubspecYaml = '''
-name: ai_generated_app
-description: A new Flutter project generated by AI Multi-Agent Builder.
-publish_to: 'none'
-version: 1.0.0+1
-
-environment:
-  sdk: '>=3.0.0 <4.0.0'
-
-dependencies:
-  flutter:
-    sdk: flutter
-  http: ^1.2.0
-  shared_preferences: ^2.2.2
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
-
-flutter:
-  uses-material-design: true
-''';
-    _addLog('✔️ फाइल 2/3: pubspec.yaml तैयार!');
-
-    // --- 3. फाइल: .github/workflows/build.yml ---
     String workflowYml = '''
 name: Flutter Build
 
@@ -349,33 +275,85 @@ jobs:
         with:
           flutter-version: '3.16.9'
 
+      - name: Create Android Structure if missing
+        run: |
+          if [ ! -d "android" ]; then
+            flutter create . --org com.example --project-name ai_generated_app --platforms android
+          fi
+
       - name: Install Dependencies
         run: flutter pub get
 
       - name: Build APK
         run: flutter build apk --release
 ''';
-    _addLog('✔️ फाइल 3/3: workflow build.yml तैयार!');
 
-    // --- गिटहब पर केवल इन 3 फाइलों का अपलोड ---
-    _addLog('🔍 एजेंट 2: गिटहब पर शुद्ध 3 फाइलें अपलोड कर रहा है...');
+    bool workflowSuccess = await _pushFileToGitHub(
+      githubToken, repoOwner, repoName, '.github/workflows/build.yml', workflowYml, 'Auto Agent: setup build workflow'
+    );
 
-    bool f1 = await _pushFileToGitHub(githubToken, repoOwner, repoName, 'lib/main.dart', generatedCode, 'Agent: update main.dart');
-    bool f2 = await _pushFileToGitHub(githubToken, repoOwner, repoName, 'pubspec.yaml', pubspecYaml, 'Agent: update pubspec.yaml');
-    bool f3 = await _pushFileToGitHub(githubToken, repoOwner, repoName, '.github/workflows/build.yml', workflowYml, 'Agent: update workflow');
+    if (!workflowSuccess) {
+      _addLog('❌ गिटहब पर Workflow सेटअप करने में असफल (टोकन या रिपॉजिटरी नाम चेक करें)।');
+      setState(() => isRunning = false);
+      return;
+    }
+    _addLog('✔️ गिटहब एक्शंस ऑटो-कॉन्फिगर हो गया!');
 
-    if (f1 && f2 && f3) {
-      _addLog('🎉 शानदार! सिर्फ 3 फाइलें बिल्कुल सही तरीके से गिटहब पर पहुँच गई हैं।');
+    // --- स्टेप 2: Groq 70B से नया ऐप कोड लिखवाना ---
+    _addLog('🤖 एजेंट 2: Groq 70B से यूजर के आइडिया पर ऐप कोड लिखवा रहा है...');
+    String generatedCode = await _generateCodeWithGroq(grokApiKey, _promptController.text.trim());
+
+    if (generatedCode.isEmpty) {
+      _addLog('❌ कोड जनरेशन असफल रहा।');
+      setState(() => isRunning = false);
+      return;
+    }
+    _addLog('✔️ lib/main.dart कोड तैयार!');
+
+    // --- स्टेप 3: pubspec.yaml तैयार करना ---
+    String pubspecYaml = '''
+name: ai_generated_app
+description: A new Flutter project generated by Fully Auto AI Agent Builder.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  shared_preferences: ^2.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+''';
+    _addLog('✔️ pubspec.yaml कॉन्फिग तैयार!');
+
+    // --- स्टेप 4: गिटहब पर कोड अपलोड करना ---
+    _addLog('🔍 एजेंट 3: गिटहब पर कोड और पबस्पेक पुश कर रहा है...');
+
+    bool f1 = await _pushFileToGitHub(githubToken, repoOwner, repoName, 'lib/main.dart', generatedCode, 'Auto Agent: update main.dart');
+    bool f2 = await _pushFileToGitHub(githubToken, repoOwner, repoName, 'pubspec.yaml', pubspecYaml, 'Auto Agent: update pubspec.yaml');
+
+    if (f1 && f2) {
+      _addLog('🎉 शानदार! सारा काम ऑटोमैटिक हो गया। गिटहब Actions में APK बनना शुरू हो गया है!');
       setState(() {
         isRunning = false;
-        buildStatus = 'बिल्ड ट्रिगर हो गई (Actions चेक करें)';
+        buildStatus = 'बिल्ड सफलतापूर्वक ट्रिगर हो गई!';
         isSuccess = true;
       });
     } else {
       _addLog('⚠️ फाइल अपलोड करने में दिक्कत आई।');
       setState(() {
         isRunning = false;
-        buildStatus = 'बिल्ड फेल / इनकंप्लीट';
+        buildStatus = 'बिल्ड फेल';
         isSuccess = false;
       });
     }
@@ -385,7 +363,7 @@ jobs:
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI 3-File Safe Builder'),
+        title: const Text('Fully Auto AI Builder'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -412,7 +390,7 @@ jobs:
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('कोई भी नया ऐप आइडिया यहाँ लिखें:', style: TextStyle(color: Colors.grey)),
+                  const Text('नया ऐप आइडिया यहाँ लिखें:', style: TextStyle(color: Colors.grey)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _promptController,
@@ -431,12 +409,12 @@ jobs:
               height: 48,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
-                onPressed: isRunning ? null : _startMultiAgentsSystem,
+                onPressed: isRunning ? null : _startFullyAutomatedSystem,
                 icon: isRunning 
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.flash_on),
+                    : const Icon(Icons.auto_awesome),
                 label: Text(
-                  isRunning ? 'बिल्ड तैयार हो रही है...' : '✨ 3-File Safe Agent चलाएँ',
+                  isRunning ? 'ऑटो-बिल्ड जारी है...' : '🚀 ऑटो-एजेंट चलाकर ऐप बनाएँ',
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
