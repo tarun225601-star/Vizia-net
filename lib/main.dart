@@ -4,6 +4,27 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'AI Multi-Agent Builder',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        primarySwatch: Colors.blue,
+      ),
+      home: const HomeScreen(),
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
 // ==========================================
 // सेटिंग्स स्क्रीन (Settings Screen)
 // ==========================================
@@ -112,6 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _artifactDownloadUrl;
 
   void _addLog(String message) {
+    if (!mounted) return;
     setState(() {
       _logs.insert(0, '[${TimeOfDay.now().format(context)}] $message');
     });
@@ -352,7 +374,6 @@ Future<bool> startMultiAgentLoop({
     attempt++;
     logCallback("🤖 [Attempt $attempt] एजेंट 1 (Coder) कोड लिख रहा है...");
 
-    // स्टेप 1: Coder Agent से कोड जनरेट करवाना
     String rawCode = await callGroqApiAgent(
       systemPrompt: "You are an expert Flutter Coder Agent. Write clean, complete, and executable Dart code based on user requests. Return ONLY valid code inside markdown code blocks (```dart ... ```).",
       userPrompt: currentPrompt,
@@ -367,7 +388,6 @@ Future<bool> startMultiAgentLoop({
 
     logCallback("🧐 एजेंट 2 (Reviewer & Debugger) कोड की समीक्षा कर रहा है...");
 
-    // स्टेप 2: Reviewer Agent से कोड की जाँच और सुधार करवाना
     String reviewedCode = await callGroqApiAgent(
       systemPrompt: "You are an expert Flutter Reviewer and Debugger Agent. Review the provided Flutter code, fix any syntax errors, missing imports, or logical bugs, and return ONLY the fully corrected, clean Dart code inside standard markdown code blocks (```dart ... ```).",
       userPrompt: "Here is the code written by the Coder Agent:\n$rawCode\n\nOriginal Request: $prompt\nPlease review, fix any bugs, and return the final clean code.",
@@ -377,7 +397,6 @@ Future<bool> startMultiAgentLoop({
 
     String finalCodeToPush = reviewedCode.isNotEmpty ? reviewedCode : rawCode;
 
-    // स्टेप 3: गिटहब पर पुश करना
     logCallback("📦 फाइनल कोड गिटहब पर पुश किया जा रहा है...");
     var githubResult = await pushCodeToGitHub(
       code: finalCodeToPush,
@@ -469,7 +488,6 @@ Future<String> callGroqApiAgent({
 // ==========================================
 // GitHub Push Function
 // ==========================================
-Footer
 Future<Map<String, dynamic>> pushCodeToGitHub({
   required String code,
   required String path,
