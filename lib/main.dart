@@ -25,7 +25,7 @@ class MultiAgentBuilderApp extends StatelessWidget {
 }
 
 // ==========================================
-// सेटिंग्स स्क्रीन (Grok और GitHub क्रेडेंशियल्स)
+// सेटिंग्स स्क्रीन (Groq API और GitHub क्रेडेंशियल्स)
 // ==========================================
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -96,7 +96,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _groqKeyController,
-              decoration: const InputDecoration(labelText: 'Grok (xAI) API Key'),
+              decoration: const InputDecoration(labelText: 'Groq Cloud API Key'),
               obscureText: true,
             ),
             const SizedBox(height: 20),
@@ -140,7 +140,7 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
     });
   }
 
-  // गिटहब पर सिंगल फाइल पुश करने का एकदम सेफ फंक्शन
+  // गिटहब पर सिंगल फाइल पुश करने का फंक्शन
   Future<bool> _pushFileToGitHub(String token, String owner, String repo, String path, String content, String commitMessage) async {
     try {
       final url = Uri.parse('https://api.github.com/repos/$owner/$repo/contents/$path');
@@ -181,10 +181,10 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
     }
   }
 
-  // --- Grok API से 100% सेल्फ-कंटेन्ड सिंगल-फाइल कोड जनरेटर ---
+  // --- Groq Cloud API से कोड जनरेटर (सही URL और 70B मॉडल के साथ) ---
   Future<String> _generateCodeWithGrok(String grokApiKey, String userPrompt) async {
     try {
-      final url = Uri.parse('https://api.x.ai/v1/chat/completions');
+      final url = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final response = await http.post(
         url,
@@ -193,7 +193,7 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
           'Authorization': 'Bearer $grokApiKey',
         },
         body: jsonEncode({
-          "model": "grok-beta",
+          "model": "llama-3.3-70b-versatile",
           "messages": [
             {
               "role": "system",
@@ -219,11 +219,11 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
         }
         return text.trim();
       } else {
-        _addLog('❌ Grok API Error: ${response.body}');
+        _addLog('❌ Groq API Error: ${response.body}');
         return '';
       }
     } catch (e) {
-      _addLog('❌ Grok Exception: $e');
+      _addLog('❌ Groq Exception: $e');
       return '';
     }
   }
@@ -250,8 +250,8 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
 
     _addLog('🚀 एजेंट सिस्टम सक्रिय हो गया है!');
     
-    // --- एजेंट 1: Grok AI कोडर ---
-    _addLog('🤖 एजेंट 1 (Grok AI) सिंगल-फाइल ऐप कोड लिख रहा है...');
+    // --- एजेंट 1: Groq AI कोडर ---
+    _addLog('🤖 एजेंट 1 (Groq 70B) सिंगल-फाइल ऐप कोड लिख रहा है...');
     String generatedCode = await _generateCodeWithGrok(grokApiKey, _promptController.text.trim());
 
     if (generatedCode.isEmpty) {
@@ -262,7 +262,7 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
 
     _addLog('✅ एजेंट 1: एकदम एरर-फ्री सिंगल-फाइल कोड तैयार है!');
 
-    // फिक्स्ड गिटहब एक्शन वर्कफ़्लो फाइल (ताकि APK बिल्ड में कोई दिक्कत न आए)
+    // फिक्स्ड गिटहब एक्शन वर्कफ़्लो फाइल
     String workflowYml = '''
 name: Flutter Build
 
@@ -327,7 +327,7 @@ jobs:
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Multi-Agent Builder (Grok)'),
+        title: const Text('AI Multi-Agent Builder'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
