@@ -192,7 +192,7 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
   // Google Gemini API से डायनेमिक कोड जनरेट करना
   Future<String> _generateCodeWithGemini(String userPrompt, String geminiKey) async {
     try {
-      final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$geminiKey');
+      final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$geminiKey');
       
       final promptToSend = '''
 You are an expert Flutter developer and AI coding agent. 
