@@ -227,13 +227,12 @@ class MyApp extends StatelessWidget {
 ''';
   }
 
-  // **स्मार्ट और डायनेमिक फाइल सेलेक्टर**
+  // **स्मार्ट और डायनेमिक फाइल सेलेक्टर (Escaped Variables)**
   Future<Map<String, String>> _intelligentFileSelector(String prompt, String groqKey) async {
     _addLog('🧠 AI प्रॉम्प्ट का विश्लेषण कर रहा है और ज़रूरी फाइलें सेलेक्ट कर रहा है...');
     
     String mainDartCode = await _generateCodeWithGroq(groqKey, prompt);
 
-    // बेस फाइलें जो हमेशा लगेंगी
     Map<String, String> selectedFiles = {
       "pubspec.yaml": '''
 name: ai_generated_app
@@ -257,8 +256,7 @@ flutter:
       "lib/main.dart": mainDartCode,
     };
 
-    // अगर यूजर को APK या पूरा ऐप बिल्ड चाहिए, तो ऑटोमैटिकली बाकी जरूरी 5 फाइलें जोड़ देगा
-    bool buildFullApp = true; // GitHub Actions से APK बिल्ड कराने के लिए Default true
+    bool buildFullApp = true;
 
     if (buildFullApp) {
       selectedFiles["android/app/src/main/AndroidManifest.xml"] = '''
@@ -321,7 +319,7 @@ pluginManagement {
     if (flutterSdkPath == null) {
         throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file or with the FLUTTER_ROOT environment variable.")
     }
-    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+    includeBuild("\$flutterSdkPath/packages/flutter_tools/gradle")
 }
 
 plugins {
