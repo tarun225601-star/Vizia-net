@@ -259,7 +259,7 @@ pluginManagement {
     if (flutterSdkPath == null) {
         throw new GradleException("Flutter SDK not found.")
     }
-    includeBuild("\\$flutterSdkPath/packages/flutter_tools/gradle")
+    includeBuild("\\\\$flutterSdkPath/packages/flutter_tools/gradle")
 }
 
 dependencyResolutionManagement {
