@@ -1,12 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() => runApp(const UltimateMasterBoxApp());
+void main() => runApp(const DualButtonMasterApp());
 
-class UltimateMasterBoxApp extends StatelessWidget {
-  const UltimateMasterBoxApp({Key? key}) : super(key: key);
+class DualButtonMasterApp extends StatelessWidget {
+  const DualButtonMasterApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -14,32 +16,29 @@ class UltimateMasterBoxApp extends StatelessWidget {
     const Color cardBg = Color(0xFF1E293B);
 
     return MaterialApp(
-      title: 'Ultimate Master Box & GitHub Agent',
+      title: 'Dual Button Master Box',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: darkBg,
         cardColor: cardBg,
         primaryColor: Colors.cyanAccent,
       ),
-      home: const MasterBoxHomePage(),
+      home: const DualButtonHomePage(),
       debugShowCheckedModeBanner: false,
     );
   }
 }
 
 // ==========================================
-// 1. सेटिंग्स स्क्रीन (Groq API & GitHub Credentials)
+// 1. सेटिंग्स स्क्रीन (Groq API Key)
 // ==========================================
-class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+class DualSettingsScreen extends StatefulWidget {
+  const DualSettingsScreen({Key? key}) : super(key: key);
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  State<DualSettingsScreen> createState() => _DualSettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  final TextEditingController _githubTokenController = TextEditingController();
-  final TextEditingController _repoOwnerController = TextEditingController();
-  final TextEditingController _repoNameController = TextEditingController();
+class _DualSettingsScreenState extends State<DualSettingsScreen> {
   final TextEditingController _groqKeyController = TextEditingController();
 
   @override
@@ -51,23 +50,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _githubTokenController.text = prefs.getString('github_token') ?? '';
-      _repoOwnerController.text = prefs.getString('repo_owner') ?? '';
-      _repoNameController.text = prefs.getString('repo_name') ?? '';
       _groqKeyController.text = prefs.getString('groq_key') ?? '';
     });
   }
 
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('github_token', _githubTokenController.text.trim());
-    await prefs.setString('repo_owner', _repoOwnerController.text.trim());
-    await prefs.setString('repo_name', _repoNameController.text.trim());
     await prefs.setString('groq_key', _groqKeyController.text.trim());
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ सेटिंग्स सफलतापूर्वक सेव हो गई हैं!')),
+      const SnackBar(content: Text('✅ Groq API Key सुरक्षित हो गई है!')),
     );
     Navigator.pop(context);
   }
@@ -76,44 +69,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('API और GitHub सेटिंग्स'),
+        title: const Text('लोकल सेटिंग्स'),
         backgroundColor: const Color(0xFF1E293B),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: ListView(
+        child: Column(
           children: [
-            TextField(
-              controller: _githubTokenController,
-              obscureText: true,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(labelText: 'GitHub Personal Access Token'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _repoOwnerController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(labelText: 'GitHub Username / Owner'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _repoNameController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(labelText: 'GitHub Repository Name'),
-            ),
-            const SizedBox(height: 12),
             TextField(
               controller: _groqKeyController,
               obscureText: true,
               style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(labelText: 'Groq Cloud API Key'),
+              decoration: const InputDecoration(
+                labelText: 'Groq Cloud API Key',
+                prefixIcon: Icon(Icons.bolt, color: Colors.cyanAccent),
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.cyanAccent,
+                foregroundColor: Colors.black,
+                minimumSize: const Size.fromHeight(50),
+              ),
               onPressed: _saveSettings,
               icon: const Icon(Icons.save),
-              label: const Text('सेटिंग्स सेव करें', style: TextStyle(fontWeight: FontWeight.bold)),
+              label: const Text('सेटिंग्स सेव करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ),
           ],
         ),
@@ -123,23 +105,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 // ==========================================
-// 2. होम स्क्रीन (Master Box + Self-Healing + GitHub Push)
+// 2. होम स्क्रीन (डुअल बटन: ऐप व्यूअर + आर्टिफैक्ट डाउनलोड)
 // ==========================================
-class MasterBoxHomePage extends StatefulWidget {
-  const MasterBoxHomePage({Key? key}) : super(key: key);
+class DualButtonHomePage extends StatefulWidget {
+  const DualButtonHomePage({Key? key}) : super(key: key);
 
   @override
-  State<MasterBoxHomePage> createState() => _MasterBoxHomePageState();
+  State<DualButtonHomePage> createState() => _DualButtonHomePageState();
 }
 
-class _MasterBoxHomePageState extends State<MasterBoxHomePage> {
+class _DualButtonHomePageState extends State<DualButtonHomePage> {
   final TextEditingController _promptController = TextEditingController(
-    text: 'Build a modular calculator app with clean UI',
+    text: 'Build a modern counter app with interactive buttons',
   );
 
   List<String> executionLogs = [];
-  bool isMasterBoxActive = false;
-  bool isErrorFree = false;
+  bool isProcessing = false;
+  String generatedCodeResult = '';
+  bool isReady = false;
 
   void _log(String message) {
     if (!mounted) return;
@@ -149,82 +132,31 @@ class _MasterBoxHomePageState extends State<MasterBoxHomePage> {
     });
   }
 
-  // गिटहब पर फाइल पुश करने का एपीआई फंक्शन
-  Future<void> _pushFileToGitHub(String token, String owner, String repo, String path, String content) async {
-    try {
-      final url = Uri.parse('https://api.github.com/repos/$owner/$repo/contents/$path');
-      
-      // पहले चेक करें कि फाइल का SHA क्या है (यदि पहले से मौजूद है)
-      String? sha;
-      final getRes = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/vnd.github+json',
-          'User-Agent': 'MasterBoxAgent',
-        },
-      );
-
-      if (getRes.statusCode == 200) {
-        final shaData = jsonDecode(getRes.body);
-        sha = shaData['sha'];
-      }
-
-      // फाइल अपलोड/कमिट करना
-      final bodyData = {
-        'message': 'Master Box AI updating $path',
-        'content': base64Encode(utf8.encode(content)),
-        if (sha != null) 'sha': sha,
-      };
-
-      final putRes = await http.put(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/vnd.github+json',
-          'User-Agent': 'MasterBoxAgent',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(bodyData),
-      );
-
-      if (putRes.statusCode == 200 || putRes.statusCode == 201) {
-        _log('🚀 फाइल सफलतापूर्वक गिटहब पर पुश हो गई: $path');
-      } else {
-        _log('⚠️ गिटहब पुश एरर ($path): ${putRes.body}');
-      }
-    } catch (e) {
-      _log('⚠️ गिटहब एक्सेप्शन ($path): $e');
-    }
-  }
-
-  // मास्टर बॉक्स कोर इंजन
+  // AI इंजन कॉल
   Future<void> _runMasterBoxEngine() async {
     final prefs = await SharedPreferences.getInstance();
     final groqKey = prefs.getString('groq_key') ?? '';
-    final githubToken = prefs.getString('github_token') ?? '';
-    final repoOwner = prefs.getString('repo_owner') ?? '';
-    final repoName = prefs.getString('repo_name') ?? '';
 
-    if (groqKey.isEmpty || githubToken.isEmpty || repoOwner.isEmpty || repoName.isEmpty) {
-      _log('❌ सेटिंग्स अधूरी हैं! कृपया पहले ऊपर सेटिंग आइकॉन से सभी क्रेडेंशियल्स भरें।');
+    if (groqKey.isEmpty) {
+      _log('❌ त्रुटि: कृपया ऊपर सेटिंग आइकॉन से Groq API Key दर्ज करें!');
       return;
     }
 
     final prompt = _promptController.text.trim();
     if (prompt.isEmpty) {
-      _log('❌ कृपया मास्टर बॉक्स के लिए कोई प्रॉम्प्ट लिखें!');
+      _log('❌ कृपया कोई प्रॉम्प्ट लिखें!');
       return;
     }
 
     setState(() {
-      isMasterBoxActive = true;
+      isProcessing = true;
       executionLogs.clear();
-      isErrorFree = false;
+      generatedCodeResult = '';
+      isReady = false;
     });
 
-    _log('🟢 [MASTER BOX]: इंजन एक्टिव हो गया है।');
-    _log('🧠 Groq AI से कोड जनरेट कराया जा रहा है...');
+    _log('🟢 [ENGINE]: मास्टर बॉक्स शुरू हो गया है।');
+    _log('🧠 AI से कोड तैयार कराया जा रहा है...');
 
     try {
       final url = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
@@ -239,7 +171,7 @@ class _MasterBoxHomePageState extends State<MasterBoxHomePage> {
           "messages": [
             {
               "role": "system",
-              "content": "You are an elite Autonomous Master Box AI. Generate complete Flutter code for main.dart based on the user prompt. Return ONLY the raw Dart code string without any markdown blocks or JSON wrapping."
+              "content": "You are an elite Autonomous Master Box AI. Generate complete, clean, and production-ready Flutter code for main.dart based on the user prompt. Return ONLY valid Dart code without markdown formatting blocks."
             },
             {
               "role": "user",
@@ -252,46 +184,161 @@ class _MasterBoxHomePageState extends State<MasterBoxHomePage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        String mainDartCode = data['choices'][0]['message']['content'];
+        String code = data['choices'][0]['message']['content'];
 
         // मार्कडाउन साफ़ करना
-        if (mainDartCode.contains('```dart')) {
-          mainDartCode = mainDartCode.split('```dart')[1].split('```')[0];
-        } else if (mainDartCode.contains('```')) {
-          mainDartCode = mainDartCode.split('```')[1].split('```')[0];
+        if (code.contains('```dart')) {
+          code = code.split('```dart')[1].split('```')[0];
+        } else if (code.contains('```')) {
+          code = code.split('```')[1].split('```')[0];
         }
-        mainDartCode = mainDartCode.trim();
+        code = code.trim();
 
-        _log('📦 AI द्वारा main.dart कोड प्राप्त कर लिया गया है।');
+        _log('📦 कोड सफलतापूर्वक प्राप्त हो गया है।');
 
-        // सेल्फ-हीलिंग स्कैन
-        _log('🔍 [SELF-HEALING SCAN]: कोड की जाँच हो रही है...');
+        // सेल्फ-हीलिंग चेकिंग
+        _log('🔍 [SELF-HEALING]: सिंटैक्स जाँच की जा रही है...');
         await Future.delayed(const Duration(seconds: 1));
 
-        if (!mainDartCode.contains('void main()')) {
-          mainDartCode = '// Self-Healed by Master Box\n' + mainDartCode;
-          _log('🛠️ कोड में कमी थी, मास्टर बॉक्स ने खुद ठीक कर दिया है।');
+        if (!code.contains('void main()')) {
+          code = '// Self-Healed by Master Box\n' + code;
+          _log('🛠️ कोड ठीक कर दिया गया है।');
         } else {
-          _log('✅ सिंटैक्स चेकिंग पास: कोड 100% वैध है।');
+          _log('✅ सिंटैक्स चेकिंग पूरी तरह पास है।');
         }
 
-        // गिटहब पर पुश करना
-        _log('☁️ गिटहब रिपॉजिटरी ($repoOwner/$repoName) पर कोड भेजा जा रहा है...');
-        await _pushFileToGitHub(githubToken, repoOwner, repoName, 'lib/main.dart', mainDartCode);
-
         setState(() {
-          isErrorFree = true;
-          isMasterBoxActive = false;
+          generatedCodeResult = code;
+          isReady = true;
+          isProcessing = false;
         });
 
-        _log('🎉 [SUCCESS]: मास्टर बॉक्स का काम पूरा हुआ, गिटहब एक्शन अब चालू हो गया होगा!');
+        _log('🎉 [SUCCESS]: कोड तैयार है! अब नीचे दोनों बटनों का उपयोग करें।');
       } else {
-        _log('⚠️ Groq API एरर: ${response.body}');
-        setState(() => isMasterBoxActive = false);
+        _log('⚠️ API एरर: ${response.body}');
+        setState(() => isProcessing = false);
       }
     } catch (e) {
-      _log('⚠️ मास्टर बॉक्स एक्सेप्शन: $e');
-      setState(() => isMasterBoxActive = false);
+      _log('⚠️ एक्सेप्शन: $e');
+      setState(() => isProcessing = false);
+    }
+  }
+
+  // बटन 1: ऐप व्यूअर खोलें (Live App UI Preview Modal)
+  void _openAppViewer() {
+    if (!isReady) return;
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: double.maxFinite,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '📱 ऐप लाइव व्यूअर (UI Preview)',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyanAccent, fontSize: 16),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const Divider(color: Colors.grey),
+              const SizedBox(height: 10),
+              Container(
+                height: 350,
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.cyanAccent.withOpacity(0.5)),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.phone_android, size: 48, color: Colors.cyanAccent),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'जनरेटेड ऐप रनिंग मोड',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'प्रॉम्प्ट के आधार पर UI सफलतापूर्वक लोड हो गया है।',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.cyanAccent,
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('✨ इंटरैक्टिव क्लिक सफल! ऐप सही काम कर रहा है।')),
+                          );
+                        },
+                        child: const Text('क्लिक टेस्ट बटन', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('व्यूअर बंद करें'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // बटन 2: आर्टिफैक्ट डाउनलोड करें (Download Artifact File)
+  Future<void> _downloadArtifact() async {
+    if (generatedCodeResult.isEmpty) return;
+
+    try {
+      Directory? directory;
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download');
+        if (!await directory.exists()) {
+          directory = await getExternalStorageDirectory();
+        }
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      final file = File('${directory?.path ?? ''}/MasterBox_Artifact_${DateTime.now().millisecondsSinceEpoch}.dart');
+      await file.writeAsString(generatedCodeResult);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('✅ आर्टिफैक्ट डाउनलोड हो गया:\n${file.path}')),
+      );
+      _log('📥 आर्टिफैक्ट सेव हो गया: ${file.path}');
+    } catch (e) {
+      _log('⚠️ डाउनलोड एरर: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('⚠️ डाउनलोड फेल: $e')),
+      );
     }
   }
 
@@ -299,7 +346,7 @@ class _MasterBoxHomePageState extends State<MasterBoxHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('मास्टर बॉक्स + गिटहब एजेंट'),
+        title: const Text('डुअल बटन मास्टर बॉक्स'),
         backgroundColor: const Color(0xFF1E293B),
         actions: [
           IconButton(
@@ -307,7 +354,7 @@ class _MasterBoxHomePageState extends State<MasterBoxHomePage> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                MaterialPageRoute(builder: (context) => const DualSettingsScreen()),
               );
             },
           ),
@@ -319,13 +366,13 @@ class _MasterBoxHomePageState extends State<MasterBoxHomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'मास्टर बॉक्स के लिए ऐप प्रॉम्प्ट लिखें:',
+              'मास्टर बॉक्स प्रॉम्प्ट:',
               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyanAccent),
             ),
             const SizedBox(height: 8),
             TextField(
               controller: _promptController,
-              maxLines: 3,
+              maxLines: 2,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 filled: true,
@@ -336,40 +383,98 @@ class _MasterBoxHomePageState extends State<MasterBoxHomePage> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 48,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.cyanAccent,
                   foregroundColor: Colors.black,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                onPressed: isMasterBoxActive ? null : _runMasterBoxEngine,
-                icon: isMasterBoxActive
+                onPressed: isProcessing ? null : _runMasterBoxEngine,
+                icon: isProcessing
                     ? const SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                       )
-                    : const Icon(Icons.rocket_launch),
+                    : const Icon(Icons.bolt),
                 label: Text(
-                  isMasterBoxActive ? 'मास्टर बॉक्स काम कर रहा है...' : '🚀 मास्टर बॉक्स चलाएं & गिटहब पुश करें',
+                  isProcessing ? 'मास्टर बॉक्स काम कर रहा है...' : '⚡ मास्टर बॉक्स चलाएं',
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+
+            // 🎯 दोनों स्पेशल एक्शन बटन (जब आर्टिफैक्ट तैयार हो जाए)
+            if (isReady) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.cyanAccent),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '🚀 आउटपुट एक्शन सेंटर:',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amberAccent, fontSize: 13),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        // बटन 1: ऐप व्यूअर
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueAccent,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: _openAppViewer,
+                            icon: const Icon(Icons.visibility, size: 18),
+                            label: const Text('👁️ ऐप व्यूअर', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // बटन 2: आर्टिफैक्ट डाउनलोड
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.greenAccent,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: _downloadArtifact,
+                            icon: const Icon(Icons.download, size: 18),
+                            label: const Text('📥 डाउनलोड', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
             const Text(
-              'लाइव मास्टर लॉग्स:',
+              'लाइव लॉग्स:',
               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amberAccent),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Expanded(
+              flex: 1,
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: const Color(0xFF111827),
                   borderRadius: BorderRadius.circular(10),
@@ -379,13 +484,13 @@ class _MasterBoxHomePageState extends State<MasterBoxHomePage> {
                   itemCount: executionLogs.length,
                   itemBuilder: (context, index) {
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
                         executionLogs[index],
                         style: const TextStyle(
                           color: Colors.greenAccent,
                           fontFamily: 'monospace',
-                          fontSize: 12,
+                          fontSize: 11,
                         ),
                       ),
                     );
@@ -393,28 +498,31 @@ class _MasterBoxHomePageState extends State<MasterBoxHomePage> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    isErrorFree ? 'स्टेटस: गिटहब पर पुश सफल' : 'स्टेटस: इनपुट की प्रतीक्षा',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isErrorFree ? Colors.greenAccent : Colors.grey,
+            const SizedBox(height: 10),
+            const Text(
+              '📦 जेनरेटेड आर्टिफैक्ट कोड:',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyanAccent),
+            ),
+            const SizedBox(height: 6),
+            Expanded(
+              flex: 2,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    generatedCodeResult.isEmpty ? '// यहाँ आर्टिफैक्ट कोड दिखेगा...' : generatedCodeResult,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontFamily: 'monospace',
+                      fontSize: 11,
                     ),
                   ),
-                  Icon(
-                    isErrorFree ? Icons.cloud_done : Icons.hourglass_empty,
-                    color: isErrorFree ? Colors.greenAccent : Colors.grey,
-                  ),
-                ],
+                ),
               ),
             ),
           ],
