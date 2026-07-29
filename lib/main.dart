@@ -75,7 +75,7 @@ class SavedProject {
 }
 
 // ==========================================
-// 1. सेटिंग्स स्क्रीन (अलग प्रोजेक्ट्स और उनकी अलग फाइलों का वॉल्ट)
+// 1. सेटिंग्स स्क्रीन (फाइल कोड वॉल्ट)
 // ==========================================
 class MasterSettingsScreen extends StatefulWidget {
   const MasterSettingsScreen({Key? key}) : super(key: key);
@@ -278,7 +278,7 @@ class FullScreenPreviewPage extends StatelessWidget {
 }
 
 // ==========================================
-// 3. होम स्क्रीन (मल्टी-फाइल मैनेजर + फुल स्क्रीन वेब प्रीव्यू)
+// 3. होम स्क्रीन
 // ==========================================
 class MasterHomePage extends StatefulWidget {
   const MasterHomePage({Key? key}) : super(key: key);
@@ -298,6 +298,19 @@ class _MasterHomePageState extends State<MasterHomePage> {
   String currentPreviewHtml = '';
   String currentProjectTitle = '';
   List<ProjectFileItem> currentFiles = [];
+
+  // JSON स्ट्रिंग को सुरक्षित करने और कंट्रोल कैरेक्टर्स हटाने का फंक्शन
+  String _cleanJsonString(String input) {
+    if (input.contains('```json')) {
+      input = input.split('```json')[1].split('```')[0];
+    } else if (input.contains('```')) {
+      input = input.split('```')[1].split('```')[0];
+    }
+    input = input.trim();
+    
+    // कंट्रोल कैरेक्टर्स और गलत एस्केप को ठीक करना
+    return input.replaceAll(RegExp(r'[\u0000-\u001F]+'), '');
+  }
 
   Future<void> _runEngine() async {
     final prefs = await SharedPreferences.getInstance();
@@ -342,14 +355,9 @@ class _MasterHomePageState extends State<MasterHomePage> {
         final data = jsonDecode(response.body);
         String rawContent = data['choices'][0]['message']['content'];
 
-        if (rawContent.contains('```json')) {
-          rawContent = rawContent.split('```json')[1].split('```')[0];
-        } else if (rawContent.contains('```')) {
-          rawContent = rawContent.split('```')[1].split('```')[0];
-        }
-        rawContent = rawContent.trim();
+        String cleanedJsonStr = _cleanJsonString(rawContent);
 
-        final parsedJson = jsonDecode(rawContent);
+        final parsedJson = jsonDecode(cleanedJsonStr);
         final List<dynamic> fileListJson = parsedJson['files'] ?? [];
         List<ProjectFileItem> fetchedFiles = fileListJson.map((f) => ProjectFileItem.fromJson(f)).toList();
         String previewHtml = parsedJson['previewHtml'] ?? '<html><body style="background:#0F172A;color:white;text-align:center;padding-top:50px;"><h1>Preview Ready</h1></body></html>';
@@ -446,7 +454,6 @@ class _MasterHomePageState extends State<MasterHomePage> {
             Text(statusMessage, style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontFamily: 'monospace')),
             const SizedBox(height: 12),
             
-            // फुल स्क्रीन वेब व्यू बटन (अब हमेशा दिखेगा जब ऐप बन जाएगी)
             if (showWebViewButton) ...[
               SizedBox(
                 width: double.infinity,
