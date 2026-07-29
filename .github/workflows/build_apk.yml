@@ -1,40 +1,44 @@
-name: Build Android APK
-
-on:
-  push:
-    branches: [ "main" ]
-
+name: Flutter APK Build
+on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-    - name: Set up Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.19.x'
-        channel: 'stable'
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.x'
+          channel: 'stable'
 
-    - name: Fix Android Scaffold & Gradle
-      run: |
-        flutter create . --project-name=desi_ai_app --platforms=android --org com.desi.app
+      - name: Save existing main.dart
+        run: |
+          mkdir -p /tmp/backup
+          cp lib/main.dart /tmp/backup/main.dart
 
-    - name: Get Dependencies
-      run: flutter pub get
+      - name: Initialize Flutter Android Scaffold
+        run: |
+          flutter create . --project-name=desi_ai_app --platforms=android --org=com.example.app --force
 
-    - name: Build APK
-      run: flutter build apk --release
+      - name: Restore AI main.dart
+        run: |
+          cp /tmp/backup/main.dart lib/main.dart
 
-    - name: Upload APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-release-apk
-        path: build/app/outputs/flutter-apk/app-release.apk
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
