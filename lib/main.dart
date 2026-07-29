@@ -208,12 +208,20 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
         }),
       );
 
-      if (response.statusCode == 200) {
-  final data = jsonDecode(response.body);
-  String aiResponse = data['choices'][0]['message']['content'];
-  
-  if (aiResponse.contains('AndroidManifest.xml') && !aiResponse.contains('flutterEmbedding')) {
-    aiResponse = aiResponse.replaceAll(
+          if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      String aiResponse = data['choices'][0]['message']['content'];
+
+      if (aiResponse.contains('AndroidManifest.xml') && !aiResponse.contains('flutterEmbedding')) {
+        aiResponse = aiResponse.replaceAll(
+          '<application',
+          '<application\n        <meta-data android:name="flutterEmbedding" android:value="2" />'
+        );
+      }
+
+      return aiResponse;
+    }
+
       '<application',
       '<application\n        <meta-data android:name="flutterEmbedding" android:value="2" />'
     );
