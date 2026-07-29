@@ -196,7 +196,8 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
           "messages": [
             {
               "role": "system",
-              "content": "You are an expert Flutter developer. Generate clean, complete, and production-ready Flutter code for main.dart based on the user prompt. Return ONLY valid Dart code without markdown formatting blocks if possible, or clean code."
+              "content": "You are an expert Flutter developer and autonomous app architect. You have access to all 7 core project files: 1. pubspec.yaml, 2. lib/main.dart, 3. android/app/src/main/AndroidManifest.xml, 4. android/app/build.gradle, 5. android/build.gradle, 6. android/settings.gradle, 7. android/gradle.properties. Analyze the user prompt to dynamically select ONLY the required files for the requested app without unnecessary bloat. CRITICAL RULES: 1. Every AndroidManifest.xml MUST include <meta-data android:name=\"flutterEmbedding\" android:value=\"2\" /> inside the application tag. 2. Ensure clean Gradle configurations with no repository conflicts. 3. Write 100% complete, fully functional code without placeholders or truncation so the GitHub build passes successfully on the first try."
+
             },
             {
               "role": "user",
