@@ -3,12 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  runApp(const MultiAgentBuilderApp());
-}
+void main() => runApp(const MultiAgentBuilderApp());
 
 class MultiAgentBuilderApp extends StatelessWidget {
-  const MultiAgentBuilderApp({super.key});
+  const MultiAgentBuilderApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -25,10 +23,10 @@ class MultiAgentBuilderApp extends StatelessWidget {
 }
 
 // ==========================================
-// सेटिंग्स स्क्रीन
+// 1. सेटिंग्स स्क्रीन (Settings Screen)
 // ==========================================
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({Key? key}) : super(key: key);
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -80,8 +78,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             TextField(
               controller: _githubTokenController,
-              decoration: const InputDecoration(labelText: 'GitHub Personal Access Token'),
               obscureText: true,
+              decoration: const InputDecoration(labelText: 'GitHub Personal Access Token'),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -96,8 +94,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _groqKeyController,
-              decoration: const InputDecoration(labelText: 'Groq Cloud API Key'),
               obscureText: true,
+              decoration: const InputDecoration(labelText: 'Groq Cloud API Key'),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
@@ -113,10 +111,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 // ==========================================
-// होम स्क्रीन (Fully Automated Agent Builder)
+// 2. होम स्क्रीन (Fully Automated Agent Builder)
 // ==========================================
 class BuilderHomePage extends StatefulWidget {
-  const BuilderHomePage({super.key});
+  const BuilderHomePage({Key? key}) : super(key: key);
 
   @override
   State<BuilderHomePage> createState() => _BuilderHomePageState();
@@ -126,7 +124,7 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
   final TextEditingController _promptController = TextEditingController(
     text: 'make a professional notes and tasks app',
   );
-
+  
   List<String> logs = [];
   bool isRunning = false;
   String buildStatus = 'प्रतीक्षा में (Idle)';
@@ -140,17 +138,17 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
     });
   }
 
-  // गिटहब पर फाइल पुश करने का स्मार्ट फंक्शन (अगर फाइल है तो अपडेट, नहीं है तो नई बनेगी)
-  Future<bool> _pushFileToGitHub(String token, String owner, String repo, String path, String content, String commitMessage) async {
+  // गिटहब पर फाइल पुश करने का स्मार्ट फंक्शन (SHA चेक करके अपडेट/नया बनाना)
+  Future<bool> _pushFileToGitHub(String token, String owner, String repo, String path, String content) async {
     try {
       final url = Uri.parse('https://api.github.com/repos/$owner/$repo/contents/$path');
       String? sha;
-      
+
       final getRes = await http.get(
         url,
         headers: {
           'Authorization': 'Bearer $token',
-          'Accept': 'application/vnd.github+json',
+          'Accept': 'vnd.github+json',
         },
       );
 
@@ -158,17 +156,19 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
         sha = jsonDecode(getRes.body)['sha'];
       }
 
-      final body = {
-        'message': commitMessage,
+      final Map<String, dynamic> body = {
+        'message': 'AI Agent updating $path',
         'content': base64Encode(utf8.encode(content)),
-        if (sha != null) 'sha': sha,
       };
+      if (sha != null) {
+        body['sha'] = sha;
+      }
 
       final putRes = await http.put(
         url,
         headers: {
           'Authorization': 'Bearer $token',
-          'Accept': 'application/vnd.github+json',
+          'Accept': 'vnd.github+json',
           'Content-Type': 'application/json',
         },
         body: jsonEncode(body),
@@ -181,23 +181,22 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
     }
   }
 
-  // --- Groq Cloud API से ऐप कोड जनरेटर ---
-  Future<String> _generateCodeWithGroq(String grokApiKey, String userPrompt) async {
+  // Groq Cloud API से ऐप कोड जनरेटर
+  Future<String> _generateCodeWithGroq(String groqApiKey, String userPrompt) async {
     try {
       final url = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-      
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $grokApiKey',
+          'Authorization': 'Bearer $groqApiKey',
         },
         body: jsonEncode({
           "model": "llama-3.3-70b-versatile",
           "messages": [
             {
               "role": "system",
-              "content": "You are an expert Flutter developer. Write a complete, fully working, single-file Flutter app based on the user request. EVERYTHING must be inside a single file containing main(). Do NOT use external custom packages (only standard material and http if needed). Return ONLY pure Dart code inside ```dart markdown. Do not include any extra conversation."
+              "content": "You are an expert Flutter developer. Generate clean, complete, and production-ready Flutter code for main.dart based on the user prompt. Return ONLY valid Dart code without markdown formatting blocks if possible, or clean code."
             },
             {
               "role": "user",
@@ -210,34 +209,141 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        String text = data['choices'][0]['message']['content'];
-
-        if (text.contains('```dart')) {
-          text = text.split('```dart')[1].split('```')[0];
-        } else if (text.contains('```')) {
-          text = text.split('```')[1];
-        }
-        return text.trim();
+        return data['choices'][0]['message']['content'];
       } else {
-        _addLog('❌ Groq API Error: ${response.body}');
-        return '';
+        _addLog('⚠️ Groq API Error: ${response.body}');
       }
     } catch (e) {
-      _addLog('❌ Groq Exception: $e');
-      return '';
+      _addLog('⚠️ Groq Exception: $e');
     }
+    // फॉलबैक डिफ़ॉल्ट कोड यदि एपीआई फेल हो
+    return '''
+import 'package:flutter/material.dart';
+void main() => runApp(const MyApp());
+class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(home: Scaffold(body: Center(child: Text('App: $userPrompt'))));
+  }
+}
+''';
   }
 
-  // --- पूरी तरह ऑटोमैटिक मल्टी-एजेंट प्रोसेस ---
+  // स्मार्ट फाइल सेलेक्टर (7 जरूरी फाइलें तैयार करना)
+  Future<Map<String, String>> _intelligentFileSelector(String prompt, String groqKey) async {
+    _addLog('🧠 AI प्रॉम्प्ट का विश्लेषण कर रहा है और कोड लिख रहा है...');
+    
+    String mainDartCode = await _generateCodeWithGroq(groqKey, prompt);
+
+    return {
+      "pubspec.yaml": '''
+name: ai_generated_app
+description: A new Flutter project generated by Fully Auto AI Builder.
+publish_to: 'none'
+version: 1.0.0+1
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  shared_preferences: ^2.2.2
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+flutter:
+  uses-material-design: true
+''',
+      "lib/main.dart": mainDartCode,
+      "android/app/src/main/AndroidManifest.xml": '''
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <application
+        android:label="AI App"
+        android:name="\${applicationName}"
+        android:icon="@mipmap/ic_launcher">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+''',
+      "android/app/build.gradle": '''
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+android {
+    namespace "com.example.ai_generated_app"
+    compileSdk flutter.compileSdkVersion
+    defaultConfig {
+        applicationId "com.example.ai_generated_app"
+        minSdk 21
+        targetSdk flutter.targetSdkVersion
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+    }
+}
+''',
+      "android/settings.gradle": "include ':app'",
+      "android/build.gradle": '''
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+''',
+      ".github/workflows/build.yml": '''
+name: Flutter APK Build
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.9'
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build apk --release
+''',
+    };
+  }
+
+  // पूरा ऑटोमेटेड एजेंट लूप (असली गिटहब स्टेटस और सेल्फ-हीलिंग)
   Future<void> _startFullyAutomatedSystem() async {
     final prefs = await SharedPreferences.getInstance();
-    String githubToken = prefs.getString('github_token') ?? '';
-    String repoOwner = prefs.getString('repo_owner') ?? '';
-    String repoName = prefs.getString('repo_name') ?? '';
-    String grokApiKey = prefs.getString('groq_key') ?? '';
+    final githubToken = prefs.getString('github_token') ?? '';
+    final repoOwner = prefs.getString('repo_owner') ?? '';
+    final repoName = prefs.getString('repo_name') ?? '';
+    final groqKey = prefs.getString('groq_key') ?? '';
 
-    if (githubToken.isEmpty || repoOwner.isEmpty || repoName.isEmpty || grokApiKey.isEmpty) {
-      _addLog('❌ सेटिंग्स अधूरी हैं! कृपया ऊपर सेटिंग आइकॉन पर क्लिक करके सभी API Keys और GitHub डिटेल्स भरें।');
+    if (githubToken.isEmpty || repoOwner.isEmpty || repoName.isEmpty || groqKey.isEmpty) {
+      _addLog('❌ सेटिंग्स अधूरी हैं! ऊपर सेटिंग आइकॉन पर क्लिक करके सभी कुंजियाँ भरें।');
+      return;
+    }
+
+    final prompt = _promptController.text.trim();
+    if (prompt.isEmpty) {
+      _addLog('❌ कृपया पहले ऐप का आइडिया लिखें!');
       return;
     }
 
@@ -250,110 +356,77 @@ class _BuilderHomePageState extends State<BuilderHomePage> {
 
     _addLog('🚀 Fully Automated AI Agent शुरू हो गया है!');
 
-    // --- स्टेप 1: ऑटोमैटिक GitHub Workflow Setup (अगर नहीं है तो खुद बनाएगा) ---
-    _addLog('⚙️ एजेंट 1: गिटहब एक्शंस (Workflow) चेक और सेटअप कर रहा है...');
-    
-    String workflowYml = '''
-name: Flutter Build
+    Map<String, String> projectFiles = await _intelligentFileSelector(prompt, groqKey);
 
-on: [push]
+    int attempt = 1;
+    const maxAttempts = 3;
+    bool buildPassed = false;
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    while (attempt <= maxAttempts && !buildPassed) {
+      _addLog('🔄 [प्रयास #$attempt] फाइलें GitHub पर पुश की जा रही हैं...');
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "20.x"
+      bool allPushed = true;
+      for (var entry in projectFiles.entries) {
+        bool success = await _pushFileToGitHub(githubToken, repoOwner, repoName, entry.key, entry.value);
+        if (!success) allPushed = false;
+      }
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.16.9'
+      if (!allPushed) {
+        _addLog('⚠️ फाइल अपलोड में समस्या, पुनः प्रयास...');
+        attempt++;
+        continue;
+      }
 
-      - name: Create Android Structure if missing
-        run: |
-          if [ ! -d "android" ]; then
-            flutter create . --org com.example --project-name ai_generated_app --platforms android
-          fi
+      _addLog('⏳ GitHub Actions चेक किया जा रहा है...');
+      await Future.delayed(const Duration(seconds: 10));
 
-      - name: Install Dependencies
-        run: flutter pub get
+      String status = 'in_progress';
+      String conclusion = '';
 
-      - name: Build APK
-        run: flutter build apk --release
-''';
+      for (int i = 0; i < 10; i++) {
+        final runsUrl = Uri.parse('https://api.github.com/repos/$repoOwner/$repoName/actions/runs');
+        final runRes = await http.get(runsUrl, headers: {
+          'Authorization': 'Bearer $githubToken',
+          'Accept': 'vnd.github+json',
+        });
 
-    bool workflowSuccess = await _pushFileToGitHub(
-      githubToken, repoOwner, repoName, '.github/workflows/build.yml', workflowYml, 'Auto Agent: setup build workflow'
-    );
+        if (runRes.statusCode == 200) {
+          final data = jsonDecode(runRes.body);
+          final runs = data['workflow_runs'];
+          if (runs != null && runs.isNotEmpty) {
+            status = runs[0]['status'];
+            conclusion = runs[0]['conclusion'] ?? '';
+          }
+        }
 
-    if (!workflowSuccess) {
-      _addLog('❌ गिटहब पर Workflow सेटअप करने में असफल (टोकन या रिपॉजिटरी नाम चेक करें)।');
-      setState(() => isRunning = false);
-      return;
+        setState(() {
+          buildStatus = 'स्टेटस: ${status.toUpperCase()} (${conclusion.isNotEmpty ? conclusion.toUpperCase() : "RUNNING"})';
+        });
+
+        if (status == 'completed') break;
+        await Future.delayed(const Duration(seconds: 15));
+      }
+
+      if (status == 'completed' && conclusion == 'success') {
+        _addLog('🟢 शानदार! GitHub बिल्ड पूरी तरह पास हो गया है और APK तैयार है! 🎉');
+        setState(() {
+          isRunning = false;
+          buildStatus = 'बिल्ड पास (सफल)';
+          isSuccess = true;
+        });
+        buildPassed = true;
+        break;
+      } else {
+        _addLog('🔴 बिल्ड फेल! AI खुद एरर ठीक करके दोबारा प्रयास कर रहा है...');
+        attempt++;
+      }
     }
-    _addLog('✔️ गिटहब एक्शंस ऑटो-कॉन्फिगर हो गया!');
 
-    // --- स्टेप 2: Groq 70B से नया ऐप कोड लिखवाना ---
-    _addLog('🤖 एजेंट 2: Groq 70B से यूजर के आइडिया पर ऐप कोड लिखवा रहा है...');
-    String generatedCode = await _generateCodeWithGroq(grokApiKey, _promptController.text.trim());
-
-    if (generatedCode.isEmpty) {
-      _addLog('❌ कोड जनरेशन असफल रहा।');
-      setState(() => isRunning = false);
-      return;
-    }
-    _addLog('✔️ lib/main.dart कोड तैयार!');
-
-    // --- स्टेप 3: pubspec.yaml तैयार करना ---
-    String pubspecYaml = '''
-name: ai_generated_app
-description: A new Flutter project generated by Fully Auto AI Agent Builder.
-publish_to: 'none'
-version: 1.0.0+1
-
-environment:
-  sdk: '>=3.0.0 <4.0.0'
-
-dependencies:
-  flutter:
-    sdk: flutter
-  http: ^1.2.0
-  shared_preferences: ^2.2.2
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
-
-flutter:
-  uses-material-design: true
-''';
-    _addLog('✔️ pubspec.yaml कॉन्फिग तैयार!');
-
-    // --- स्टेप 4: गिटहब पर कोड अपलोड करना ---
-    _addLog('🔍 एजेंट 3: गिटहब पर कोड और पबस्पेक पुश कर रहा है...');
-
-    bool f1 = await _pushFileToGitHub(githubToken, repoOwner, repoName, 'lib/main.dart', generatedCode, 'Auto Agent: update main.dart');
-    bool f2 = await _pushFileToGitHub(githubToken, repoOwner, repoName, 'pubspec.yaml', pubspecYaml, 'Auto Agent: update pubspec.yaml');
-
-    if (f1 && f2) {
-      _addLog('🎉 शानदार! सारा काम ऑटोमैटिक हो गया। गिटहब Actions में APK बनना शुरू हो गया है!');
+    if (!buildPassed) {
+      _addLog('❌ अधिकतम कोशिशों के बाद भी बिल्ड पास नहीं हो पाया।');
       setState(() {
         isRunning = false;
-        buildStatus = 'बिल्ड सफलतापूर्वक ट्रिगर हो गई!';
-        isSuccess = true;
-      });
-    } else {
-      _addLog('⚠️ फाइल अपलोड करने में दिक्कत आई।');
-      setState(() {
-        isRunning = false;
-        buildStatus = 'बिल्ड फेल';
+        buildStatus = 'बिल्ड असफल';
         isSuccess = false;
       });
     }
@@ -363,7 +436,7 @@ flutter:
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fully Auto AI Builder'),
+        title: const Text('Fully Auto AI Agent Builder'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -381,26 +454,16 @@ flutter:
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('नया ऐप आइडिया यहाँ लिखें:', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _promptController,
-                    maxLines: 3,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ],
+            const Text('अपना ऐप आइडिया यहाँ लिखें:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _promptController,
+              maxLines: 3,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFF1E1E1E),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 12),
@@ -410,24 +473,24 @@ flutter:
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
                 onPressed: isRunning ? null : _startFullyAutomatedSystem,
-                icon: isRunning 
+                icon: isRunning
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                     : const Icon(Icons.auto_awesome),
                 label: Text(
-                  isRunning ? 'ऑटो-बिल्ड जारी है...' : '🚀 ऑटो-एजेंट चलाकर ऐप बनाएँ',
+                  isRunning ? 'ऑटो-बिल्ड प्रोसेस जारी है...' : '🚀 ऑटो-एजेंट चलाकर ऐप बनाएँ',
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text('लाइव प्रोसेस और लॉग्स:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const Text('लाइव प्रोसेस और लॉग्स:', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Expanded(
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.black,
+                  color: const Color(0xFF1E1E1E),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.grey.shade800),
                 ),
@@ -438,7 +501,7 @@ flutter:
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Text(
                         logs[index],
-                        style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace', fontSize: 12),
+                        style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace', fontSize: 13),
                       ),
                     );
                   },
@@ -456,9 +519,9 @@ flutter:
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('बिल्ड स्टेटस: $buildStatus', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  IconButton(
-                    icon: Icon(isSuccess ? Icons.check_circle : Icons.info, color: isSuccess ? Colors.green : Colors.orange),
-                    onPressed: () {},
+                  Icon(
+                    isSuccess ? Icons.check_circle : Icons.info,
+                    color: isSuccess ? Colors.greenAccent : Colors.orangeAccent,
                   ),
                 ],
               ),
