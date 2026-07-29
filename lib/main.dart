@@ -253,13 +253,13 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 ''',
-    "android/settings.gradle": '''
+        "android/settings.gradle": '''
 pluginManagement {
-    def flutterSdkPath = settings.ext.has('flutter.sdk') ? settings.ext.get('flutter.sdk') : System.getenv('FLUTTER_ROOT')
-    if (flutterSdkPath == null) {
-        throw new GradleException("Flutter SDK not found.")
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://storage.googleapis.com/download.flutter.io' }
     }
-    includeBuild("\\\\$flutterSdkPath/packages/flutter_tools/gradle")
 }
 
 dependencyResolutionManagement {
@@ -279,6 +279,7 @@ plugins {
 
 include ":app"
 ''',
+
     "lib/main.dart": mainDartCode,
   };
 
