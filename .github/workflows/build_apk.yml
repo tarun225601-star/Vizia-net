@@ -25,7 +25,7 @@ jobs:
 
       - name: Initialize Flutter Android Scaffold
         run: |
-          flutter create . --project-name=desi_ai_app --platforms=android --org=com.example.app --force
+          flutter create . --project-name=desi_ai_app --platforms=android --org=com.example.app
 
       - name: Restore AI main.dart
         run: |
