@@ -226,7 +226,7 @@ class AgentLog {
 enum LogType { info, success, warning, error }
 
 // ==========================================
-// 4. MAIN DASHBOARD WITH INTERACTIVE FILE SELECTION
+// 4. MAIN DASHBOARD WITH SEARCH & DYNAMIC PLANNER
 // ==========================================
 class MasterDashboardScreen extends StatefulWidget {
   const MasterDashboardScreen({Key? key}) : super(key: key);
@@ -237,16 +237,18 @@ class MasterDashboardScreen extends StatefulWidget {
 
 class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   final TextEditingController _promptController = TextEditingController(
-    text: 'Create a simple calculator app in Flutter.',
+    text: 'Create a full featured shopping app with internet and local database in Flutter.',
   );
   
+  final TextEditingController _searchFileController = TextEditingController();
+  String _fileSearchQuery = '';
+
   final List<AgentLog> _logs = [];
   bool _isAutonomousRunning = false;
   double _progressValue = 0.0;
   String _currentPhase = 'IDLE - Waiting for instructions';
   String _actionsUrl = '';
 
-  // Interactive File Selection States
   bool _isWaitingForUserFileSelection = false;
   List<Map<String, dynamic>> _selectableFiles = [];
 
@@ -270,7 +272,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   }
 
   // ==========================================
-  // STEP 1: PLAN FILES & PAUSE FOR USER SELECTION
+  // STEP 1: DYNAMICALLY PLAN FILES FROM PROMPT
   // ==========================================
   Future<void> _startPipelineAndPlanFiles() async {
     final config = await _getStoredConfig();
@@ -288,27 +290,29 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
       _progressValue = 0.15;
       _actionsUrl = '';
       _isWaitingForUserFileSelection = false;
-      _currentPhase = 'Phase 1: Generating Blueprint Options...';
+      _currentPhase = 'Phase 1: Analyzing Prompt & Generating Required File List...';
     });
 
     _addLog('🚀 Autonomous Agent Session Started.', type: LogType.success);
 
     try {
-      _addLog('🧠 Analyzing prompt and fetching recommended file structure...');
+      _addLog('🧠 Reading user prompt to evaluate required project files...');
       final filePlan = await _callGroqForFilePlan(config, _promptController.text);
       
       setState(() {
         _selectableFiles = filePlan.map((path) => {
           'path': path,
-          'selected': true, // Default sabhi ticked rahengi
+          'selected': true,
         }).toList();
         _isAutonomousRunning = false;
         _isWaitingForUserFileSelection = true;
         _progressValue = 0.30;
-        _currentPhase = 'Paused: Waiting for User File Selection';
+        _currentPhase = 'Paused: Review & Search Dynamic File List';
+        _fileSearchQuery = '';
+        _searchFileController.clear();
       });
 
-      _addLog('📋 Architect proposed ${filePlan.length} files. Please select files below and click Proceed.', type: LogType.success);
+      _addLog('📋 Architect planned ${filePlan.length} files. Search and review below.', type: LogType.success);
     } catch (e) {
       _addLog('⚠️ Planning Error: $e', type: LogType.error);
       setState(() {
@@ -342,7 +346,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
       _currentPhase = 'Phase 2: Code Synthesis for Selected Files...';
     });
 
-    _addLog('⚡ User confirmed ${chosenFiles.length} files. Starting code synthesis...');
+    _addLog('⚡ User confirmed ${chosenFiles.length} files. Starting code generation...');
 
     try {
       final rawResponse = await _callGroqForCodeGeneration(config!, _promptController.text, chosenFiles);
@@ -397,10 +401,15 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   Future<List<String>> _callGroqForFilePlan(AgentConfig config, String userPrompt) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
     final systemPrompt = '''
-You are a Lead Software Architect. Given the user prompt, suggest all necessary files to build this project (e.g., pubspec.yaml, lib/main.dart, .github/workflows/flutter.yml, etc.). Keep it concise.
-Return ONLY a valid JSON array of strings containing paths. Example:
-["pubspec.yaml", "lib/main.dart", ".github/workflows/flutter.yml"]
-No markdown formatting, no extra text.
+You are an expert Lead Software Architect. Read the user prompt carefully and determine the necessary files to build the requested Flutter project.
+RULES:
+1. Under the `lib/` folder, ALWAYS include ONLY ONE single file: "lib/main.dart". Never split code into separate screen or model files.
+2. Always include essential project root files:
+   - "pubspec.yaml"
+   - ".github/workflows/flutter.yml"
+3. DYNAMICALLY check the prompt for hardware or special requirements:
+   - If the prompt mentions permissions, hardware, camera, location, internet, storage, or native configuration, include "android/app/src/main/AndroidManifest.xml" and "ios/Runner/Info.plist".
+4. Return ONLY a valid JSON array of strings containing the file paths. No markdown formatting, no extra text.
 ''';
 
     final response = await http.post(
@@ -448,7 +457,8 @@ MANDATORY RULES:
     }
   ]
 }
-2. CRITICAL FOR GITHUB ACTIONS (.github/workflows/flutter.yml): If you are generating a workflow file, you MUST include the official Flutter setup action so that 'flutter' command is never missing:
+2. Ensure lib/main.dart contains the entire standalone application code.
+3. CRITICAL FOR GITHUB ACTIONS (.github/workflows/flutter.yml): If included, use official actions:
 name: Build Flutter App
 on: [push, pull_request]
 jobs:
@@ -462,7 +472,7 @@ jobs:
           channel: 'stable'
       - run: flutter pub get
       - run: flutter build apk --release
-3. Ensure strict valid YAML syntax without tabs or unescaped characters.
+4. Ensure strict valid formatting for XML, YAML, and Dart code without tabs or unescaped characters.
 ''';
 
     final response = await http.post(
@@ -475,7 +485,7 @@ jobs:
         "model": config.selectedModel,
         "messages": [
           {"role": "system", "content": systemPrompt},
-          {"role": "user", "content": "Generate code for: $userPrompt strictly for files: ${filePlan.toString()}"}
+          {"role": "user", "content": "Generate complete code for: $userPrompt strictly for files: ${filePlan.toString()}"}
         ],
         "temperature": 0.2,
         "max_tokens": 8000,
@@ -546,7 +556,7 @@ jobs:
     }
 
     final Map<String, dynamic> requestBody = {
-      'message': 'Autonomous Agent Commit: $fileName',
+      'message': 'Autonomous Search-Filtered Commit: $fileName',
       'content': base64Encode(utf8.encode(fileCode)),
     };
 
@@ -570,10 +580,16 @@ jobs:
   }
 
   // ==========================================
-  // UI DESIGN WITH FILE SELECTION CHIPS
+  // UI DESIGN
   // ==========================================
   @override
   Widget build(BuildContext context) {
+    // Filter files based on search query
+    final filteredFiles = _selectableFiles.where((fileMap) {
+      final path = fileMap['path'].toString().toLowerCase();
+      return path.contains(_fileSearchQuery.toLowerCase());
+    }).toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Autonomous Replit Studio Engine'),
@@ -607,7 +623,7 @@ jobs:
             ),
             const SizedBox(height: 16),
             
-            // ACTION BUTTON (START OR PROCEED)
+            // ACTION BUTTON (START PLAN)
             if (!_isWaitingForUserFileSelection)
               SizedBox(
                 width: double.infinity,
@@ -616,13 +632,13 @@ jobs:
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
                   onPressed: _isAutonomousRunning ? null : _startPipelineAndPlanFiles,
                   child: Text(
-                    _isAutonomousRunning ? 'Processing Blueprint...' : '🔍 Step 1: Plan & Select Files',
+                    _isAutonomousRunning ? 'Analyzing Prompt...' : '🔍 Step 1: Analyze & Plan Files',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
               ),
 
-            // INTERACTIVE FILE SELECTION PANEL (गोल-गोल खाने / चेकबॉक्स)
+            // INTERACTIVE FILE SELECTION & SEARCH PANEL
             if (_isWaitingForUserFileSelection) ...[
               Container(
                 padding: const EdgeInsets.all(14),
@@ -635,31 +651,67 @@ jobs:
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      '📌 Select Files to Generate & Push:',
+                      '📌 Dynamic Project Files List:',
                       style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00E5FF), fontSize: 15),
                     ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Uncheck any file you do not want to include in this build:',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    const SizedBox(height: 10),
+                    
+                    // SEARCH BAR FOR FILES
+                    TextField(
+                      controller: _searchFileController,
+                      onChanged: (val) => setState(() => _fileSearchQuery = val),
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Search files (e.g. main.dart, yaml, xml)...',
+                        hintStyle: const TextStyle(color: Colors.white54),
+                        prefixIcon: const Icon(Icons.search, color: Color(0xFF00E5FF)),
+                        suffixIcon: _fileSearchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, color: Colors.white54, size: 18),
+                                onPressed: () {
+                                  setState(() {
+                                    _searchFileController.clear();
+                                    _fileSearchQuery = '';
+                                  });
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: Colors.black45,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 10),
+                      ),
                     ),
+                    const SizedBox(height: 10),
                     const Divider(color: Colors.white24),
-                    ..._selectableFiles.map((fileMap) {
-                      return CheckboxListTile(
-                        activeColor: const Color(0xFF00E5FF),
-                        checkColor: Colors.black,
-                        title: Text(
-                          fileMap['path'],
-                          style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 13),
+
+                    // CHECKBOX LIST (FILTERED BY SEARCH)
+                    if (filteredFiles.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(12.0),
+                        child: Center(
+                          child: Text('No matching files found.', style: TextStyle(color: Colors.white54)),
                         ),
-                        value: fileMap['selected'],
-                        onChanged: (bool? val) {
-                          setState(() {
-                            fileMap['selected'] = val ?? true;
-                          });
-                        },
-                      );
-                    }).toList(),
+                      )
+                    else
+                      ...filteredFiles.map((fileMap) {
+                        return CheckboxListTile(
+                          activeColor: const Color(0xFF00E5FF),
+                          checkColor: Colors.black,
+                          dense: true,
+                          title: Text(
+                            fileMap['path'],
+                            style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 13),
+                          ),
+                          value: fileMap['selected'],
+                          onChanged: (bool? val) {
+                            setState(() {
+                              fileMap['selected'] = val ?? true;
+                            });
+                          },
+                        );
+                      }).toList(),
+
                     const SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,
@@ -668,7 +720,7 @@ jobs:
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.tealAccent, foregroundColor: Colors.black),
                         onPressed: _confirmAndExecuteBuild,
                         child: const Text(
-                          '🚀 Step 2: Confirm Selection & Push to GitHub',
+                          '🚀 Step 2: Confirm & Push to GitHub',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                       ),
