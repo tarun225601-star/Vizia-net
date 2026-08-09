@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 void main() => runApp(const MasterBoxApp());
 
@@ -13,7 +12,7 @@ class MasterBoxApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Master Box - GitHub Fixed Repo Edition',
+      title: 'Master Box - GitHub CI/CD Builder',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0F172A),
         cardColor: const Color(0xFF1E293B),
@@ -26,7 +25,7 @@ class MasterBoxApp extends StatelessWidget {
 }
 
 // ==========================================
-// मॉडल: प्रोजेक्ट फाइलें
+// प्रोजेक्ट फाइल मॉडल
 // ==========================================
 class ProjectFileItem {
   final String fileName;
@@ -46,14 +45,12 @@ class SavedProject {
   final String projectTitle;
   final String timestamp;
   final List<ProjectFileItem> files;
-  final String previewHtml;
   final String githubRepoUrl;
 
   SavedProject({
     required this.projectTitle,
     required this.timestamp,
     required this.files,
-    required this.previewHtml,
     required this.githubRepoUrl,
   });
 
@@ -61,7 +58,6 @@ class SavedProject {
         'projectTitle': projectTitle,
         'timestamp': timestamp,
         'files': files.map((f) => f.toJson()).toList(),
-        'previewHtml': previewHtml,
         'githubRepoUrl': githubRepoUrl,
       };
 
@@ -72,14 +68,13 @@ class SavedProject {
       projectTitle: json['projectTitle'] ?? 'Project',
       timestamp: json['timestamp'] ?? '',
       files: parsedFiles,
-      previewHtml: json['previewHtml'] ?? '',
       githubRepoUrl: json['githubRepoUrl'] ?? '',
     );
   }
 }
 
 // ==========================================
-// 1. सेटिंग्स स्क्रीन (अब रिपॉजिटरी नेम के साथ)
+// 1. सेटिंग्स स्क्रीन
 // ==========================================
 class MasterSettingsScreen extends StatefulWidget {
   const MasterSettingsScreen({Key? key}) : super(key: key);
@@ -108,7 +103,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
       _githubTokenController.text = prefs.getString('github_token') ?? '';
       _githubUsernameController.text = prefs.getString('github_username') ?? '';
       _repoNameController.text = prefs.getString('github_repo_name') ?? '';
-      List<String> rawList = prefs.getStringList('saved_projects_vault_v5') ?? [];
+      List<String> rawList = prefs.getStringList('saved_projects_vault_v6') ?? [];
       savedProjectsList = rawList.map((item) => SavedProject.fromJson(jsonDecode(item))).toList();
     });
   }
@@ -121,7 +116,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
     await prefs.setString('github_repo_name', _repoNameController.text.trim());
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ GitHub रिपॉजिटरी और सेटिंग्स सेव हो गई हैं!')),
+      const SnackBar(content: Text('✅ सेटिंग्स सफलतापूर्वक सेव हो गई हैं!')),
     );
   }
 
@@ -131,9 +126,9 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
       savedProjectsList.removeAt(index);
     });
     List<String> rawList = savedProjectsList.map((item) => jsonEncode(item.toJson())).toList();
-    await prefs.setStringList('saved_projects_vault_v5', rawList);
+    await prefs.setStringList('saved_projects_vault_v6', rawList);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🗑️ प्रोजेक्ट डिलीट कर दिया गया है।')),
+      const SnackBar(content: Text('🗑️ प्रोजेक्ट हटा दिया गया है।')),
     );
   }
 
@@ -141,7 +136,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('लोकल सेटिंग्स और फिक्स रिपॉजिटरी वॉल्ट'),
+        title: const Text('GitHub CI/CD सेटिंग्स'),
         backgroundColor: const Color(0xFF1E293B),
       ),
       body: Padding(
@@ -173,7 +168,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
               controller: _repoNameController,
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
-                labelText: 'Target GitHub Repository Name (जिसमें कोड भेजना है)',
+                labelText: 'Target GitHub Repository Name (जहाँ कोड जाएगा)',
                 prefixIcon: Icon(Icons.folder, color: Colors.greenAccent),
                 border: OutlineInputBorder(),
               ),
@@ -198,7 +193,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
             ),
             const SizedBox(height: 20),
             const Text(
-              '📦 सहेजे गए प्रोजेक्ट्स की हिस्ट्री:',
+              '📦 पुरानी हिस्ट्री:',
               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amberAccent),
             ),
             const SizedBox(height: 10),
@@ -229,7 +224,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
                         ],
                       ),
                       if (project.githubRepoUrl.isNotEmpty)
-                        Text('🔗 GitHub: ${project.githubRepoUrl}', style: const TextStyle(color: Colors.greenAccent, fontSize: 11)),
+                        Text('🔗 Repo: ${project.githubRepoUrl}', style: const TextStyle(color: Colors.greenAccent, fontSize: 11)),
                       Text('समय: ${project.timestamp}', style: const TextStyle(color: Colors.white54, fontSize: 10)),
                     ],
                   ),
@@ -244,32 +239,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
 }
 
 // ==========================================
-// 2. फुल स्क्रीन वेब प्रीव्यू पेज
-// ==========================================
-class FullScreenPreviewPage extends StatelessWidget {
-  final String htmlCode;
-  final String appTitle;
-
-  const FullScreenPreviewPage({Key? key, required this.htmlCode, required this.appTitle}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final WebViewController controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..loadHtmlString(htmlCode);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(appTitle, style: const TextStyle(fontSize: 16)),
-        backgroundColor: const Color(0xFF1E293B),
-      ),
-      body: WebViewWidget(controller: controller),
-    );
-  }
-}
-
-// ==========================================
-// 3. होम स्क्रीन
+// 2. होम स्क्रीन & ऑटोमेशन इंजन
 // ==========================================
 class MasterHomePage extends StatefulWidget {
   const MasterHomePage({Key? key}) : super(key: key);
@@ -280,17 +250,15 @@ class MasterHomePage extends StatefulWidget {
 
 class _MasterHomePageState extends State<MasterHomePage> {
   final TextEditingController _promptController = TextEditingController(
-    text: 'Build a modern responsive calculator app with HTML/CSS/JS',
+    text: 'Build a fully working Flutter calculator app with nice UI',
   );
 
   bool isProcessing = false;
   String statusMessage = 'तैयार है...';
-  bool showWebViewButton = false;
-  String currentPreviewHtml = '';
-  String currentProjectTitle = '';
   String currentRepoUrl = '';
   List<ProjectFileItem> currentFiles = [];
 
+  // क्रैश रोकने के लिए फुलप्रूफ JSON क्लीनर
   String _cleanJsonString(String input) {
     if (input.contains('```json')) {
       input = input.split('```json')[1].split('```')[0];
@@ -298,10 +266,11 @@ class _MasterHomePageState extends State<MasterHomePage> {
       input = input.split('```')[1].split('```')[0];
     }
     input = input.trim();
-    return input.replaceAll(RegExp(r'[\u0000-\u001F]+'), '');
+    input = input.replaceAll(RegExp(r'[\u0000-\u001F\u007F-\u009F]'), '');
+    return input;
   }
 
-  // एक ही फिक्स रिपॉजिटरी में बार-बार कोड पुश/अपडेट करने का फंक्शन
+  // गिटहब पर रिपॉजिटरी चेक करना, फाइलें भेजना और Actions ट्रिगर करना
   Future<String> _pushFilesToFixedRepo(List<ProjectFileItem> files) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('github_token') ?? '';
@@ -312,12 +281,11 @@ class _MasterHomePageState extends State<MasterHomePage> {
       throw Exception('GitHub Token, Username या Repo Name सेटिंग्स में अधूरा है!');
     }
 
-    // 1. चेक करें या फिक्स रिपॉजिटरी बनाएँ (अगर पहले से नहीं है)
+    // 1. रिपॉजिटरी चेक करें, अगर न हो तो बनाएं
     final repoCheckUrl = Uri.parse('https://api.github.com/repos/$username/$repoName');
     final checkResponse = await http.get(repoCheckUrl, headers: {'Authorization': 'Bearer $token'});
 
     if (checkResponse.statusCode == 404) {
-      // अगर रिपॉजिटरी मौजूद नहीं है, तो उसे पहली बार बना दो
       final createRepoUrl = Uri.parse('https://api.github.com/user/repos');
       await http.post(
         createRepoUrl,
@@ -328,19 +296,19 @@ class _MasterHomePageState extends State<MasterHomePage> {
         },
         body: jsonEncode({
           'name': repoName,
-          'description': 'Created by Master Box AI App Builder',
+          'description': 'Automated Flutter App Builder by Master Box',
           'private': false,
           'auto_init': true,
         }),
       );
     }
 
-    // 2. हर फाइल को उसी फिक्स रिपॉजिटरी में पुश/अपडेट करें
+    // 2. सभी फाइलों (और .github/workflows/flutter.yml) को पुश/अपडेट करें
     for (var file in files) {
-      final cleanFileName = file.fileName.replaceAll(' ', '_');
-      final fileUrl = Uri.parse('https://api.github.com/repos/$username/$repoName/contents/$cleanFileName');
+      // पाथ ठीक से सेट करें (जैसे subfolders के लिए)
+      final filePath = file.fileName.trim();
+      final fileUrl = Uri.parse('https://api.github.com/repos/$username/$repoName/contents/$filePath');
       
-      // फाइल का SHA पता करें ताकि वह पुरानी फाइल को ओवरराइट/अपडेट कर सके
       String? fileSha;
       final getCheck = await http.get(fileUrl, headers: {'Authorization': 'Bearer $token'});
       if (getCheck.statusCode == 200) {
@@ -350,11 +318,11 @@ class _MasterHomePageState extends State<MasterHomePage> {
       String encodedContent = base64Encode(utf8.encode(file.fileCode));
 
       Map<String, dynamic> bodyData = {
-        'message': 'AI Update: Update ${file.fileName}',
+        'message': 'CI/CD AI Agent: Update $filePath',
         'content': encodedContent,
       };
       if (fileSha != null) {
-        bodyData['sha'] = fileSha; // SHA होने से फाइल अपडेट हो जाएगी, डुप्लीकेट नहीं बनेगी
+        bodyData['sha'] = fileSha;
       }
 
       await http.put(
@@ -368,7 +336,7 @@ class _MasterHomePageState extends State<MasterHomePage> {
       );
     }
 
-    return 'https://github.com/$username/$repoName';
+    return 'https://github.com/$username/$repoName/actions';
   }
 
   Future<void> _runEngine() async {
@@ -376,7 +344,7 @@ class _MasterHomePageState extends State<MasterHomePage> {
     final groqKey = prefs.getString('groq_key') ?? '';
 
     if (groqKey.isEmpty) {
-      setState(() => statusMessage = '❌ त्रुटि: कृपया सेटिंग्स में जाकर Groq API Key दर्ज करें!');
+      setState(() => statusMessage = '❌ त्रुटि: सेटिंग्स में Groq API Key दर्ज करें!');
       return;
     }
 
@@ -385,12 +353,12 @@ class _MasterHomePageState extends State<MasterHomePage> {
 
     setState(() {
       isProcessing = true;
-      statusMessage = '🔄 एआई से कोड बन रहा है और GitHub रिपॉजिटरी में अपडेट हो रहा है...';
-      showWebViewButton = false;
+      statusMessage = '🔄 AI ऐप कोड और Build Actions फाइल बना रहा है...';
       currentFiles.clear();
     });
 
     try {
+      // Groq API से पूरा Flutter प्रोजेक्ट और GitHub Actions स्क्रिप्ट मांग रहे हैं
       final response = await http.post(
         Uri.parse('https://api.groq.com/openai/v1/chat/completions'),
         headers: {
@@ -402,11 +370,25 @@ class _MasterHomePageState extends State<MasterHomePage> {
           "messages": [
             {
               "role": "system",
-              "content": "You are an elite developer. Generate a multi-file project structure based on the prompt. Return ONLY a valid JSON object in this exact format without markdown blocks: {\"files\": [{\"fileName\": \"main.dart\", \"fileCode\": \"...\"}, {\"fileName\": \"pubspec.yaml\", \"fileCode\": \"...\"}], \"previewHtml\": \"... (fully styled responsive HTML/CSS/JS app for webview preview) ...\"}"
+              "content": """You are an elite Flutter & DevOps Architect. 
+Generate a complete working Flutter project structure based on user prompt.
+You MUST include these files:
+1. "lib/main.dart" (Complete executable app)
+2. "pubspec.yaml" (Valid dependencies)
+3. ".github/workflows/flutter.yml" (GitHub action script to build APK: triggers on push, uses subosito/flutter-action, runs flutter build apk --release, and uploads artifact).
+
+Return ONLY a valid JSON object in this exact format without any markdown wrappers:
+{
+  "files": [
+    {"fileName": "lib/main.dart", "fileCode": "...code..."},
+    {"fileName": "pubspec.yaml", "fileCode": "...code..."},
+    {"fileName": ".github/workflows/flutter.yml", "fileCode": "name: Build APK\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v3\n      - uses: subosito/flutter-action@v2\n        with:\n          flutter-version: '3.x'\n      - run: flutter pub get\n      - run: flutter build apk --release\n      - uses: actions/upload-artifact@v3\n        with:\n          name: release-apk\n          path: build/app/outputs/flutter-apk/app-release.apk"}
+  ]
+}"""
             },
             {"role": "user", "content": prompt}
           ],
-          "temperature": 0.7,
+          "temperature": 0.4,
         }),
       );
 
@@ -418,48 +400,42 @@ class _MasterHomePageState extends State<MasterHomePage> {
         final parsedJson = jsonDecode(cleanedJsonStr);
         final List<dynamic> fileListJson = parsedJson['files'] ?? [];
         List<ProjectFileItem> fetchedFiles = fileListJson.map((f) => ProjectFileItem.fromJson(f)).toList();
-        String previewHtml = parsedJson['previewHtml'] ?? '';
 
-        // फिक्स रिपॉजिटरी में कोड पुश/अपडेट करें
-        String repoUrl = '';
+        setState(() => statusMessage = '☁️ गिटहब पर कोड पुश हो रहा है और बिल्ड शुरू हो रही है...');
+
+        // गिटहब पर पुश करें
+        String actionsUrl = '';
         try {
-          repoUrl = await _pushFilesToFixedRepo(fetchedFiles);
+          actionsUrl = await _pushFilesToFixedRepo(fetchedFiles);
         } catch (e) {
-          repoUrl = 'GitHub Push Failed: $e';
+          actionsUrl = 'GitHub Push Error: $e';
         }
 
-        List<String> rawList = prefs.getStringList('saved_projects_vault_v5') ?? [];
+        // हिस्ट्री सेव करें
+        List<String> rawList = prefs.getStringList('saved_projects_vault_v6') ?? [];
         List<SavedProject> existingProjects = rawList.map((item) => SavedProject.fromJson(jsonDecode(item))).toList();
         
         int nextNum = existingProjects.length + 1;
         String shortTitle = prompt.length > 20 ? '${prompt.substring(0, 20)}...' : prompt;
-        String projTitle = 'Project #$nextNum: $shortTitle';
-        String timeStr = TimeOfDay.fromDateTime(DateTime.now()).format(context);
-
         SavedProject newProj = SavedProject(
-          projectTitle: projTitle,
-          timestamp: timeStr,
+          projectTitle: 'Project #$nextNum: $shortTitle',
+          timestamp: TimeOfDay.fromDateTime(DateTime.now()).format(context),
           files: fetchedFiles,
-          previewHtml: previewHtml,
-          githubRepoUrl: repoUrl,
+          githubRepoUrl: actionsUrl,
         );
         existingProjects.insert(0, newProj);
-
-        await prefs.setStringList('saved_projects_vault_v5', existingProjects.map((item) => jsonEncode(item.toJson())).toList());
+        await prefs.setStringList('saved_projects_vault_v6', existingProjects.map((item) => jsonEncode(item.toJson())).toList());
 
         setState(() {
           currentFiles = fetchedFiles;
-          currentPreviewHtml = previewHtml;
-          currentProjectTitle = projTitle;
-          currentRepoUrl = repoUrl;
+          currentRepoUrl = actionsUrl;
           isProcessing = false;
-          showWebViewButton = true;
-          statusMessage = '✅ कोड जनरेट होकर GitHub रिपॉजिटरी में अपडेट हो गया!';
+          statusMessage = '✅ काम हो गया! GitHub Actions पर APK बनना शुरू हो गया है।';
         });
       } else {
         setState(() {
           isProcessing = false;
-          statusMessage = '⚠️ API एरर: ${response.statusCode}';
+          statusMessage = '⚠️ API Error: ${response.statusCode}';
         });
       }
     } catch (e) {
@@ -474,7 +450,7 @@ class _MasterHomePageState extends State<MasterHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('मास्टर बॉक्स - Fixed Repo AI Builder'),
+        title: const Text('मास्टर बॉक्स - APK CI/CD Builder'),
         backgroundColor: const Color(0xFF1E293B),
         actions: [
           IconButton(
@@ -493,7 +469,7 @@ class _MasterHomePageState extends State<MasterHomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('प्रोजेक्ट अपडेट या नया बदलाव करने के लिए प्रॉम्ट लिखें:', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+            const Text('ऐप बनवाने के लिए प्रॉम्ट लिखें:', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             TextField(
               controller: _promptController,
@@ -512,43 +488,18 @@ class _MasterHomePageState extends State<MasterHomePage> {
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black),
                 onPressed: isProcessing ? null : _runEngine,
-                icon: isProcessing ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.cloud_upload),
-                label: Text(isProcessing ? 'अपडेट हो रहा है...' : '⚡ कोड बनाओ और Repo में भेजो', style: const TextStyle(fontWeight: FontWeight.bold)),
+                icon: isProcessing ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.rocket_launch),
+                label: Text(isProcessing ? 'बिल्ड प्रोसेस जारी है...' : '⚡ ऐप बनाओ और APK बिल्ड चलाओ', style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(height: 10),
             Text(statusMessage, style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontFamily: 'monospace')),
             if (currentRepoUrl.isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text('🔗 GitHub Link: $currentRepoUrl', style: const TextStyle(color: Colors.amberAccent, fontSize: 11)),
+              Text('🔗 Actions Link (यहाँ APK मिलेगा): $currentRepoUrl', style: const TextStyle(color: Colors.amberAccent, fontSize: 11)),
             ],
             const SizedBox(height: 12),
-            
-            if (showWebViewButton && currentPreviewHtml.isNotEmpty) ...[
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent, foregroundColor: Colors.black),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => FullScreenPreviewPage(
-                          htmlCode: currentPreviewHtml,
-                          appTitle: currentProjectTitle,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.fullscreen),
-                  label: const Text('🚀 वेब प्रीव्यू चलाकर देखें', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            const Text('📁 जनरेटेड फाइलें:', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+            const Text('📁 जनरेटेड प्रोजेक्ट फाइलें:', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             Expanded(
               child: currentFiles.isEmpty
@@ -568,7 +519,7 @@ class _MasterHomePageState extends State<MasterHomePage> {
                                 Text('📄 ${file.fileName}', style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 13)),
                                 const SizedBox(height: 4),
                                 SizedBox(
-                                  height: 60,
+                                  height: 50,
                                   child: SingleChildScrollView(
                                     child: Text(
                                       file.fileCode,
