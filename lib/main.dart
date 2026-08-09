@@ -307,7 +307,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
         final filePlan = await _callGroqForFilePlan(config, _promptController.text);
         _addLog('📋 Architect Approved Files: ${filePlan.join(', ')}', type: LogType.success);
 
-        // STEP 2: Generate code based on blueprint
+        // STEP 2: Generate code based on blueprint (Now strictly includes GitHub Actions setup rule)
         setState(() => _currentPhase = 'Phase 2: Code Synthesis & Multi-File Generation...');
         _addLog('⚡ Step 2: Synthesizing raw files according to blueprint...');
         final rawResponse = await _callGroqForCodeGeneration(config, _promptController.text, filePlan);
@@ -414,13 +414,13 @@ No markdown formatting, no extra text.
   }
 
   // ==========================================
-  // 7. CODE GENERATION
+  // 7. CODE GENERATION (UPDATED WITH FLUTTER ACTIONS RULE)
   // ==========================================
   Future<String> _callGroqForCodeGeneration(AgentConfig config, String userPrompt, List<String> filePlan) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
     
     final systemPrompt = '''
-You are an expert Developer. Generate production-ready code strictly for these files: ${filePlan.join(', ')}.
+You are an expert Developer and DevOps Engineer. Generate production-ready code strictly for these files: ${filePlan.join(', ')}.
 MANDATORY RULES:
 1. Output MUST be ONLY a clean raw JSON object matching this exact structure, with no markdown tags:
 {
@@ -431,7 +431,21 @@ MANDATORY RULES:
     }
   ]
 }
-2. Ensure strict valid YAML syntax without unescaped characters for workflow files.
+2. CRITICAL FOR GITHUB ACTIONS (.github/workflows/flutter.yml): If you are generating a workflow file, you MUST include the official Flutter setup action so that 'flutter' command is never missing. Use this exact structure for the workflow:
+name: Build Flutter App
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.x'
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build appbundle --release
+3. Ensure strict valid YAML syntax without tabs or unescaped characters.
 ''';
 
     final response = await http.post(
