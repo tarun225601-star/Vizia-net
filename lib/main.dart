@@ -226,7 +226,7 @@ class AgentLog {
 enum LogType { info, success, warning, error }
 
 // ==========================================
-// 4. MAIN DASHBOARD
+// 4. MAIN DASHBOARD WITH INTERACTIVE FILE SELECTION
 // ==========================================
 class MasterDashboardScreen extends StatefulWidget {
   const MasterDashboardScreen({Key? key}) : super(key: key);
@@ -237,7 +237,7 @@ class MasterDashboardScreen extends StatefulWidget {
 
 class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   final TextEditingController _promptController = TextEditingController(
-    text: 'Create a fully operational, responsive Flutter fitness tracker app with dark mode, storage, and custom charts.',
+    text: 'Create a simple calculator app in Flutter.',
   );
   
   final List<AgentLog> _logs = [];
@@ -245,7 +245,10 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   double _progressValue = 0.0;
   String _currentPhase = 'IDLE - Waiting for instructions';
   String _actionsUrl = '';
-  List<dynamic> _generatedFilesCache = [];
+
+  // Interactive File Selection States
+  bool _isWaitingForUserFileSelection = false;
+  List<Map<String, dynamic>> _selectableFiles = [];
 
   void _addLog(String msg, {LogType type = LogType.info}) {
     final now = DateTime.now();
@@ -267,9 +270,9 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   }
 
   // ==========================================
-  // 5. SELF-VERIFYING AUTONOMOUS PIPELINE
+  // STEP 1: PLAN FILES & PAUSE FOR USER SELECTION
   // ==========================================
-  Future<void> _executeAutonomousPipeline() async {
+  Future<void> _startPipelineAndPlanFiles() async {
     final config = await _getStoredConfig();
     if (!config!.isValid) {
       _addLog('Configuration error: Missing API credentials or repository parameters.', type: LogType.error);
@@ -282,76 +285,92 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     setState(() {
       _isAutonomousRunning = true;
       _logs.clear();
-      _progressValue = 0.05;
+      _progressValue = 0.15;
       _actionsUrl = '';
-      _currentPhase = 'Phase 1: Dynamic Architecture Planning...';
+      _isWaitingForUserFileSelection = false;
+      _currentPhase = 'Phase 1: Generating Blueprint Options...';
     });
 
     _addLog('🚀 Autonomous Agent Session Started.', type: LogType.success);
-    _addLog('Target Repository: ${config.githubUser}/${config.githubRepo}');
-
-    int attempt = 0;
-    bool success = false;
-    List files = [];
-
-    while (attempt < 3 && !success) {
-      attempt++;
-      setState(() {
-        _progressValue = 0.10 + (attempt * 0.10);
-        _currentPhase = 'Self-Correction & Validation Loop (Attempt $attempt/3)';
-      });
-
-      try {
-        // STEP 1: Ask Groq for precise file blueprint
-        _addLog('🧠 Step 1: Querying Groq for optimal file structure blueprint...');
-        final filePlan = await _callGroqForFilePlan(config, _promptController.text);
-        _addLog('📋 Architect Approved Files: ${filePlan.join(', ')}', type: LogType.success);
-
-        // STEP 2: Generate code based on blueprint (Now strictly includes GitHub Actions setup rule)
-        setState(() => _currentPhase = 'Phase 2: Code Synthesis & Multi-File Generation...');
-        _addLog('⚡ Step 2: Synthesizing raw files according to blueprint...');
-        final rawResponse = await _callGroqForCodeGeneration(config, _promptController.text, filePlan);
-
-        // STEP 3: Self-Validation and Verification Check
-        setState(() => _currentPhase = 'Phase 3: Rigorous Validation & Self-Check...');
-        _addLog('🔍 Step 3: Running internal syntax & structure verification checks...');
-        files = _parseAndValidateJsonFiles(rawResponse, filePlan);
-
-        success = true;
-        _addLog('✅ All files passed multi-layer verification checks successfully!', type: LogType.success);
-      } catch (e) {
-        _addLog('⚠️ Validation Exception caught: $e', type: LogType.warning);
-        if (attempt >= 3) {
-          _addLog('❌ Autonomous agent failed after 3 corrective iterations.', type: LogType.error);
-          setState(() {
-            _isAutonomousRunning = false;
-            _currentPhase = 'Pipeline Aborted due to validation failure.';
-          });
-          return;
-        }
-        _addLog('🔄 Self-Healing Engine re-trying synthesis loop...');
-      }
-    }
-
-    if (!success) return;
-
-    setState(() {
-      _generatedFilesCache = files;
-      _progressValue = 0.60;
-      _currentPhase = 'Phase 4: GitHub Secure Synchronization & Push';
-    });
 
     try {
+      _addLog('🧠 Analyzing prompt and fetching recommended file structure...');
+      final filePlan = await _callGroqForFilePlan(config, _promptController.text);
+      
+      setState(() {
+        _selectableFiles = filePlan.map((path) => {
+          'path': path,
+          'selected': true, // Default sabhi ticked rahengi
+        }).toList();
+        _isAutonomousRunning = false;
+        _isWaitingForUserFileSelection = true;
+        _progressValue = 0.30;
+        _currentPhase = 'Paused: Waiting for User File Selection';
+      });
+
+      _addLog('📋 Architect proposed ${filePlan.length} files. Please select files below and click Proceed.', type: LogType.success);
+    } catch (e) {
+      _addLog('⚠️ Planning Error: $e', type: LogType.error);
+      setState(() {
+        _isAutonomousRunning = false;
+        _currentPhase = 'Pipeline Aborted.';
+      });
+    }
+  }
+
+  // ==========================================
+  // STEP 2: GENERATE CODE & PUSH CHOSEN FILES
+  // ==========================================
+  Future<void> _confirmAndExecuteBuild() async {
+    final config = await _getStoredConfig();
+    final chosenFiles = _selectableFiles
+        .where((f) => f['selected'] == true)
+        .map((f) => f['path'].toString())
+        .toList();
+
+    if (chosenFiles.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('⚠️ Please select at least one file!')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isWaitingForUserFileSelection = false;
+      _isAutonomousRunning = true;
+      _progressValue = 0.45;
+      _currentPhase = 'Phase 2: Code Synthesis for Selected Files...';
+    });
+
+    _addLog('⚡ User confirmed ${chosenFiles.length} files. Starting code synthesis...');
+
+    try {
+      final rawResponse = await _callGroqForCodeGeneration(config!, _promptController.text, chosenFiles);
+      
+      setState(() {
+        _progressValue = 0.65;
+        _currentPhase = 'Phase 3: Validation & Security Check...';
+      });
+      _addLog('🔍 Running internal syntax verification checks...');
+      
+      final files = _parseAndValidateJsonFiles(rawResponse, chosenFiles);
+      _addLog('✅ All chosen files passed verification!', type: LogType.success);
+
+      setState(() {
+        _progressValue = 0.75;
+        _currentPhase = 'Phase 4: GitHub Secure Synchronization & Push...';
+      });
+
       _addLog('☁️ Connecting to GitHub REST API endpoints...');
       for (int i = 0; i < files.length; i++) {
         final fileEntry = files[i];
         final String fileName = fileEntry['fileName'];
         final String fileCode = fileEntry['fileCode'];
 
-        final filePushProgress = 0.60 + ((i + 1) / files.length) * 0.35;
+        final filePushProgress = 0.75 + ((i + 1) / files.length) * 0.20;
         setState(() => _progressValue = filePushProgress);
 
-        _addLog('📦 Pushing verified target file: $fileName');
+        _addLog('📦 Pushing target file: $fileName');
         await _pushFileToGitHub(config, fileName, fileCode);
       }
 
@@ -362,24 +381,23 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
         _actionsUrl = 'https://github.com/${config.githubUser}/${config.githubRepo}/actions';
       });
 
-      _addLog('🎉 All ${files.length} verified project files deployed cleanly!', type: LogType.success);
-    } catch (gitErr) {
-      _addLog('❌ GitHub Synchronization Failed: $gitErr', type: LogType.error);
+      _addLog('🎉 All selected project files deployed cleanly!', type: LogType.success);
+    } catch (e) {
+      _addLog('❌ Execution Failed: $e', type: LogType.error);
       setState(() {
         _isAutonomousRunning = false;
-        _currentPhase = 'Deployment Failed during sync.';
+        _currentPhase = 'Deployment Failed.';
       });
     }
   }
 
   // ==========================================
-  // 6. ARCHITECT FILE PLANNER
+  // ARCHITECT FILE PLANNER
   // ==========================================
   Future<List<String>> _callGroqForFilePlan(AgentConfig config, String userPrompt) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-    
     final systemPrompt = '''
-You are a Lead Software Architect. Given the user requirement, determine the exact file structure required (e.g., pubspec.yaml, lib/main.dart, .github/workflows/flutter.yml).
+You are a Lead Software Architect. Given the user prompt, suggest all necessary files to build this project (e.g., pubspec.yaml, lib/main.dart, .github/workflows/flutter.yml, etc.). Keep it concise.
 Return ONLY a valid JSON array of strings containing paths. Example:
 ["pubspec.yaml", "lib/main.dart", ".github/workflows/flutter.yml"]
 No markdown formatting, no extra text.
@@ -414,13 +432,12 @@ No markdown formatting, no extra text.
   }
 
   // ==========================================
-  // 7. CODE GENERATION (UPDATED WITH FLUTTER ACTIONS RULE)
+  // CODE GENERATION
   // ==========================================
   Future<String> _callGroqForCodeGeneration(AgentConfig config, String userPrompt, List<String> filePlan) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-    
     final systemPrompt = '''
-You are an expert Developer and DevOps Engineer. Generate production-ready code strictly for these files: ${filePlan.join(', ')}.
+You are an expert Developer and DevOps Engineer. Generate production-ready code strictly for these planned files: ${filePlan.join(', ')}.
 MANDATORY RULES:
 1. Output MUST be ONLY a clean raw JSON object matching this exact structure, with no markdown tags:
 {
@@ -431,7 +448,7 @@ MANDATORY RULES:
     }
   ]
 }
-2. CRITICAL FOR GITHUB ACTIONS (.github/workflows/flutter.yml): If you are generating a workflow file, you MUST include the official Flutter setup action so that 'flutter' command is never missing. Use this exact structure for the workflow:
+2. CRITICAL FOR GITHUB ACTIONS (.github/workflows/flutter.yml): If you are generating a workflow file, you MUST include the official Flutter setup action so that 'flutter' command is never missing:
 name: Build Flutter App
 on: [push, pull_request]
 jobs:
@@ -444,7 +461,7 @@ jobs:
           flutter-version: '3.19.x'
           channel: 'stable'
       - run: flutter pub get
-      - run: flutter build appbundle --release
+      - run: flutter build apk --release
 3. Ensure strict valid YAML syntax without tabs or unescaped characters.
 ''';
 
@@ -458,7 +475,7 @@ jobs:
         "model": config.selectedModel,
         "messages": [
           {"role": "system", "content": systemPrompt},
-          {"role": "user", "content": "Generate code for: $userPrompt for files: ${filePlan.toString()}"}
+          {"role": "user", "content": "Generate code for: $userPrompt strictly for files: ${filePlan.toString()}"}
         ],
         "temperature": 0.2,
         "max_tokens": 8000,
@@ -474,7 +491,7 @@ jobs:
   }
 
   // ==========================================
-  // 8. STRICT VALIDATION & SELF-CHECK ENGINE
+  // VALIDATION
   // ==========================================
   List<dynamic> _parseAndValidateJsonFiles(String rawContent, List<String> expectedFiles) {
     String cleaned = rawContent.replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F]'), '').trim();
@@ -496,14 +513,11 @@ jobs:
       throw Exception('Validation Error: Generated files list is empty.');
     }
 
-    // Double check YAML syntax integrity if present
     for (var file in files) {
       String name = file['fileName'] ?? '';
       String code = file['fileCode'] ?? '';
-      if (name.endsWith('.yml') || name.endsWith('.yaml')) {
-        if (code.contains('\t')) {
-          throw Exception('Validation Error: YAML file $name contains tabs instead of spaces.');
-        }
+      if ((name.endsWith('.yml') || name.endsWith('.yaml')) && code.contains('\t')) {
+        throw Exception('Validation Error: YAML file $name contains tabs instead of spaces.');
       }
     }
 
@@ -511,7 +525,7 @@ jobs:
   }
 
   // ==========================================
-  // 9. GITHUB REST SYNC
+  // GITHUB PUSH
   // ==========================================
   Future<void> _pushFileToGitHub(AgentConfig config, String fileName, String fileCode) async {
     final endpointStr = 'https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/contents/$fileName';
@@ -532,7 +546,7 @@ jobs:
     }
 
     final Map<String, dynamic> requestBody = {
-      'message': 'Autonomous Agent Self-Verified Commit: $fileName',
+      'message': 'Autonomous Agent Commit: $fileName',
       'content': base64Encode(utf8.encode(fileCode)),
     };
 
@@ -556,7 +570,7 @@ jobs:
   }
 
   // ==========================================
-  // 10. UI DESIGN
+  // UI DESIGN WITH FILE SELECTION CHIPS
   // ==========================================
   @override
   Widget build(BuildContext context) {
@@ -583,7 +597,7 @@ jobs:
             const SizedBox(height: 8),
             TextField(
               controller: _promptController,
-              maxLines: 4,
+              maxLines: 3,
               style: const TextStyle(color: Colors.white, fontSize: 14),
               decoration: InputDecoration(
                 filled: true,
@@ -592,19 +606,80 @@ jobs:
               ),
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
-                onPressed: _isAutonomousRunning ? null : _executeAutonomousPipeline,
-                child: Text(
-                  _isAutonomousRunning ? 'Self-Checking & Running...' : '🚀 Launch Verified Autonomous Pipeline',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            
+            // ACTION BUTTON (START OR PROCEED)
+            if (!_isWaitingForUserFileSelection)
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
+                  onPressed: _isAutonomousRunning ? null : _startPipelineAndPlanFiles,
+                  child: Text(
+                    _isAutonomousRunning ? 'Processing Blueprint...' : '🔍 Step 1: Plan & Select Files',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
+
+            // INTERACTIVE FILE SELECTION PANEL (गोल-गोल खाने / चेकबॉक्स)
+            if (_isWaitingForUserFileSelection) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131B2E),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF00E5FF), width: 1.5),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '📌 Select Files to Generate & Push:',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00E5FF), fontSize: 15),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Uncheck any file you do not want to include in this build:',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    const Divider(color: Colors.white24),
+                    ..._selectableFiles.map((fileMap) {
+                      return CheckboxListTile(
+                        activeColor: const Color(0xFF00E5FF),
+                        checkColor: Colors.black,
+                        title: Text(
+                          fileMap['path'],
+                          style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 13),
+                        ),
+                        value: fileMap['selected'],
+                        onChanged: (bool? val) {
+                          setState(() {
+                            fileMap['selected'] = val ?? true;
+                          });
+                        },
+                      );
+                    }).toList(),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.tealAccent, foregroundColor: Colors.black),
+                        onPressed: _confirmAndExecuteBuild,
+                        child: const Text(
+                          '🚀 Step 2: Confirm Selection & Push to GitHub',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(color: const Color(0xFF131B2E), borderRadius: BorderRadius.circular(8)),
@@ -633,7 +708,7 @@ jobs:
             const Text('Live Telemetry & Logs:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
             const SizedBox(height: 8),
             Container(
-              height: 220,
+              height: 200,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
               child: ListView.builder(
