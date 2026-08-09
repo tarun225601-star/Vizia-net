@@ -291,9 +291,17 @@ CRITICAL RULES:
             SizedBox(
               width: double.infinity,
               height: 50,
-              child: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black),
-              onPressed: loading ? null : _runAutonomousAgent,
-              child: Text(loading ? 'एजेंट काम कर रहा है...' : '🚀 ऑटोनोमस एजेंट चालू करें', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.cyanAccent,
+                  foregroundColor: Colors.black,
+                ),
+                onPressed: loading ? null : _runAutonomousAgent,
+                child: Text(
+                  loading ? 'एजेंट काम कर रहा है...' : '🚀 ऑटोनोमस एजेंट चालू करें',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
             ),
             const SizedBox(height: 20),
             Text(status, style: const TextStyle(color: Colors.greenAccent, fontSize: 13, fontFamily: 'monospace')),
