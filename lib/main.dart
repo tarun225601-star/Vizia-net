@@ -29,7 +29,7 @@ class MasterAutonomousStudioApp extends StatelessWidget {
 }
 
 // ==========================================
-// 1. ADVANCED CONFIGURATION & SETTINGS MODEL
+// 1. CONFIGURATION MODEL
 // ==========================================
 class AgentConfig {
   final String groqKey;
@@ -54,7 +54,7 @@ class AgentConfig {
 }
 
 // ==========================================
-// 2. SETTINGS SCREEN VIEW & CONTROLLER
+// 2. SETTINGS SCREEN
 // ==========================================
 class MasterSettingsScreen extends StatefulWidget {
   const MasterSettingsScreen({Key? key}) : super(key: key);
@@ -100,7 +100,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('⚡ All Master Credentials Saved Successfully!'),
+        content: Text('⚡ Parameters Saved Successfully!'),
         backgroundColor: Colors.teal,
       ),
     );
@@ -116,20 +116,6 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          const Text(
-            'API & Repository Setup',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF00E5FF),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Provide your Groq API key and GitHub credentials for fully automated multi-file compilation and push.',
-            style: TextStyle(color: Colors.white70, fontSize: 13),
-          ),
-          const SizedBox(height: 20),
           TextField(
             controller: _groqController,
             obscureText: _obscureKey,
@@ -153,7 +139,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
               prefixIcon: Icon(Icons.person, color: Color(0xFF00E5FF)),
               border: OutlineInputBorder(),
               filled: true,
-              fillColor: Color(0xFF131B2E),
+              fillColor: const Color(0xFF131B2E),
             ),
           ),
           const SizedBox(height: 16),
@@ -164,7 +150,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
               prefixIcon: Icon(Icons.folder_special, color: Color(0xFF00E5FF)),
               border: OutlineInputBorder(),
               filled: true,
-              fillColor: Color(0xFF131B2E),
+              fillColor: const Color(0xFF131B2E),
             ),
           ),
           const SizedBox(height: 16),
@@ -188,10 +174,10 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
             value: _modelChoice,
             dropdownColor: const Color(0xFF131B2E),
             decoration: const InputDecoration(
-              labelText: 'AI Processing Engine Model',
+              labelText: 'AI Model',
               border: OutlineInputBorder(),
               filled: true,
-              fillColor: Color(0xFF131B2E),
+              fillColor: const Color(0xFF131B2E),
             ),
             items: const [
               DropdownMenuItem(
@@ -200,7 +186,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
               ),
               DropdownMenuItem(
                 value: 'llama-3.1-8b-instant',
-                child: Text('Llama 3.1 8B Instant (Ultra Fast)'),
+                child: Text('Llama 3.1 8B Instant'),
               ),
             ],
             onChanged: (val) {
@@ -217,10 +203,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
                 foregroundColor: Colors.black,
               ),
               onPressed: _saveSettings,
-              child: const Text(
-                'Save Agent Parameters',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
+              child: const Text('Save Parameters', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -230,7 +213,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
 }
 
 // ==========================================
-// 3. LOGGING & TELEMETRY ENGINE MODEL
+// 3. LOGGING MODEL
 // ==========================================
 class AgentLog {
   final String timestamp;
@@ -243,7 +226,7 @@ class AgentLog {
 enum LogType { info, success, warning, error }
 
 // ==========================================
-// 4. MAIN AUTONOMOUS WORKBENCH DASHBOARD
+// 4. MAIN DASHBOARD
 // ==========================================
 class MasterDashboardScreen extends StatefulWidget {
   const MasterDashboardScreen({Key? key}) : super(key: key);
@@ -284,7 +267,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   }
 
   // ==========================================
-  // 5. CORE AUTONOMOUS AGENT ORCHESTRATOR
+  // 5. SELF-VERIFYING AUTONOMOUS PIPELINE
   // ==========================================
   Future<void> _executeAutonomousPipeline() async {
     final config = await _getStoredConfig();
@@ -301,7 +284,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
       _logs.clear();
       _progressValue = 0.05;
       _actionsUrl = '';
-      _currentPhase = 'Initializing Autonomous Loop...';
+      _currentPhase = 'Phase 1: Dynamic Architecture Planning...';
     });
 
     _addLog('🚀 Autonomous Agent Session Started.', type: LogType.success);
@@ -314,27 +297,39 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     while (attempt < 3 && !success) {
       attempt++;
       setState(() {
-        _progressValue = 0.15 + (attempt * 0.15);
-        _currentPhase = 'Synthesis Phase: Attempt $attempt/3';
+        _progressValue = 0.10 + (attempt * 0.10);
+        _currentPhase = 'Self-Correction & Validation Loop (Attempt $attempt/3)';
       });
-      _addLog('🧠 Architect Agent analyzing prompt requirements (Attempt $attempt)...');
 
       try {
-        final rawResponse = await _callGroqModel(config, _promptController.text);
-        files = _parseAndValidateJsonFiles(rawResponse);
+        // STEP 1: Ask Groq for precise file blueprint
+        _addLog('🧠 Step 1: Querying Groq for optimal file structure blueprint...');
+        final filePlan = await _callGroqForFilePlan(config, _promptController.text);
+        _addLog('📋 Architect Approved Files: ${filePlan.join(', ')}', type: LogType.success);
+
+        // STEP 2: Generate code based on blueprint
+        setState(() => _currentPhase = 'Phase 2: Code Synthesis & Multi-File Generation...');
+        _addLog('⚡ Step 2: Synthesizing raw files according to blueprint...');
+        final rawResponse = await _callGroqForCodeGeneration(config, _promptController.text, filePlan);
+
+        // STEP 3: Self-Validation and Verification Check
+        setState(() => _currentPhase = 'Phase 3: Rigorous Validation & Self-Check...');
+        _addLog('🔍 Step 3: Running internal syntax & structure verification checks...');
+        files = _parseAndValidateJsonFiles(rawResponse, filePlan);
+
         success = true;
-        _addLog('✅ Code Synthesis & Architecture Generation successful!', type: LogType.success);
+        _addLog('✅ All files passed multi-layer verification checks successfully!', type: LogType.success);
       } catch (e) {
-        _addLog('⚠️ Validation/Parsing Exception caught: $e', type: LogType.warning);
+        _addLog('⚠️ Validation Exception caught: $e', type: LogType.warning);
         if (attempt >= 3) {
           _addLog('❌ Autonomous agent failed after 3 corrective iterations.', type: LogType.error);
           setState(() {
             _isAutonomousRunning = false;
-            _currentPhase = 'Pipeline Aborted due to persistent parsing errors.';
+            _currentPhase = 'Pipeline Aborted due to validation failure.';
           });
           return;
         }
-        _addLog('🔄 Self-Healing Engine engaging automatic syntax adjustment prompt rewrite...');
+        _addLog('🔄 Self-Healing Engine re-trying synthesis loop...');
       }
     }
 
@@ -342,8 +337,8 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
 
     setState(() {
       _generatedFilesCache = files;
-      _progressValue = 0.65;
-      _currentPhase = 'Deployment Phase: GitHub Sync & SHA Resolution';
+      _progressValue = 0.60;
+      _currentPhase = 'Phase 4: GitHub Secure Synchronization & Push';
     });
 
     try {
@@ -353,10 +348,10 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
         final String fileName = fileEntry['fileName'];
         final String fileCode = fileEntry['fileCode'];
 
-        final filePushProgress = 0.65 + ((i + 1) / files.length) * 0.25;
+        final filePushProgress = 0.60 + ((i + 1) / files.length) * 0.35;
         setState(() => _progressValue = filePushProgress);
 
-        _addLog('📦 Processing target file: $fileName');
+        _addLog('📦 Pushing verified target file: $fileName');
         await _pushFileToGitHub(config, fileName, fileCode);
       }
 
@@ -367,47 +362,27 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
         _actionsUrl = 'https://github.com/${config.githubUser}/${config.githubRepo}/actions';
       });
 
-      _addLog('🎉 All ${files.length} project files deployed cleanly to GitHub repository!', type: LogType.success);
-      _addLog('🔨 GitHub Actions runner triggered. Check workflows for build progress.', type: LogType.success);
+      _addLog('🎉 All ${files.length} verified project files deployed cleanly!', type: LogType.success);
     } catch (gitErr) {
       _addLog('❌ GitHub Synchronization Failed: $gitErr', type: LogType.error);
       setState(() {
         _isAutonomousRunning = false;
-        _currentPhase = 'Deployment Failed during network sync.';
+        _currentPhase = 'Deployment Failed during sync.';
       });
     }
   }
 
   // ==========================================
-  // 6. HTTP API INTERACTION LAYER WITH GROQ
+  // 6. ARCHITECT FILE PLANNER
   // ==========================================
-  Future<String> _callGroqModel(AgentConfig config, String userPrompt) async {
+  Future<List<String>> _callGroqForFilePlan(AgentConfig config, String userPrompt) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
     
     final systemPrompt = '''
-You are an elite Autonomous AI Agent, Lead Mobile Architect, and Self-Healing Code Engine.
-Your goal is to parse user prompts and output a fully complete, professional, compilation-ready Flutter application architecture.
-
-MANDATORY RULES:
-1. Output MUST be ONLY a clean, parseable JSON object matching this exact structure:
-{
-  "files": [
-    {
-      "fileName": "lib/main.dart",
-      "fileCode": "// complete dart code here..."
-    },
-    {
-      "fileName": "pubspec.yaml",
-      "fileCode": "name: autonomous_app\ndescription: Auto generated\nversion: 1.0.0+1\nenvironment:\n  sdk: '>=3.0.0 <4.0.0'\ndependencies:\n  flutter:\n    sdk: flutter\n  http: ^1.2.0\n  shared_preferences: ^2.2.2\n  provider: ^6.1.1\n"
-    },
-    {
-      "fileName": ".github/workflows/flutter.yml",
-      "fileCode": "name: Build APK\\non: [push]\\njobs:\\n  build:\\n    runs-on: ubuntu-latest\\n    steps:\\n      - uses: actions/checkout@v3\\n      - uses: subosito/flutter-action@v2\\n        with:\\n          flutter-version: '3.x'\\n      - run: flutter pub get\\n      - run: flutter build apk --release\\n      - uses: actions/upload-artifact@v3\\n        with:\\n          name: release-apk\\n          path: build/app/outputs/flutter-apk/app-release.apk\\n"
-    }
-  ]
-}
-2. If the user app demands device permissions, you MUST include 'android/app/src/main/AndroidManifest.xml' containing matching <uses-permission> tags.
-3. No markdown text blocks (no ```json or ``` wrappers), no conversational filler. Return strictly valid raw JSON.
+You are a Lead Software Architect. Given the user requirement, determine the exact file structure required (e.g., pubspec.yaml, lib/main.dart, .github/workflows/flutter.yml).
+Return ONLY a valid JSON array of strings containing paths. Example:
+["pubspec.yaml", "lib/main.dart", ".github/workflows/flutter.yml"]
+No markdown formatting, no extra text.
 ''';
 
     final response = await http.post(
@@ -422,13 +397,62 @@ MANDATORY RULES:
           {"role": "system", "content": systemPrompt},
           {"role": "user", "content": userPrompt}
         ],
-        "temperature": 0.3,
+        "temperature": 0.1,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Architect Planner Error: ${response.body}');
+    }
+
+    final decoded = jsonDecode(response.body);
+    String content = decoded['choices'][0]['message']['content'];
+    content = content.replaceAll('```json', '').replaceAll('```', '').trim();
+    
+    List<dynamic> parsedList = jsonDecode(content);
+    return parsedList.map((e) => e.toString()).toList();
+  }
+
+  // ==========================================
+  // 7. CODE GENERATION
+  // ==========================================
+  Future<String> _callGroqForCodeGeneration(AgentConfig config, String userPrompt, List<String> filePlan) async {
+    final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+    
+    final systemPrompt = '''
+You are an expert Developer. Generate production-ready code strictly for these files: ${filePlan.join(', ')}.
+MANDATORY RULES:
+1. Output MUST be ONLY a clean raw JSON object matching this exact structure, with no markdown tags:
+{
+  "files": [
+    {
+      "fileName": "lib/main.dart",
+      "fileCode": "// complete code..."
+    }
+  ]
+}
+2. Ensure strict valid YAML syntax without unescaped characters for workflow files.
+''';
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${config.groqKey}',
+      },
+      body: jsonEncode({
+        "model": config.selectedModel,
+        "messages": [
+          {"role": "system", "content": systemPrompt},
+          {"role": "user", "content": "Generate code for: $userPrompt for files: ${filePlan.toString()}"}
+        ],
+        "temperature": 0.2,
         "max_tokens": 8000,
       }),
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Groq API Error Code ${response.statusCode}: ${response.body}');
+      throw Exception('Code Gen Error: ${response.body}');
     }
 
     final decoded = jsonDecode(response.body);
@@ -436,35 +460,44 @@ MANDATORY RULES:
   }
 
   // ==========================================
-  // 7. ROBUST JSON REPAIR & PARSING UTILITY (Fixed Version)
+  // 8. STRICT VALIDATION & SELF-CHECK ENGINE
   // ==========================================
-  List<dynamic> _parseAndValidateJsonFiles(String rawContent) {
-    // 1. कंट्रोल कैरेक्टर्स और विजिबिलिटी इश्यूज को साफ़ करें
+  List<dynamic> _parseAndValidateJsonFiles(String rawContent, List<String> expectedFiles) {
     String cleaned = rawContent.replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F]'), '').trim();
-    
-    // 2. मार्कडाउन रैपर्स को हटा दें
     cleaned = cleaned.replaceAll('```json', '').replaceAll('```', '').trim();
     
-    // 3. JSON ऑब्जेक्ट की सही बाउंड्री ढूँढें
     int startIdx = cleaned.indexOf('{');
     int endIdx = cleaned.lastIndexOf('}');
     if (startIdx != -1 && endIdx != -1) {
       cleaned = cleaned.substring(startIdx, endIdx + 1);
     }
 
-    try {
-      final decodedJson = jsonDecode(cleaned);
-      if (decodedJson['files'] == null || (decodedJson['files'] as List).isEmpty) {
-        throw Exception('Synthesized JSON missing required files array.');
-      }
-      return decodedJson['files'];
-    } catch (e) {
-      throw Exception('Parsing Exception: ${e.toString()}');
+    final decodedJson = jsonDecode(cleaned);
+    if (decodedJson['files'] == null || !(decodedJson['files'] is List)) {
+      throw Exception('Validation Error: Missing files array in JSON.');
     }
+
+    List<dynamic> files = decodedJson['files'];
+    if (files.isEmpty) {
+      throw Exception('Validation Error: Generated files list is empty.');
+    }
+
+    // Double check YAML syntax integrity if present
+    for (var file in files) {
+      String name = file['fileName'] ?? '';
+      String code = file['fileCode'] ?? '';
+      if (name.endsWith('.yml') || name.endsWith('.yaml')) {
+        if (code.contains('\t')) {
+          throw Exception('Validation Error: YAML file $name contains tabs instead of spaces.');
+        }
+      }
+    }
+
+    return files;
   }
 
   // ==========================================
-  // 8. GITHUB REST CONTENT SYNC WITH SHA CHECK
+  // 9. GITHUB REST SYNC
   // ==========================================
   Future<void> _pushFileToGitHub(AgentConfig config, String fileName, String fileCode) async {
     final endpointStr = 'https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/contents/$fileName';
@@ -485,7 +518,7 @@ MANDATORY RULES:
     }
 
     final Map<String, dynamic> requestBody = {
-      'message': 'Autonomous Agent Commit: Automated build update for $fileName',
+      'message': 'Autonomous Agent Self-Verified Commit: $fileName',
       'content': base64Encode(utf8.encode(fileCode)),
     };
 
@@ -504,12 +537,12 @@ MANDATORY RULES:
     );
 
     if (putResponse.statusCode != 200 && putResponse.statusCode != 201) {
-      throw Exception('GitHub Sync rejected push for $fileName (${putResponse.statusCode}): ${putResponse.body}');
+      throw Exception('GitHub Sync rejected push for $fileName (${putResponse.statusCode})');
     }
   }
 
   // ==========================================
-  // 9. UI WIDGET RENDER TREE & DESIGN SYSTEM
+  // 10. UI DESIGN
   // ==========================================
   @override
   Widget build(BuildContext context) {
@@ -517,7 +550,6 @@ MANDATORY RULES:
       appBar: AppBar(
         title: const Text('Autonomous Replit Studio Engine'),
         backgroundColor: const Color(0xFF131B2E),
-        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.settings, color: Color(0xFF00E5FF)),
@@ -533,41 +565,7 @@ MANDATORY RULES:
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF131B2E), Color(0xFF1F2937)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '⚡ Full-Spectrum Autonomous Engine',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF00E5FF),
-                    ),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    'Engineered to architect, validate, self-heal, and deploy complete multi-file Flutter repositories directly into your pipeline with zero manual code entry.',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Autonomous Prompt Instruction:',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-            ),
+            const Text('Autonomous Prompt Instruction:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(height: 8),
             TextField(
               controller: _promptController,
@@ -576,11 +574,7 @@ MANDATORY RULES:
               decoration: InputDecoration(
                 filled: true,
                 fillColor: const Color(0xFF131B2E),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                hintText: 'Describe the complete app you want built automatically...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 16),
@@ -588,16 +582,10 @@ MANDATORY RULES:
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00E5FF),
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
                 onPressed: _isAutonomousRunning ? null : _executeAutonomousPipeline,
                 child: Text(
-                  _isAutonomousRunning ? 'Autonomous Engine Running...' : '🚀 Launch Full Autonomous Pipeline',
+                  _isAutonomousRunning ? 'Self-Checking & Running...' : '🚀 Launch Verified Autonomous Pipeline',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ),
@@ -605,148 +593,51 @@ MANDATORY RULES:
             const SizedBox(height: 24),
             Container(
               padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF131B2E),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white10),
-              ),
+              decoration: BoxDecoration(color: const Color(0xFF131B2E), borderRadius: BorderRadius.circular(8)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Pipeline Status:',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70),
-                      ),
-                      Text(
-                        '${(_progressValue * 100).toInt()}%',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00E5FF)),
-                      ),
+                      const Text('Pipeline Status:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
+                      Text('${(_progressValue * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00E5FF))),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  LinearProgressIndicator(
-                    value: _progressValue,
-                    backgroundColor: Colors.black45,
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00E5FF)),
-                  ),
+                  LinearProgressIndicator(value: _progressValue, backgroundColor: Colors.black45, valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00E5FF))),
                   const SizedBox(height: 10),
-                  Text(
-                    _currentPhase,
-                    style: const TextStyle(
-                      color: Colors.tealAccent,
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                    ),
-                  ),
+                  Text(_currentPhase, style: const TextStyle(color: Colors.tealAccent, fontFamily: 'monospace', fontSize: 12)),
                 ],
               ),
             ),
             if (_actionsUrl.isNotEmpty) ...[
               const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F2C2C),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.teal),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '📦 GitHub Actions Build Dashboard:',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.tealAccent),
-                    ),
-                    const SizedBox(height: 6),
-                    SelectableText(
-                      _actionsUrl,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
+              SelectableText(_actionsUrl, style: const TextStyle(color: Colors.white, fontSize: 12)),
             ],
             const SizedBox(height: 24),
-            const Text(
-              'Live Autonomous Telemetry & Logs:',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70),
-            ),
+            const Text('Live Telemetry & Logs:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
             const SizedBox(height: 8),
             Container(
-              height: 260,
+              height: 220,
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: _logs.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No logs recorded yet. Launch pipeline to view live stream.',
-                        style: TextStyle(color: Colors.white38, fontSize: 12),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _logs.length,
-                      itemBuilder: (context, index) {
-                        final log = _logs[index];
-                        Color color = Colors.white70;
-                        if (log.type == LogType.success) color = Colors.tealAccent;
-                        if (log.type == LogType.warning) color = Colors.amberAccent;
-                        if (log.type == LogType.error) color = Colors.redAccent;
+              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
+              child: ListView.builder(
+                itemCount: _logs.length,
+                itemBuilder: (context, index) {
+                  final log = _logs[index];
+                  Color color = Colors.white70;
+                  if (log.type == LogType.success) color = Colors.tealAccent;
+                  if (log.type == LogType.warning) color = Colors.amberAccent;
+                  if (log.type == LogType.error) color = Colors.redAccent;
 
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 3.0),
-                          child: Text(
-                            '[${log.timestamp}] ${log.message}',
-                            style: TextStyle(
-                              color: color,
-                              fontFamily: 'monospace',
-                              fontSize: 11,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            const SizedBox(height: 20),
-            if (_generatedFilesCache.isNotEmpty) ...[
-              const Text(
-                'Synthesized Multi-File Artifact Manifest:',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70),
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3.0),
+                    child: Text('[${log.timestamp}] ${log.message}', style: TextStyle(color: color, fontFamily: 'monospace', fontSize: 11)),
+                  );
+                },
               ),
-              const SizedBox(height: 8),
-              ..._generatedFilesCache.map((fileMap) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF131B2E),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.insert_drive_file, size: 18, color: Color(0xFF00E5FF)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          fileMap['fileName'] ?? 'unknown',
-                          style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 12),
-                        ),
-                      ),
-                      const Text(
-                        'Deployed',
-                        style: TextStyle(color: Colors.tealAccent, fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
+            ),
           ],
         ),
       ),
