@@ -150,10 +150,10 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
             controller: _userController,
             decoration: const InputDecoration(
               labelText: 'GitHub Username',
-              prefixIcon: const Icon(Icons.person, color: Color(0xFF00E5FF)),
-              border: const OutlineInputBorder(),
+              prefixIcon: Icon(Icons.person, color: Color(0xFF00E5FF)),
+              border: OutlineInputBorder(),
               filled: true,
-              fillColor: const Color(0xFF131B2E),
+              fillColor: Color(0xFF131B2E),
             ),
           ),
           const SizedBox(height: 16),
@@ -161,10 +161,10 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
             controller: _repoController,
             decoration: const InputDecoration(
               labelText: 'GitHub Repository Name',
-              prefixIcon: const Icon(Icons.folder_special, color: Color(0xFF00E5FF)),
-              border: const OutlineInputBorder(),
+              prefixIcon: Icon(Icons.folder_special, color: Color(0xFF00E5FF)),
+              border: OutlineInputBorder(),
               filled: true,
-              fillColor: const Color(0xFF131B2E),
+              fillColor: Color(0xFF131B2E),
             ),
           ),
           const SizedBox(height: 16),
@@ -209,15 +209,18 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
           ),
           const SizedBox(height: 24),
           SizedBox(
+            width: double.infinity,
             height: 50,
-            child: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00E5FF),
-              foregroundColor: Colors.black,
-            ),
-            onPressed: _saveSettings,
-            child: const Text(
-              'Save Agent Parameters',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00E5FF),
+                foregroundColor: Colors.black,
+              ),
+              onPressed: _saveSettings,
+              child: const Text(
+                'Save Agent Parameters',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ),
           ),
         ],
@@ -308,7 +311,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     bool success = false;
     List files = [];
 
-    // Phase 1: AI Code Synthesis with Self-Healing Error Correction Loop (3 Retries)
     while (attempt < 3 && !success) {
       attempt++;
       setState(() {
@@ -344,7 +346,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
       _currentPhase = 'Deployment Phase: GitHub Sync & SHA Resolution';
     });
 
-    // Phase 2: Autonomous Multi-File GitHub Deployment Loop
     try {
       _addLog('☁️ Connecting to GitHub REST API endpoints...');
       for (int i = 0; i < files.length; i++) {
@@ -384,7 +385,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
     
     final systemPrompt = '''
-You are an elite Autonomous AI Agent, Lead Mobile Architect, and Self-Healing Code Engine (like Replit Agent).
+You are an elite Autonomous AI Agent, Lead Mobile Architect, and Self-Healing Code Engine.
 Your goal is to parse user prompts and output a fully complete, professional, compilation-ready Flutter application architecture.
 
 MANDATORY RULES:
@@ -405,8 +406,8 @@ MANDATORY RULES:
     }
   ]
 }
-2. If the user app demands device permissions (Camera, Location, Storage, Bluetooth, etc.), you MUST include 'android/app/src/main/AndroidManifest.xml' containing matching <uses-permission> tags and add necessary dependencies in pubspec.yaml.
-3. No markdown text blocks (no ```json or ``` wrappers), no conversational filler, no explanations. Return strictly valid raw JSON.
+2. If the user app demands device permissions, you MUST include 'android/app/src/main/AndroidManifest.xml' containing matching <uses-permission> tags.
+3. No markdown text blocks (no ```json or ``` wrappers), no conversational filler. Return strictly valid raw JSON.
 ''';
 
     final response = await http.post(
@@ -522,7 +523,6 @@ MANDATORY RULES:
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Banner Header Card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -534,9 +534,9 @@ MANDATORY RULES:
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3)),
               ),
-              child: Column(
+              child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text(
                     '⚡ Full-Spectrum Autonomous Engine',
                     style: TextStyle(
@@ -593,7 +593,6 @@ MANDATORY RULES:
               ),
             ),
             const SizedBox(height: 24),
-            // Progress & Status Tracker Section
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -635,7 +634,6 @@ MANDATORY RULES:
                 ],
               ),
             ),
-            // Actions Output Link Card
             if (_actionsUrl.isNotEmpty) ...[
               const SizedBox(height: 20),
               Container(
@@ -706,7 +704,6 @@ MANDATORY RULES:
                     ),
             ),
             const SizedBox(height: 20),
-            // File Cache Preview Section
             if (_generatedFilesCache.isNotEmpty) ...[
               const Text(
                 'Synthesized Multi-File Artifact Manifest:',
@@ -738,7 +735,7 @@ MANDATORY RULES:
                     ],
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ],
         ),
