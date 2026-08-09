@@ -13,7 +13,7 @@ class MasterBoxApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Master Box Pro',
+      title: 'Master Box - GitHub Fixed Repo Edition',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0F172A),
         cardColor: const Color(0xFF1E293B),
@@ -26,7 +26,7 @@ class MasterBoxApp extends StatelessWidget {
 }
 
 // ==========================================
-// मॉडल: हर प्रोजेक्ट की अलग-अलग फाइलें और डाटा
+// मॉडल: प्रोजेक्ट फाइलें
 // ==========================================
 class ProjectFileItem {
   final String fileName;
@@ -47,12 +47,14 @@ class SavedProject {
   final String timestamp;
   final List<ProjectFileItem> files;
   final String previewHtml;
+  final String githubRepoUrl;
 
   SavedProject({
     required this.projectTitle,
     required this.timestamp,
     required this.files,
     required this.previewHtml,
+    required this.githubRepoUrl,
   });
 
   Map<String, dynamic> toJson() => {
@@ -60,6 +62,7 @@ class SavedProject {
         'timestamp': timestamp,
         'files': files.map((f) => f.toJson()).toList(),
         'previewHtml': previewHtml,
+        'githubRepoUrl': githubRepoUrl,
       };
 
   factory SavedProject.fromJson(Map<String, dynamic> json) {
@@ -70,12 +73,13 @@ class SavedProject {
       timestamp: json['timestamp'] ?? '',
       files: parsedFiles,
       previewHtml: json['previewHtml'] ?? '',
+      githubRepoUrl: json['githubRepoUrl'] ?? '',
     );
   }
 }
 
 // ==========================================
-// 1. सेटिंग्स स्क्रीन (फाइल कोड वॉल्ट)
+// 1. सेटिंग्स स्क्रीन (अब रिपॉजिटरी नेम के साथ)
 // ==========================================
 class MasterSettingsScreen extends StatefulWidget {
   const MasterSettingsScreen({Key? key}) : super(key: key);
@@ -86,6 +90,9 @@ class MasterSettingsScreen extends StatefulWidget {
 
 class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
   final TextEditingController _groqKeyController = TextEditingController();
+  final TextEditingController _githubTokenController = TextEditingController();
+  final TextEditingController _githubUsernameController = TextEditingController();
+  final TextEditingController _repoNameController = TextEditingController();
   List<SavedProject> savedProjectsList = [];
 
   @override
@@ -98,17 +105,23 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _groqKeyController.text = prefs.getString('groq_key') ?? '';
-      List<String> rawList = prefs.getStringList('saved_projects_vault_v3') ?? [];
+      _githubTokenController.text = prefs.getString('github_token') ?? '';
+      _githubUsernameController.text = prefs.getString('github_username') ?? '';
+      _repoNameController.text = prefs.getString('github_repo_name') ?? '';
+      List<String> rawList = prefs.getStringList('saved_projects_vault_v5') ?? [];
       savedProjectsList = rawList.map((item) => SavedProject.fromJson(jsonDecode(item))).toList();
     });
   }
 
-  Future<void> _saveKey() async {
+  Future<void> _saveKeys() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('groq_key', _groqKeyController.text.trim());
+    await prefs.setString('github_token', _githubTokenController.text.trim());
+    await prefs.setString('github_username', _githubUsernameController.text.trim());
+    await prefs.setString('github_repo_name', _repoNameController.text.trim());
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ Groq API Key सुरक्षित हो गई है!')),
+      const SnackBar(content: Text('✅ GitHub रिपॉजिटरी और सेटिंग्स सेव हो गई हैं!')),
     );
   }
 
@@ -118,7 +131,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
       savedProjectsList.removeAt(index);
     });
     List<String> rawList = savedProjectsList.map((item) => jsonEncode(item.toJson())).toList();
-    await prefs.setStringList('saved_projects_vault_v3', rawList);
+    await prefs.setStringList('saved_projects_vault_v5', rawList);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('🗑️ प्रोजेक्ट डिलीट कर दिया गया है।')),
     );
@@ -128,13 +141,12 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('लोकल सेटिंग्स और फाइल कोड वॉल्ट'),
+        title: const Text('लोकल सेटिंग्स और फिक्स रिपॉजिटरी वॉल्ट'),
         backgroundColor: const Color(0xFF1E293B),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: ListView(
           children: [
             TextField(
               controller: _groqKeyController,
@@ -146,105 +158,84 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _githubUsernameController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: 'GitHub Username',
+                prefixIcon: Icon(Icons.person, color: Colors.amberAccent),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _repoNameController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: 'Target GitHub Repository Name (जिसमें कोड भेजना है)',
+                prefixIcon: Icon(Icons.folder, color: Colors.greenAccent),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _githubTokenController,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: 'GitHub Personal Access Token (PAT)',
+                prefixIcon: Icon(Icons.code, color: Colors.cyanAccent),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black),
-              onPressed: _saveKey,
+              onPressed: _saveKeys,
               icon: const Icon(Icons.save),
-              label: const Text('की सेव करें', style: TextStyle(fontWeight: FontWeight.bold)),
+              label: const Text('सेटिंग्स सेव करें', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 20),
             const Text(
-              '📦 सहेजे गए प्रोजेक्ट्स और उनकी अलग-अलग फाइलें:',
+              '📦 सहेजे गए प्रोजेक्ट्स की हिस्ट्री:',
               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amberAccent),
             ),
             const SizedBox(height: 10),
-            Expanded(
-              child: savedProjectsList.isEmpty
-                  ? const Center(child: Text('कोई प्रोजेक्ट सेव नहीं है।', style: TextStyle(color: Colors.white54)))
-                  : ListView.builder(
-                      itemCount: savedProjectsList.length,
-                      itemBuilder: (context, projIndex) {
-                        final project = savedProjectsList[projIndex];
-                        return Card(
-                          color: const Color(0xFF1E293B),
-                          margin: const EdgeInsets.only(bottom: 14),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      project.projectTitle,
-                                      style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold, fontSize: 16),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
-                                      onPressed: () => _deleteProject(projIndex),
-                                    ),
-                                  ],
-                                ),
-                                Text('समय: ${project.timestamp}', style: const TextStyle(color: Colors.white54, fontSize: 10)),
-                                const SizedBox(height: 8),
-                                const Text('📁 इस प्रोजेक्ट की फाइलें:', style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 4),
-                                ...project.files.map((file) {
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF0F172A),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text('📄 ${file.fileName}', style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)),
-                                            ElevatedButton.icon(
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.cyanAccent,
-                                                foregroundColor: Colors.black,
-                                                minimumSize: const Size(60, 26),
-                                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                                              ),
-                                              onPressed: () {
-                                                Clipboard.setData(ClipboardData(text: file.fileCode));
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(content: Text('📋 "${file.fileName}" का कोड कॉपी हो गया!')),
-                                                );
-                                              },
-                                              icon: const Icon(Icons.copy, size: 12),
-                                              label: const Text('कॉपी', style: TextStyle(fontSize: 10)),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        SizedBox(
-                                          height: 60,
-                                          child: SingleChildScrollView(
-                                            child: Text(
-                                              file.fileCode,
-                                              style: const TextStyle(color: Colors.white70, fontFamily: 'monospace', fontSize: 9),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                              ],
+            ...savedProjectsList.asMap().entries.map((entry) {
+              int projIndex = entry.key;
+              final project = entry.value;
+              return Card(
+                color: const Color(0xFF1E293B),
+                margin: const EdgeInsets.only(bottom: 14),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              project.projectTitle,
+                              style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold, fontSize: 15),
                             ),
                           ),
-                        );
-                      },
-                    ),
-            ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
+                            onPressed: () => _deleteProject(projIndex),
+                          ),
+                        ],
+                      ),
+                      if (project.githubRepoUrl.isNotEmpty)
+                        Text('🔗 GitHub: ${project.githubRepoUrl}', style: const TextStyle(color: Colors.greenAccent, fontSize: 11)),
+                      Text('समय: ${project.timestamp}', style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
           ],
         ),
       ),
@@ -297,9 +288,9 @@ class _MasterHomePageState extends State<MasterHomePage> {
   bool showWebViewButton = false;
   String currentPreviewHtml = '';
   String currentProjectTitle = '';
+  String currentRepoUrl = '';
   List<ProjectFileItem> currentFiles = [];
 
-  // JSON स्ट्रिंग को सुरक्षित करने और कंट्रोल कैरेक्टर्स हटाने का फंक्शन
   String _cleanJsonString(String input) {
     if (input.contains('```json')) {
       input = input.split('```json')[1].split('```')[0];
@@ -307,9 +298,77 @@ class _MasterHomePageState extends State<MasterHomePage> {
       input = input.split('```')[1].split('```')[0];
     }
     input = input.trim();
-    
-    // कंट्रोल कैरेक्टर्स और गलत एस्केप को ठीक करना
     return input.replaceAll(RegExp(r'[\u0000-\u001F]+'), '');
+  }
+
+  // एक ही फिक्स रिपॉजिटरी में बार-बार कोड पुश/अपडेट करने का फंक्शन
+  Future<String> _pushFilesToFixedRepo(List<ProjectFileItem> files) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('github_token') ?? '';
+    final username = prefs.getString('github_username') ?? '';
+    final repoName = prefs.getString('github_repo_name') ?? '';
+
+    if (token.isEmpty || username.isEmpty || repoName.isEmpty) {
+      throw Exception('GitHub Token, Username या Repo Name सेटिंग्स में अधूरा है!');
+    }
+
+    // 1. चेक करें या फिक्स रिपॉजिटरी बनाएँ (अगर पहले से नहीं है)
+    final repoCheckUrl = Uri.parse('https://api.github.com/repos/$username/$repoName');
+    final checkResponse = await http.get(repoCheckUrl, headers: {'Authorization': 'Bearer $token'});
+
+    if (checkResponse.statusCode == 404) {
+      // अगर रिपॉजिटरी मौजूद नहीं है, तो उसे पहली बार बना दो
+      final createRepoUrl = Uri.parse('https://api.github.com/user/repos');
+      await http.post(
+        createRepoUrl,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'name': repoName,
+          'description': 'Created by Master Box AI App Builder',
+          'private': false,
+          'auto_init': true,
+        }),
+      );
+    }
+
+    // 2. हर फाइल को उसी फिक्स रिपॉजिटरी में पुश/अपडेट करें
+    for (var file in files) {
+      final cleanFileName = file.fileName.replaceAll(' ', '_');
+      final fileUrl = Uri.parse('https://api.github.com/repos/$username/$repoName/contents/$cleanFileName');
+      
+      // फाइल का SHA पता करें ताकि वह पुरानी फाइल को ओवरराइट/अपडेट कर सके
+      String? fileSha;
+      final getCheck = await http.get(fileUrl, headers: {'Authorization': 'Bearer $token'});
+      if (getCheck.statusCode == 200) {
+        fileSha = jsonDecode(getCheck.body)['sha'];
+      }
+
+      String encodedContent = base64Encode(utf8.encode(file.fileCode));
+
+      Map<String, dynamic> bodyData = {
+        'message': 'AI Update: Update ${file.fileName}',
+        'content': encodedContent,
+      };
+      if (fileSha != null) {
+        bodyData['sha'] = fileSha; // SHA होने से फाइल अपडेट हो जाएगी, डुप्लीकेट नहीं बनेगी
+      }
+
+      await http.put(
+        fileUrl,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(bodyData),
+      );
+    }
+
+    return 'https://github.com/$username/$repoName';
   }
 
   Future<void> _runEngine() async {
@@ -326,7 +385,7 @@ class _MasterHomePageState extends State<MasterHomePage> {
 
     setState(() {
       isProcessing = true;
-      statusMessage = '🔄 एआई से अलग-अलग फाइलें और वेब प्रीव्यू तैयार हो रहा है...';
+      statusMessage = '🔄 एआई से कोड बन रहा है और GitHub रिपॉजिटरी में अपडेट हो रहा है...';
       showWebViewButton = false;
       currentFiles.clear();
     });
@@ -354,16 +413,22 @@ class _MasterHomePageState extends State<MasterHomePage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         String rawContent = data['choices'][0]['message']['content'];
-
         String cleanedJsonStr = _cleanJsonString(rawContent);
 
         final parsedJson = jsonDecode(cleanedJsonStr);
         final List<dynamic> fileListJson = parsedJson['files'] ?? [];
         List<ProjectFileItem> fetchedFiles = fileListJson.map((f) => ProjectFileItem.fromJson(f)).toList();
-        String previewHtml = parsedJson['previewHtml'] ?? '<html><body style="background:#0F172A;color:white;text-align:center;padding-top:50px;"><h1>Preview Ready</h1></body></html>';
+        String previewHtml = parsedJson['previewHtml'] ?? '';
 
-        // प्रोजेक्ट सेव करना
-        List<String> rawList = prefs.getStringList('saved_projects_vault_v3') ?? [];
+        // फिक्स रिपॉजिटरी में कोड पुश/अपडेट करें
+        String repoUrl = '';
+        try {
+          repoUrl = await _pushFilesToFixedRepo(fetchedFiles);
+        } catch (e) {
+          repoUrl = 'GitHub Push Failed: $e';
+        }
+
+        List<String> rawList = prefs.getStringList('saved_projects_vault_v5') ?? [];
         List<SavedProject> existingProjects = rawList.map((item) => SavedProject.fromJson(jsonDecode(item))).toList();
         
         int nextNum = existingProjects.length + 1;
@@ -376,19 +441,20 @@ class _MasterHomePageState extends State<MasterHomePage> {
           timestamp: timeStr,
           files: fetchedFiles,
           previewHtml: previewHtml,
+          githubRepoUrl: repoUrl,
         );
         existingProjects.insert(0, newProj);
 
-        List<String> updatedRawList = existingProjects.map((item) => jsonEncode(item.toJson())).toList();
-        await prefs.setStringList('saved_projects_vault_v3', updatedRawList);
+        await prefs.setStringList('saved_projects_vault_v5', existingProjects.map((item) => jsonEncode(item.toJson())).toList());
 
         setState(() {
           currentFiles = fetchedFiles;
           currentPreviewHtml = previewHtml;
           currentProjectTitle = projTitle;
+          currentRepoUrl = repoUrl;
           isProcessing = false;
           showWebViewButton = true;
-          statusMessage = '✅ "${projTitle}" की सभी फाइलें और वेब प्रीव्यू तैयार है!';
+          statusMessage = '✅ कोड जनरेट होकर GitHub रिपॉजिटरी में अपडेट हो गया!';
         });
       } else {
         setState(() {
@@ -408,7 +474,7 @@ class _MasterHomePageState extends State<MasterHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('मास्टर बॉक्स प्रो (मल्टी-फाइल + वेब प्रीव्यू)'),
+        title: const Text('मास्टर बॉक्स - Fixed Repo AI Builder'),
         backgroundColor: const Color(0xFF1E293B),
         actions: [
           IconButton(
@@ -427,7 +493,7 @@ class _MasterHomePageState extends State<MasterHomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('ऐप/प्रोजेक्ट प्रॉम्प्ट लिखें:', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+            const Text('प्रोजेक्ट अपडेट या नया बदलाव करने के लिए प्रॉम्ट लिखें:', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             TextField(
               controller: _promptController,
@@ -446,18 +512,22 @@ class _MasterHomePageState extends State<MasterHomePage> {
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black),
                 onPressed: isProcessing ? null : _runEngine,
-                icon: isProcessing ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.bolt),
-                label: Text(isProcessing ? 'फाइलें बनाई जा रही हैं...' : '⚡ प्रोजेक्ट फाइलें व वेब प्रीव्यू बनाएँ', style: const TextStyle(fontWeight: FontWeight.bold)),
+                icon: isProcessing ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.cloud_upload),
+                label: Text(isProcessing ? 'अपडेट हो रहा है...' : '⚡ कोड बनाओ और Repo में भेजो', style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(height: 10),
-            Text(statusMessage, style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontFamily: 'monospace')),
+            Text(statusMessage, style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontFamily: 'monospace')),
+            if (currentRepoUrl.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text('🔗 GitHub Link: $currentRepoUrl', style: const TextStyle(color: Colors.amberAccent, fontSize: 11)),
+            ],
             const SizedBox(height: 12),
             
-            if (showWebViewButton) ...[
+            if (showWebViewButton && currentPreviewHtml.isNotEmpty) ...[
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 46,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent, foregroundColor: Colors.black),
                   onPressed: () {
@@ -471,18 +541,18 @@ class _MasterHomePageState extends State<MasterHomePage> {
                       ),
                     );
                   },
-                  icon: const Icon(Icons.fullscreen, size: 28),
-                  label: const Text('🚀 फुल स्क्रीन में वेब ऐप चलाकर देखें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  icon: const Icon(Icons.fullscreen),
+                  label: const Text('🚀 वेब प्रीव्यू चलाकर देखें', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 12),
             ],
 
-            const Text('📁 जनरेटेड प्रोजेक्ट फाइलें (अलग-अलग):', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+            const Text('📁 जनरेटेड फाइलें:', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             Expanded(
               child: currentFiles.isEmpty
-                  ? const Center(child: Text('// यहाँ प्रोजेक्ट की अलग-अलग फाइलें दिखेंगी...', style: TextStyle(color: Colors.white54, fontSize: 12)))
+                  ? const Center(child: Text('// यहाँ कोड फाइलें दिखेंगी...', style: TextStyle(color: Colors.white54, fontSize: 12)))
                   : ListView.builder(
                       itemCount: currentFiles.length,
                       itemBuilder: (context, index) {
@@ -495,26 +565,10 @@ class _MasterHomePageState extends State<MasterHomePage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('📄 ${file.fileName}', style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 13)),
-                                    ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black, minimumSize: const Size(70, 28)),
-                                      onPressed: () {
-                                        Clipboard.setData(ClipboardData(text: file.fileCode));
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('📋 "${file.fileName}" कॉपी हो गया!')),
-                                        );
-                                      },
-                                      icon: const Icon(Icons.copy, size: 14),
-                                      label: const Text('कॉपी', style: TextStyle(fontSize: 11)),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
+                                Text('📄 ${file.fileName}', style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                                const SizedBox(height: 4),
                                 SizedBox(
-                                  height: 70,
+                                  height: 60,
                                   child: SingleChildScrollView(
                                     child: Text(
                                       file.fileCode,
