@@ -213,20 +213,26 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
 }
 
 // ==========================================
-// 3. LOGGING MODEL
+// 3. LOGGING MODEL (Updated with canSolve)
 // ==========================================
 class AgentLog {
   final String timestamp;
   final String message;
   final LogType type;
+  final bool canSolve;
 
-  AgentLog({required this.timestamp, required this.message, required this.type});
+  AgentLog({
+    required this.timestamp,
+    required this.message,
+    required this.type,
+    this.canSolve = false,
+  });
 }
 
 enum LogType { info, success, warning, error }
 
 // ==========================================
-// 4. MAIN DASHBOARD WITH SEARCH & DYNAMIC PLANNER
+// 4. MAIN DASHBOARD WITH LIVE BUILD & SOLVE BUTTON
 // ==========================================
 class MasterDashboardScreen extends StatefulWidget {
   const MasterDashboardScreen({Key? key}) : super(key: key);
@@ -252,11 +258,15 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   bool _isWaitingForUserFileSelection = false;
   List<Map<String, dynamic>> _selectableFiles = [];
 
-  void _addLog(String msg, {LogType type = LogType.info}) {
+  // लाइव गिटहब बिल्ड स्टेटस के लिए स्टेट वेरिएबल्स
+  Map<String, dynamic> _latestBuildRun = {};
+  bool _isCheckingBuild = false;
+
+  void _addLog(String msg, {LogType type = LogType.info, bool canSolve = false}) {
     final now = DateTime.now();
     final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
     setState(() {
-      _logs.insert(0, AgentLog(timestamp: timeStr, message: msg, type: type));
+      _logs.insert(0, AgentLog(timestamp: timeStr, message: msg, type: type, canSolve: canSolve));
     });
   }
 
@@ -269,6 +279,80 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
       githubRepo: (prefs.getString('master_github_repo') ?? '').trim(),
       selectedModel: prefs.getString('master_model_choice') ?? 'llama-3.3-70b-versatile',
     );
+  }
+
+  // ==========================================
+  // FETCH LIVE GITHUB ACTIONS BUILD STATUS
+  // ==========================================
+  Future<void> _fetchLiveBuildStatus() async {
+    final config = await _getStoredConfig();
+    if (config == null || !config.isValid) return;
+
+    setState(() => _isCheckingBuild = true);
+    try {
+      final uri = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/actions/runs?per_page=1');
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer ${config.githubToken}',
+          'Accept': 'application/vnd.github+json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['workflow_runs'] != null && (data['workflow_runs'] as List).isNotEmpty) {
+          setState(() {
+            _latestBuildRun = data['workflow_runs'][0];
+          });
+        }
+      }
+    } catch (e) {
+      // Ignore background fetch error
+    } finally {
+      if (mounted) setState(() => _isCheckingBuild = false);
+    }
+  }
+
+  // ==========================================
+  // AUTO SOLVE ERROR ACTION (Agent Fix Trigger)
+  // ==========================================
+  Future<void> _solveError(String errorMessage) async {
+    final config = await _getStoredConfig();
+    if (config == null || !config.isValid) {
+      _addLog('Configuration missing for auto-fix action.', type: LogType.error);
+      return;
+    }
+
+    _addLog('🤖 Agent initiated self-correction for error: "$errorMessage"', type: LogType.warning);
+    setState(() {
+      _isAutonomousRunning = true;
+      _currentPhase = 'Agent fixing specific build error...';
+    });
+
+    try {
+      final fixPrompt = "Fix this specific build error in the Flutter project: $errorMessage. Analyze what went wrong and provide the updated file content in the standard JSON structure.";
+      
+      final rawResponse = await _callGroqForCodeGeneration(config, fixPrompt, ['lib/main.dart']);
+      final files = _parseAndValidateJsonFiles(rawResponse, ['lib/main.dart']);
+
+      for (var fileEntry in files) {
+        final String fileName = fileEntry['fileName'];
+        final String fileCode = fileEntry['fileCode'];
+        _addLog('📦 Pushing fix for file: $fileName');
+        await _pushFileToGitHub(config, fileName, fileCode);
+      }
+
+      _addLog('🎉 Fix successfully pushed to GitHub! Check live build status below.', type: LogType.success);
+      _fetchLiveBuildStatus();
+    } catch (e) {
+      _addLog('❌ Auto-fix failed: $e', type: LogType.error);
+    } finally {
+      setState(() {
+        _isAutonomousRunning = false;
+        _currentPhase = 'Idle / Ready';
+      });
+    }
   }
 
   // ==========================================
@@ -386,8 +470,11 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
       });
 
       _addLog('🎉 All selected project files deployed cleanly!', type: LogType.success);
+      
+      // तुरंत गिटहब बिल्ड स्टेटस चेक करना शुरू करें
+      _fetchLiveBuildStatus();
     } catch (e) {
-      _addLog('❌ Execution Failed: $e', type: LogType.error);
+      _addLog('❌ Execution Failed: $e', type: LogType.error, canSolve: true);
       setState(() {
         _isAutonomousRunning = false;
         _currentPhase = 'Deployment Failed.';
@@ -584,17 +671,30 @@ jobs:
   // ==========================================
   @override
   Widget build(BuildContext context) {
-    // Filter files based on search query
     final filteredFiles = _selectableFiles.where((fileMap) {
       final path = fileMap['path'].toString().toLowerCase();
       return path.contains(_fileSearchQuery.toLowerCase());
     }).toList();
+
+    // GitHub Build Status variables
+    final String runStatus = _latestBuildRun['status'] ?? 'unknown';
+    final String runConclusion = _latestBuildRun['conclusion'] ?? 'pending';
+    final String runUrl = _latestBuildRun['html_url'] ?? '';
+
+    Color buildStatusColor = Colors.orangeAccent;
+    if (runConclusion == 'success') buildStatusColor = Colors.tealAccent;
+    if (runConclusion == 'failure') buildStatusColor = Colors.redAccent;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Autonomous Replit Studio Engine'),
         backgroundColor: const Color(0xFF131B2E),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Color(0xFF00E5FF)),
+            onPressed: _fetchLiveBuildStatus,
+            tooltip: 'Refresh GitHub Build Status',
+          ),
           IconButton(
             icon: const Icon(Icons.settings, color: Color(0xFF00E5FF)),
             onPressed: () => Navigator.push(
@@ -656,7 +756,6 @@ jobs:
                     ),
                     const SizedBox(height: 10),
                     
-                    // SEARCH BAR FOR FILES
                     TextField(
                       controller: _searchFileController,
                       onChanged: (val) => setState(() => _fileSearchQuery = val),
@@ -685,7 +784,6 @@ jobs:
                     const SizedBox(height: 10),
                     const Divider(color: Colors.white24),
 
-                    // CHECKBOX LIST (FILTERED BY SEARCH)
                     if (filteredFiles.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(12.0),
@@ -752,15 +850,54 @@ jobs:
                 ],
               ),
             ),
-            if (_actionsUrl.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              SelectableText(_actionsUrl, style: const TextStyle(color: Colors.white, fontSize: 12)),
-            ],
+
+            // ==========================================
+            // LIVE GITHUB BUILD STATUS PANEL (Logs ke upar)
+            // ==========================================
+            const SizedBox(height: 20),
+            const Text('☁️ Live GitHub Build Status:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF131B2E),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: buildStatusColor.withOpacity(0.5), width: 1),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.between,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Status: $runStatus', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                        const SizedBox(height: 4),
+                        Text('Conclusion: $runConclusion', style: TextStyle(color: buildStatusColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.black45, foregroundColor: Colors.white),
+                    onPressed: _fetchLiveBuildStatus,
+                    icon: _isCheckingBuild 
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.cyan)) 
+                        : const Icon(Icons.sync, size: 16, color: Color(0xFF00E5FF)),
+                    label: const Text('Check Status', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+
             const SizedBox(height: 24),
             const Text('Live Telemetry & Logs:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
             const SizedBox(height: 8),
+
+            // ==========================================
+            // LOGS CONTAINER WITH 'SOLVE' BUTTON FOR ERRORS
+            // ==========================================
             Container(
-              height: 200,
+              height: 220,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
               child: ListView.builder(
@@ -773,8 +910,34 @@ jobs:
                   if (log.type == LogType.error) color = Colors.redAccent;
 
                   return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3.0),
-                    child: Text('[${log.timestamp}] ${log.message}', style: TextStyle(color: color, fontFamily: 'monospace', fontSize: 11)),
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '[${log.timestamp}] ${log.message}',
+                            style: TextStyle(color: color, fontFamily: 'monospace', fontSize: 11),
+                          ),
+                        ),
+                        if (log.canSolve || log.type == LogType.error) ...[
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            height: 26,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                              ),
+                              onPressed: () => _solveError(log.message),
+                              icon: const Icon(Icons.auto_fix_high, size: 12),
+                              label: const Text('Solve', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   );
                 },
               ),
