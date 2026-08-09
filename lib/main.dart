@@ -436,21 +436,31 @@ MANDATORY RULES:
   }
 
   // ==========================================
-  // 7. ROBUST JSON REPAIR & PARSING UTILITY
+  // 7. ROBUST JSON REPAIR & PARSING UTILITY (Fixed Version)
   // ==========================================
   List<dynamic> _parseAndValidateJsonFiles(String rawContent) {
-    String cleaned = rawContent.replaceAll('```json', '').replaceAll('```', '').trim();
+    // 1. कंट्रोल कैरेक्टर्स और विजिबिलिटी इश्यूज को साफ़ करें
+    String cleaned = rawContent.replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F]'), '').trim();
+    
+    // 2. मार्कडाउन रैपर्स को हटा दें
+    cleaned = cleaned.replaceAll('```json', '').replaceAll('```', '').trim();
+    
+    // 3. JSON ऑब्जेक्ट की सही बाउंड्री ढूँढें
     int startIdx = cleaned.indexOf('{');
     int endIdx = cleaned.lastIndexOf('}');
     if (startIdx != -1 && endIdx != -1) {
       cleaned = cleaned.substring(startIdx, endIdx + 1);
     }
 
-    final decodedJson = jsonDecode(cleaned);
-    if (decodedJson['files'] == null || (decodedJson['files'] as List).isEmpty) {
-      throw Exception('Synthesized JSON missing required files array.');
+    try {
+      final decodedJson = jsonDecode(cleaned);
+      if (decodedJson['files'] == null || (decodedJson['files'] as List).isEmpty) {
+        throw Exception('Synthesized JSON missing required files array.');
+      }
+      return decodedJson['files'];
+    } catch (e) {
+      throw Exception('Parsing Exception: ${e.toString()}');
     }
-    return decodedJson['files'];
   }
 
   // ==========================================
