@@ -17,10 +17,10 @@ class MasterAutonomousStudioApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF07090E),
         cardColor: const Color(0xFF131B2E),
         primaryColor: const Color(0xFF00E5FF),
-        colorScheme: ColorScheme.dark(
-          primary: const Color(0xFF00E5FF),
-          secondary: const Color(0xFF7C4DFF),
-          surface: const Color(0xFF131B2E),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF00E5FF),
+          secondary: Color(0xFF7C4DFF),
+          surface: Color(0xFF131B2E),
         ),
       ),
       home: const MasterDashboardScreen(),
@@ -243,7 +243,7 @@ class MasterDashboardScreen extends StatefulWidget {
 
 class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   final TextEditingController _promptController = TextEditingController(
-    text: 'Create a full featured shopping app with internet and local database in Flutter.',
+    text: 'Create a simple calculator app in Flutter with modern UI.',
   );
   
   final TextEditingController _searchFileController = TextEditingController();
@@ -298,9 +298,15 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['workflow_runs'] != null && (data['workflow_runs'] as List).isNotEmpty) {
+          final run = data['workflow_runs'][0];
           setState(() {
-            _latestBuildRun = data['workflow_runs'][0];
+            _latestBuildRun = run;
           });
+
+          // यदि बिल्ड फेल हुई है, तो उसे ऑटोमेटिक लॉग में डालकर सॉल्व बटन दिखाओ
+          if (run['conclusion'] == 'failure') {
+            _addLog('GitHub Build Failed! Unsupported Gradle or Gradle version mismatch detected.', type: LogType.error, canSolve: true);
+          }
         }
       }
     } catch (e) {
@@ -317,17 +323,17 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
       return;
     }
 
-    _addLog('🤖 Agent initiated self-correction for error: "$errorMessage"', type: LogType.warning);
+    _addLog('🤖 Agent initiated self-correction for build error...', type: LogType.warning);
     setState(() {
       _isAutonomousRunning = true;
-      _currentPhase = 'Agent fixing specific build error...';
+      _currentPhase = 'Agent fixing Gradle/Build error...';
     });
 
     try {
-      final fixPrompt = "Fix this specific build error in the Flutter project: $errorMessage. Ensure you NEVER use 'MainAxisAlignment.between' (use 'MainAxisAlignment.spaceBetween' instead). For any YAML file (.github/workflows/flutter.yml), write every single line and indentation properly. Provide the updated file content in the standard JSON structure.";
+      final fixPrompt = "Fix the Gradle build failure in the Flutter project. Ensure pubspec.yaml and android/build.gradle / settings.gradle or flutter.yml are fully compatible and modern. Provide the updated file contents in clean JSON.";
       
-      final rawResponse = await _callGroqForCodeGeneration(config, fixPrompt, ['lib/main.dart']);
-      final files = _parseAndValidateJsonFiles(rawResponse, ['lib/main.dart']);
+      final rawResponse = await _callGroqForCodeGeneration(config, fixPrompt, ['pubspec.yaml', '.github/workflows/flutter.yml']);
+      final files = _parseAndValidateJsonFiles(rawResponse, ['pubspec.yaml', '.github/workflows/flutter.yml']);
 
       for (var fileEntry in files) {
         final String fileName = fileEntry['fileName'];
@@ -336,7 +342,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
         await _pushFileToGitHub(config, fileName, fileCode);
       }
 
-      _addLog('🎉 Fix successfully pushed to GitHub! Check live build status below.', type: LogType.success);
+      _addLog('🎉 Fix successfully pushed to GitHub! Check status again shortly.', type: LogType.success);
       _fetchLiveBuildStatus();
     } catch (e) {
       _addLog('❌ Auto-fix failed: $e', type: LogType.error);
@@ -472,13 +478,11 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     final systemPrompt = '''
 You are an expert Lead Software Architect. Read the user prompt carefully and determine the necessary files to build the requested Flutter project.
 RULES:
-1. Under the `lib/` folder, ALWAYS include ONLY ONE single file: "lib/main.dart". Never split code into separate screen or model files.
+1. Under the `lib/` folder, ALWAYS include ONLY ONE single file: "lib/main.dart".
 2. Always include essential project root files:
    - "pubspec.yaml"
    - ".github/workflows/flutter.yml"
-3. DYNAMICALLY check the prompt for hardware or special requirements:
-   - If the prompt mentions permissions, hardware, camera, location, internet, storage, or native configuration, include "android/app/src/main/AndroidManifest.xml" and "ios/Runner/Info.plist".
-4. Return ONLY a valid JSON array of strings containing the file paths. No markdown formatting, no extra text.
+3. Return ONLY a valid JSON array of strings containing the file paths. No markdown formatting, no extra text.
 ''';
 
     final response = await http.post(
@@ -523,10 +527,9 @@ MANDATORY RULES:
     }
   ]
 }
-2. Ensure lib/main.dart contains the entire standalone application code.
-3. FLUTTER SYNTAX RULE: ALWAYS use 'MainAxisAlignment.spaceBetween' for spacing items in rows/columns. NEVER use 'MainAxisAlignment.between'.
-4. YAML FORMATTING RULE (.github/workflows/flutter.yml):
-   - You MUST write the YAML code in a proper multi-line format using explicit newline characters.
+2. FLUTTER SYNTAX RULE: ALWAYS use 'MainAxisAlignment.spaceBetween' for spacing items in rows/columns. NEVER use 'MainAxisAlignment.between'.
+3. YAML FORMATTING RULE (.github/workflows/flutter.yml):
+   - You MUST write the YAML code in a proper multi-line format using standard newlines.
 ''';
 
     final response = await http.post(
@@ -582,7 +585,7 @@ MANDATORY RULES:
         throw Exception('Syntax Error in $name: Found "MainAxisAlignment.between". Use "MainAxisAlignment.spaceBetween" instead.');
       }
 
-      // 🛡️ GUARANTEED FORCE AUTO-FIX FOR YAML: अगर एजेंट फिर भी एक लाइन में भेजे, तो हमारा कोड खुद इसे परफेक्ट मल्टी-लाइन बना देगा!
+      // 🛡️ YAML Auto-Fix: अगर फाइल .yml है और एक लाइन में है, तो ऑटोमैटिक मल्टी-लाइन कर देगा
       if (name.endsWith('.yml') || name.endsWith('.yaml')) {
         if (!code.contains('\n') || code.length > 30 && !code.contains('\n')) {
           code = code
@@ -600,8 +603,6 @@ MANDATORY RULES:
               .replaceAll('flutter-version:', '\n          flutter-version:')
               .replaceAll('channel:', '\n          channel:');
         }
-        
-        // टैब्स को सुरक्षित रूप से स्पेसेस में बदलना
         code = code.replaceAll('\t', '  ');
         file['fileCode'] = code.trim();
       }
@@ -629,7 +630,7 @@ MANDATORY RULES:
     }
 
     final Map<String, dynamic> requestBody = {
-      'message': 'Autonomous Multi-Line Yaml Force Commit: $fileName',
+      'message': 'Autonomous Multi-Line Sync: $fileName',
       'content': base64Encode(utf8.encode(fileCode)),
     };
 
@@ -787,7 +788,7 @@ MANDATORY RULES:
                             });
                           },
                         );
-                      }).toList(),
+                      }),
 
                     const SizedBox(height: 10),
                     SizedBox(
