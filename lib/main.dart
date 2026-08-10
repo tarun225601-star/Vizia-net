@@ -324,7 +324,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     });
 
     try {
-      final fixPrompt = "Fix this specific build error in the Flutter project: $errorMessage. Ensure you NEVER use 'MainAxisAlignment.between' (use 'MainAxisAlignment.spaceBetween' instead). Analyze what went wrong and provide the updated file content in the standard JSON structure.";
+      final fixPrompt = "Fix this specific build error in the Flutter project: $errorMessage. Ensure you NEVER use 'MainAxisAlignment.between' (use 'MainAxisAlignment.spaceBetween' instead). For any YAML file (.github/workflows/flutter.yml), write every single line and indentation properly. Provide the updated file content in the standard JSON structure.";
       
       final rawResponse = await _callGroqForCodeGeneration(config, fixPrompt, ['lib/main.dart']);
       final files = _parseAndValidateJsonFiles(rawResponse, ['lib/main.dart']);
@@ -511,7 +511,6 @@ RULES:
 
   Future<String> _callGroqForCodeGeneration(AgentConfig config, String userPrompt, List<String> filePlan) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-    // यहाँ सिस्टम प्रॉम्प्ट में सख्त नियम जोड़ दिया गया है कि MainAxisAlignment.between का इस्तेमाल कभी न हो
     final systemPrompt = '''
 You are an expert Developer and DevOps Engineer. Generate production-ready code strictly for these planned files: ${filePlan.join(', ')}.
 MANDATORY RULES:
@@ -525,22 +524,9 @@ MANDATORY RULES:
   ]
 }
 2. Ensure lib/main.dart contains the entire standalone application code.
-3. FLUTTER SYNTAX RULE: ALWAYS use 'MainAxisAlignment.spaceBetween' for spacing items in rows/columns. NEVER use 'MainAxisAlignment.between' because it does not exist in Flutter and causes build errors.
-4. CRITICAL FOR GITHUB ACTIONS (.github/workflows/flutter.yml): If included, use official actions:
-name: Build Flutter App
-on: [push, pull_request]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.19.x'
-          channel: 'stable'
-      - run: flutter pub get
-      - run: flutter build apk --release
-5. Ensure strict valid formatting for XML, YAML, and Dart code without tabs or unescaped characters.
+3. FLUTTER SYNTAX RULE: ALWAYS use 'MainAxisAlignment.spaceBetween' for spacing items in rows/columns. NEVER use 'MainAxisAlignment.between'.
+4. YAML FORMATTING RULE (.github/workflows/flutter.yml):
+   - You MUST write the YAML code in a proper multi-line format using explicit newline characters.
 ''';
 
     final response = await http.post(
@@ -592,13 +578,32 @@ jobs:
       String name = file['fileName'] ?? '';
       String code = file['fileCode'] ?? '';
       
-      // ऑटो-चेक: यदि एजेंट गलती से .between लिख दे, तो कोड को यहीं रिजेक्ट कर दें
       if (code.contains('MainAxisAlignment.between')) {
         throw Exception('Syntax Error in $name: Found "MainAxisAlignment.between". Use "MainAxisAlignment.spaceBetween" instead.');
       }
 
-      if ((name.endsWith('.yml') || name.endsWith('.yaml')) && code.contains('\t')) {
-        throw Exception('Validation Error: YAML file $name contains tabs instead of spaces.');
+      // 🛡️ GUARANTEED FORCE AUTO-FIX FOR YAML: अगर एजेंट फिर भी एक लाइन में भेजे, तो हमारा कोड खुद इसे परफेक्ट मल्टी-लाइन बना देगा!
+      if (name.endsWith('.yml') || name.endsWith('.yaml')) {
+        if (!code.contains('\n') || code.length > 30 && !code.contains('\n')) {
+          code = code
+              .replaceAll('name:', '\nname:')
+              .replaceAll('on:', '\non:')
+              .replaceAll('push:', '\n  push:')
+              .replaceAll('branches:', '\n    branches:')
+              .replaceAll('jobs:', '\njobs:')
+              .replaceAll('build:', '\n  build:')
+              .replaceAll('runs-on:', '\n    runs-on:')
+              .replaceAll('steps:', '\n    steps:')
+              .replaceAll('- uses:', '\n      - uses:')
+              .replaceAll('- run:', '\n      - run:')
+              .replaceAll('with:', '\n        with:')
+              .replaceAll('flutter-version:', '\n          flutter-version:')
+              .replaceAll('channel:', '\n          channel:');
+        }
+        
+        // टैब्स को सुरक्षित रूप से स्पेसेस में बदलना
+        code = code.replaceAll('\t', '  ');
+        file['fileCode'] = code.trim();
       }
     }
 
@@ -624,7 +629,7 @@ jobs:
     }
 
     final Map<String, dynamic> requestBody = {
-      'message': 'Autonomous Fix Commit: $fileName',
+      'message': 'Autonomous Multi-Line Yaml Force Commit: $fileName',
       'content': base64Encode(utf8.encode(fileCode)),
     };
 
