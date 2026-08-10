@@ -73,7 +73,12 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   }
 
   Future<void> _loadSavedConfig() async {
-    // Initialization of saved local parameters if any
+    final config = await _getStoredConfig();
+    if (config.groqKey == 'YOUR_GROQ_API_KEY') {
+      _addLog('⚠️ Default configuration detected. Please check settings.');
+    } else {
+      _addLog('⚙️ Loaded stored configurations successfully.');
+    }
   }
 
   void _addLog(String message, {String type = 'info'}) {
@@ -93,6 +98,95 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       githubUser: prefs.getString('github_user') ?? 'tarun225601-star',
       githubRepo: prefs.getString('github_repo') ?? 'real_time',
       selectedModel: prefs.getString('groq_model') ?? 'llama-3.3-70b-versatile',
+    );
+  }
+
+  Future<void> _saveConfig(AgentConfig config) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('groq_key', config.groqKey);
+    await prefs.setString('github_token', config.githubToken);
+    await prefs.setString('github_user', config.githubUser);
+    await prefs.setString('github_repo', config.githubRepo);
+    await prefs.setString('groq_model', config.selectedModel);
+  }
+
+  void _showSettingsDialog() {
+    final groqKeyController = TextEditingController();
+    final githubTokenController = TextEditingController();
+    final githubUserController = TextEditingController();
+    final githubRepoController = TextEditingController();
+    String selectedModel = 'llama-3.3-70b-versatile';
+
+    _getStoredConfig().then((config) {
+      groqKeyController.text = config.groqKey;
+      githubTokenController.text = config.githubToken;
+      githubUserController.text = config.githubUser;
+      githubRepoController.text = config.githubRepo;
+    });
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enterprise Studio Settings'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: groqKeyController,
+                decoration: const InputDecoration(labelText: 'Groq API Key'),
+                obscureText: true,
+              ),
+              TextField(
+                controller: githubTokenController,
+                decoration: const InputDecoration(labelText: 'GitHub Personal Access Token'),
+                obscureText: true,
+              ),
+              TextField(
+                controller: githubUserController,
+                decoration: const InputDecoration(labelText: 'GitHub Username'),
+              ),
+              TextField(
+                controller: githubRepoController,
+                decoration: const InputDecoration(labelText: 'GitHub Repository Name'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedModel,
+                decoration: const InputDecoration(labelText: 'Groq Model'),
+                items: const [
+                  DropdownMenuItem(value: 'llama-3.3-70b-versatile', child: Text('Llama 3.3 70B Versatile')),
+                  DropdownMenuItem(value: 'llama-3.1-8b-instant', child: Text('Llama 3.1 8B Instant')),
+                ],
+                onChanged: (val) {
+                  if (val != null) selectedModel = val;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newConfig = AgentConfig(
+                groqKey: groqKeyController.text.trim(),
+                githubToken: githubTokenController.text.trim(),
+                githubUser: githubUserController.text.trim(),
+                githubRepo: githubRepoController.text.trim(),
+                selectedModel: selectedModel,
+              );
+              await _saveConfig(newConfig);
+              Navigator.pop(context);
+              _addLog('💾 Configuration updated successfully.');
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -161,7 +255,6 @@ RULES FOR FILE TREE:
       final decoded = jsonDecode(response.body);
       String content = decoded['choices'][0]['message']['content'].trim();
       
-      // Robust auto-clean for JSON array output
       content = content.replaceAll('```json', '').replaceAll('```', '').trim();
       int startIndex = content.indexOf('[');
       int endIndex = content.lastIndexOf(']');
@@ -306,7 +399,6 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
     }
   }
 
-  // SAFE BASE64 DECODER & PARSER
   List<Map<String, dynamic>> _parseAndDecodeBase64Files(String rawResponse) {
     try {
       String cleaned = rawResponse.replaceAll('```json', '').replaceAll('```', '').trim();
@@ -336,7 +428,6 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
     }
   }
 
-  // FIXED GITHUB PUSH WITH PROPER BASE64 ENCODING
   Future<void> _pushFileToGitHub(AgentConfig config, String fileName, String fileCode) async {
     final url = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/contents/$fileName');
     
@@ -355,7 +446,6 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
       }
     } catch (_) {}
 
-    // FIXED: Ensures newlines and formats stay intact
     final encodedContent = base64Encode(utf8.encode(fileCode));
 
     final Map<String, dynamic> bodyData = {
@@ -396,9 +486,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {
-              // Settings panel trigger
-            },
+            onPressed: _showSettingsDialog, // Fixed settings trigger
           ),
         ],
       ),
