@@ -291,11 +291,11 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     _addLog('🤖 Agent initiated self-correction for build error...', type: LogType.warning);
     setState(() {
       _isAutonomousRunning = true;
-      _currentPhase = 'Agent fixing Gradle/Build error...';
+      _currentPhase = 'Agent fixing Workflow/Build error...';
     });
 
     try {
-      final fixPrompt = "Fix the Gradle/Workflow build failure in the Flutter project. Ensure pubspec.yaml and .github/workflows/flutter.yml include subosito/flutter-action. Return ONLY valid JSON.";
+      final fixPrompt = "Fix the Workflow build failure. Ensure .github/workflows/flutter.yml has NO flutter test step, uses subosito/flutter-action, and builds successfully. Return ONLY valid JSON.";
       
       final rawResponse = await _callGroqForCodeGeneration(config, fixPrompt, ['pubspec.yaml', '.github/workflows/flutter.yml']);
       final files = _parseAndValidateJsonFiles(rawResponse, ['pubspec.yaml', '.github/workflows/flutter.yml']);
@@ -478,12 +478,13 @@ RULES:
   Future<String> _callGroqForCodeGeneration(AgentConfig config, String userPrompt, List<String> filePlan) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
     
-    // 🛑 सख्त और पक्का डेवऑप्स आर्किटेक्ट प्रॉम्प्ट - अब एजेंट कभी गलती नहीं करेगा
+    // 🛑 सख्त और पक्का डेवऑप्स आर्किटेक्ट प्रॉम्प्ट - बिना टेस्ट स्टेप के (क्योंकि टेस्ट फाइल नहीं है)
     final systemPrompt = '''
 You are an expert Senior DevOps and Flutter Architect. 
 YOUR RULES ARE FINAL:
 1. When creating ".github/workflows/flutter.yml", you MUST include the Flutter SDK action setup using "subosito/flutter-action@v2". 
-   NEVER write "flutter pub get" or "flutter build" without setting up the Flutter SDK step first! Example:
+   NEVER include a "flutter test" step because there is no test directory! 
+   The workflow steps MUST look strictly like this:
    steps:
      - uses: actions/checkout@v3
      - uses: subosito/flutter-action@v2
@@ -491,6 +492,8 @@ YOUR RULES ARE FINAL:
          flutter-version: '3.19.x'
      - name: Install dependencies
        run: flutter pub get
+     - name: Build and deploy
+       run: flutter build apk --release
 2. For "pubspec.yaml", ensure dependencies are standard and error-free.
 3. Every file content must be perfectly escaped for JSON with \\n for newlines.
 
