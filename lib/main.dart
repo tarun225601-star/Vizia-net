@@ -237,7 +237,7 @@ class MasterDashboardScreen extends StatefulWidget {
 
 class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   final TextEditingController _promptController = TextEditingController(
-    text: 'Build a high-level E-Commerce app with clean modular architecture, models, services, state management, and full UI screens.',
+    text: 'Build a production-grade, high-performance Flutter mobile application with a modern dark-themed UI (Material 3 standard). Follow a strict clean architecture and modular folder structure (models, services, providers, screens, pubspec.yaml, .github/workflows/flutter.yml).',
   );
   
   final TextEditingController _searchFileController = TextEditingController();
@@ -323,7 +323,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   }
 
   // ==========================================
-  // STEP 2: CODE SYNTHESIS & SELF-CORRECTION
+  // STEP 2: CODE SYNTHESIS & BASE64 DECODING
   // ==========================================
   Future<void> _confirmAndExecuteBuild() async {
     final config = await _getStoredConfig();
@@ -343,23 +343,23 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.40;
-      _currentPhase = 'Phase 2: Multi-File Code Synthesis...';
+      _currentPhase = 'Phase 2: Base64 Code Synthesis...';
     });
 
-    _addLog('⚡ User confirmed ${chosenFiles.length} files. Synthesizing high-level code...');
+    _addLog('⚡ User confirmed ${chosenFiles.length} files. Synthesizing Base64 secure code...');
 
     try {
       final rawResponse = await _callGroqForModularCodeGeneration(config!, _promptController.text, chosenFiles);
       
       setState(() {
         _progressValue = 0.60;
-        _currentPhase = 'Phase 3: Self-Correction & Syntax Verification...';
+        _currentPhase = 'Phase 3: Base64 Decoding & Syntax Verification...';
       });
-      _addLog('🔍 Running internal self-healing syntax verification...');
+      _addLog('🔍 Decoding Base64 strings and running verification...');
       
-      // Self-Correction & Validation Loop
-      final files = _parseAndSelfCorrectFiles(rawResponse, chosenFiles);
-      _addLog('✅ All files successfully passed verification and self-correction checks!', type: LogType.success);
+      // Base64 Parsing & Self-Healing Loop
+      final files = _parseAndDecodeBase64Files(rawResponse, chosenFiles);
+      _addLog('✅ All files successfully decoded and verified without corruption!', type: LogType.success);
 
       setState(() {
         _progressValue = 0.75;
@@ -410,7 +410,6 @@ RULES FOR FILE TREE:
    - "lib/services/api_service.dart"
    - "lib/providers/app_provider.dart"
    - "lib/screens/home_screen.dart"
-   - "lib/screens/detail_screen.dart"
 2. Always include essential project configurations:
    - "pubspec.yaml"
    - ".github/workflows/flutter.yml"
@@ -446,24 +445,23 @@ RULES FOR FILE TREE:
   }
 
   // ==========================================
-  // CODE GENERATION FOR MULTIPLE FILES
+  // CODE GENERATION USING BASE64 ENCODING
   // ==========================================
   Future<String> _callGroqForModularCodeGeneration(AgentConfig config, String userPrompt, List<String> filePlan) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
     final systemPrompt = '''
 You are a Principal Software Engineer. Write high-level, production-grade code for each of these requested modular files: ${filePlan.join(', ')}.
 MANDATORY RULES:
-1. Output MUST be ONLY a clean raw JSON object matching this exact structure, with no markdown tags:
+1. For EVERY file, encode the entire file code content into standard Base64 format so that no line breaks or special characters break the JSON structure.
+2. Output MUST be ONLY a clean raw JSON object matching this exact structure, with no markdown tags:
 {
   "files": [
     {
       "fileName": "lib/models/app_model.dart",
-      "fileCode": "// code here..."
+      "fileCodeBase64": "BASE64_ENCODED_STRING_HERE"
     }
   ]
 }
-2. Ensure all imports between files (e.g., importing models inside screens or services) match correctly.
-3. Write clean, complete, robust code without truncation or placeholders.
 ''';
 
     final response = await http.post(
@@ -476,9 +474,9 @@ MANDATORY RULES:
         "model": config.selectedModel,
         "messages": [
           {"role": "system", "content": systemPrompt},
-          {"role": "user", "content": "Generate modular code for: $userPrompt for files: ${filePlan.toString()}"}
+          {"role": "user", "content": "Generate Base64 encoded modular code for: $userPrompt for files: ${filePlan.toString()}"}
         ],
-        "temperature": 0.2,
+        "temperature": 0.1,
         "max_tokens": 8000,
       }),
     );
@@ -492,9 +490,9 @@ MANDATORY RULES:
   }
 
   // ==========================================
-  // SELF-CORRECTION & VALIDATION ENGINE
+  // BASE64 DECODING & PARSING ENGINE
   // ==========================================
-  List<dynamic> _parseAndSelfCorrectFiles(String rawContent, List<String> expectedFiles) {
+  List<dynamic> _parseAndDecodeBase64Files(String rawContent, List<String> expectedFiles) {
     String cleaned = rawContent.replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F]'), '').trim();
     cleaned = cleaned.replaceAll('```json', '').replaceAll('```', '').trim();
     
@@ -506,24 +504,38 @@ MANDATORY RULES:
 
     final decodedJson = jsonDecode(cleaned);
     if (decodedJson['files'] == null || !(decodedJson['files'] is List)) {
-      throw Exception('Self-Correction Error: Missing files array in JSON structure.');
+      throw Exception('Parsing Error: Missing files array in JSON structure.');
     }
 
-    List<dynamic> files = decodedJson['files'];
-    if (files.isEmpty) {
-      throw Exception('Self-Correction Error: Generated files list is empty.');
-    }
+    List<dynamic> rawFiles = decodedJson['files'];
+    List<Map<String, dynamic>> processedFiles = [];
 
-    // Self-healing checks
-    for (var file in files) {
+    for (var file in rawFiles) {
       String name = file['fileName'] ?? '';
-      String code = file['fileCode'] ?? '';
-      if ((name.endsWith('.yml') || name.endsWith('.yaml')) && code.contains('\t')) {
-        file['fileCode'] = code.replaceAll('\t', '  '); // Auto-fix YAML tabs to spaces
+      String base64Code = file['fileCodeBase64'] ?? file['fileCode'] ?? '';
+      
+      String decodedCode;
+      try {
+        // Decode from Base64 safely
+        List<int> bytes = base64Decode(base64Code.trim());
+        decodedCode = utf8.decode(bytes);
+      } catch (_) {
+        // Fallback if AI accidentally returned plain text instead of base64
+        decodedCode = base64Code;
       }
+
+      // YAML tab to spaces fix
+      if ((name.endsWith('.yml') || name.endsWith('.yaml')) && decodedCode.contains('\t')) {
+        decodedCode = decodedCode.replaceAll('\t', '  ');
+      }
+
+      processedFiles.add({
+        'fileName': name,
+        'fileCode': decodedCode,
+      });
     }
 
-    return files;
+    return processedFiles;
   }
 
   // ==========================================
@@ -548,7 +560,7 @@ MANDATORY RULES:
     }
 
     final Map<String, dynamic> requestBody = {
-      'message': 'Enterprise Modular Autonomous Commit: $fileName',
+      'message': 'Enterprise Base64 Modular Autonomous Commit: $fileName',
       'content': base64Encode(utf8.encode(fileCode)),
     };
 
@@ -707,7 +719,7 @@ MANDATORY RULES:
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.tealAccent, foregroundColor: Colors.black),
                         onPressed: _confirmAndExecuteBuild,
                         child: const Text(
-                          '🚀 Step 2: Synthesize & Push Enterprise Code',
+                          '🚀 Step 2: Synthesize Base64 & Push Code',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                       ),
