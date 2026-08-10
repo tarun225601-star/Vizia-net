@@ -295,7 +295,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     });
 
     try {
-      final fixPrompt = "Fix the Gradle build failure in the Flutter project. Ensure pubspec.yaml and android/build.gradle / flutter.yml are compatible. Return ONLY valid JSON.";
+      final fixPrompt = "Fix the Gradle/Workflow build failure in the Flutter project. Ensure pubspec.yaml and .github/workflows/flutter.yml include subosito/flutter-action. Return ONLY valid JSON.";
       
       final rawResponse = await _callGroqForCodeGeneration(config, fixPrompt, ['pubspec.yaml', '.github/workflows/flutter.yml']);
       final files = _parseAndValidateJsonFiles(rawResponse, ['pubspec.yaml', '.github/workflows/flutter.yml']);
@@ -477,16 +477,29 @@ RULES:
 
   Future<String> _callGroqForCodeGeneration(AgentConfig config, String userPrompt, List<String> filePlan) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+    
+    // 🛑 सख्त और पक्का डेवऑप्स आर्किटेक्ट प्रॉम्प्ट - अब एजेंट कभी गलती नहीं करेगा
     final systemPrompt = '''
-You are an expert Developer and DevOps Engineer. Generate code strictly for these files: ${filePlan.join(', ')}.
-MANDATORY INSTRUCTION TO PREVENT JSON CRASHES:
-Instead of raw strings containing unescaped newlines, wrap the "fileCode" content securely, OR ensure your output is strict single-line JSON format where all newlines are properly escaped as \\n.
-Output MUST be ONLY a clean raw JSON object matching this exact structure, with no markdown tags:
+You are an expert Senior DevOps and Flutter Architect. 
+YOUR RULES ARE FINAL:
+1. When creating ".github/workflows/flutter.yml", you MUST include the Flutter SDK action setup using "subosito/flutter-action@v2". 
+   NEVER write "flutter pub get" or "flutter build" without setting up the Flutter SDK step first! Example:
+   steps:
+     - uses: actions/checkout@v3
+     - uses: subosito/flutter-action@v2
+       with:
+         flutter-version: '3.19.x'
+     - name: Install dependencies
+       run: flutter pub get
+2. For "pubspec.yaml", ensure dependencies are standard and error-free.
+3. Every file content must be perfectly escaped for JSON with \\n for newlines.
+
+Output MUST be a strict JSON object with NO markdown tags:
 {
   "files": [
     {
-      "fileName": "lib/main.dart",
-      "fileCode": "// code here..."
+      "fileName": "path/to/file",
+      "fileCode": "file content here..."
     }
   ]
 }
@@ -502,9 +515,9 @@ Output MUST be ONLY a clean raw JSON object matching this exact structure, with 
         "model": config.selectedModel,
         "messages": [
           {"role": "system", "content": systemPrompt},
-          {"role": "user", "content": "Generate complete code for: $userPrompt strictly for files: ${filePlan.toString()}"}
+          {"role": "user", "content": "Generate professional code for: $userPrompt for these files: ${filePlan.toString()}. Ensure strict DevOps standards."}
         ],
-        "temperature": 0.1,
+        "temperature": 0.05,
         "max_tokens": 8000,
       }),
     );
@@ -517,7 +530,6 @@ Output MUST be ONLY a clean raw JSON object matching this exact structure, with 
     return decoded['choices'][0]['message']['content'];
   }
 
-  // 🛡️ 100% फुल-प्रूफ बुलेटप्रूफ JSON क्लीनर और सैनिटाइज़र
   List<dynamic> _parseAndValidateJsonFiles(String rawContent, List<String> expectedFiles) {
     String cleaned = rawContent.trim();
     cleaned = cleaned.replaceAll('```json', '').replaceAll('```', '').trim();
@@ -528,7 +540,6 @@ Output MUST be ONLY a clean raw JSON object matching this exact structure, with 
       cleaned = cleaned.substring(startIdx, endIdx + 1);
     }
 
-    // यहाँ हम रो कंट्रोल कैरेक्टर्स और गलत एस्केप को अपने आप ठीक कर देते हैं ताकि jsonDecode कभी फेल न हो
     cleaned = cleaned.replaceAllMapped(RegExp(r'"([^"\\]*(\\.[^"\\]*)*)"'), (match) {
       String val = match.group(0)!;
       val = val.replaceAll('\n', '\\n').replaceAll('\r', '').replaceAll('\t', '\\t');
@@ -539,7 +550,6 @@ Output MUST be ONLY a clean raw JSON object matching this exact structure, with 
     try {
       decodedJson = jsonDecode(cleaned);
     } catch (e) {
-      // यदि फिर भी कोई गड़बड़ हो, तो फॉलबैक री-पार्सर चलाएं
       cleaned = cleaned.replaceAll(RegExp(r'[\u0000-\u001F]+'), " ");
       decodedJson = jsonDecode(cleaned);
     }
