@@ -213,7 +213,7 @@ class _MasterSettingsScreenState extends State<MasterSettingsScreen> {
 }
 
 // ==========================================
-// 3. LOGGING MODEL (Updated with canSolve)
+// 3. LOGGING MODEL
 // ==========================================
 class AgentLog {
   final String timestamp;
@@ -258,7 +258,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
   bool _isWaitingForUserFileSelection = false;
   List<Map<String, dynamic>> _selectableFiles = [];
 
-  // लाइव गिटहब बिल्ड स्टेटस के लिए स्टेट वेरिएबल्स
   Map<String, dynamic> _latestBuildRun = {};
   bool _isCheckingBuild = false;
 
@@ -281,9 +280,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     );
   }
 
-  // ==========================================
-  // FETCH LIVE GITHUB ACTIONS BUILD STATUS
-  // ==========================================
   Future<void> _fetchLiveBuildStatus() async {
     final config = await _getStoredConfig();
     if (config == null || !config.isValid) return;
@@ -308,15 +304,12 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
         }
       }
     } catch (e) {
-      // Ignore background fetch error
+      // Ignore
     } finally {
       if (mounted) setState(() => _isCheckingBuild = false);
     }
   }
 
-  // ==========================================
-  // AUTO SOLVE ERROR ACTION (Agent Fix Trigger)
-  // ==========================================
   Future<void> _solveError(String errorMessage) async {
     final config = await _getStoredConfig();
     if (config == null || !config.isValid) {
@@ -331,7 +324,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     });
 
     try {
-      final fixPrompt = "Fix this specific build error in the Flutter project: $errorMessage. Analyze what went wrong and provide the updated file content in the standard JSON structure.";
+      final fixPrompt = "Fix this specific build error in the Flutter project: $errorMessage. Ensure you NEVER use 'MainAxisAlignment.between' (use 'MainAxisAlignment.spaceBetween' instead). Analyze what went wrong and provide the updated file content in the standard JSON structure.";
       
       final rawResponse = await _callGroqForCodeGeneration(config, fixPrompt, ['lib/main.dart']);
       final files = _parseAndValidateJsonFiles(rawResponse, ['lib/main.dart']);
@@ -355,9 +348,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     }
   }
 
-  // ==========================================
-  // STEP 1: DYNAMICALLY PLAN FILES FROM PROMPT
-  // ==========================================
   Future<void> _startPipelineAndPlanFiles() async {
     final config = await _getStoredConfig();
     if (!config!.isValid) {
@@ -406,9 +396,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     }
   }
 
-  // ==========================================
-  // STEP 2: GENERATE CODE & PUSH CHOSEN FILES
-  // ==========================================
   Future<void> _confirmAndExecuteBuild() async {
     final config = await _getStoredConfig();
     final chosenFiles = _selectableFiles
@@ -470,8 +457,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
       });
 
       _addLog('🎉 All selected project files deployed cleanly!', type: LogType.success);
-      
-      // तुरंत गिटहब बिल्ड स्टेटस चेक करना शुरू करें
       _fetchLiveBuildStatus();
     } catch (e) {
       _addLog('❌ Execution Failed: $e', type: LogType.error, canSolve: true);
@@ -482,9 +467,6 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
     }
   }
 
-  // ==========================================
-  // ARCHITECT FILE PLANNER
-  // ==========================================
   Future<List<String>> _callGroqForFilePlan(AgentConfig config, String userPrompt) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
     final systemPrompt = '''
@@ -527,11 +509,9 @@ RULES:
     return parsedList.map((e) => e.toString()).toList();
   }
 
-  // ==========================================
-  // CODE GENERATION
-  // ==========================================
   Future<String> _callGroqForCodeGeneration(AgentConfig config, String userPrompt, List<String> filePlan) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+    // यहाँ सिस्टम प्रॉम्प्ट में सख्त नियम जोड़ दिया गया है कि MainAxisAlignment.between का इस्तेमाल कभी न हो
     final systemPrompt = '''
 You are an expert Developer and DevOps Engineer. Generate production-ready code strictly for these planned files: ${filePlan.join(', ')}.
 MANDATORY RULES:
@@ -545,7 +525,8 @@ MANDATORY RULES:
   ]
 }
 2. Ensure lib/main.dart contains the entire standalone application code.
-3. CRITICAL FOR GITHUB ACTIONS (.github/workflows/flutter.yml): If included, use official actions:
+3. FLUTTER SYNTAX RULE: ALWAYS use 'MainAxisAlignment.spaceBetween' for spacing items in rows/columns. NEVER use 'MainAxisAlignment.between' because it does not exist in Flutter and causes build errors.
+4. CRITICAL FOR GITHUB ACTIONS (.github/workflows/flutter.yml): If included, use official actions:
 name: Build Flutter App
 on: [push, pull_request]
 jobs:
@@ -559,7 +540,7 @@ jobs:
           channel: 'stable'
       - run: flutter pub get
       - run: flutter build apk --release
-4. Ensure strict valid formatting for XML, YAML, and Dart code without tabs or unescaped characters.
+5. Ensure strict valid formatting for XML, YAML, and Dart code without tabs or unescaped characters.
 ''';
 
     final response = await http.post(
@@ -587,9 +568,6 @@ jobs:
     return decoded['choices'][0]['message']['content'];
   }
 
-  // ==========================================
-  // VALIDATION
-  // ==========================================
   List<dynamic> _parseAndValidateJsonFiles(String rawContent, List<String> expectedFiles) {
     String cleaned = rawContent.replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F]'), '').trim();
     cleaned = cleaned.replaceAll('```json', '').replaceAll('```', '').trim();
@@ -613,6 +591,12 @@ jobs:
     for (var file in files) {
       String name = file['fileName'] ?? '';
       String code = file['fileCode'] ?? '';
+      
+      // ऑटो-चेक: यदि एजेंट गलती से .between लिख दे, तो कोड को यहीं रिजेक्ट कर दें
+      if (code.contains('MainAxisAlignment.between')) {
+        throw Exception('Syntax Error in $name: Found "MainAxisAlignment.between". Use "MainAxisAlignment.spaceBetween" instead.');
+      }
+
       if ((name.endsWith('.yml') || name.endsWith('.yaml')) && code.contains('\t')) {
         throw Exception('Validation Error: YAML file $name contains tabs instead of spaces.');
       }
@@ -621,9 +605,6 @@ jobs:
     return files;
   }
 
-  // ==========================================
-  // GITHUB PUSH
-  // ==========================================
   Future<void> _pushFileToGitHub(AgentConfig config, String fileName, String fileCode) async {
     final endpointStr = 'https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/contents/$fileName';
     final fileUri = Uri.parse(endpointStr);
@@ -643,7 +624,7 @@ jobs:
     }
 
     final Map<String, dynamic> requestBody = {
-      'message': 'Autonomous Search-Filtered Commit: $fileName',
+      'message': 'Autonomous Fix Commit: $fileName',
       'content': base64Encode(utf8.encode(fileCode)),
     };
 
@@ -666,9 +647,6 @@ jobs:
     }
   }
 
-  // ==========================================
-  // UI DESIGN
-  // ==========================================
   @override
   Widget build(BuildContext context) {
     final filteredFiles = _selectableFiles.where((fileMap) {
@@ -676,10 +654,8 @@ jobs:
       return path.contains(_fileSearchQuery.toLowerCase());
     }).toList();
 
-    // GitHub Build Status variables
     final String runStatus = _latestBuildRun['status'] ?? 'unknown';
     final String runConclusion = _latestBuildRun['conclusion'] ?? 'pending';
-    final String runUrl = _latestBuildRun['html_url'] ?? '';
 
     Color buildStatusColor = Colors.orangeAccent;
     if (runConclusion == 'success') buildStatusColor = Colors.tealAccent;
@@ -723,7 +699,6 @@ jobs:
             ),
             const SizedBox(height: 16),
             
-            // ACTION BUTTON (START PLAN)
             if (!_isWaitingForUserFileSelection)
               SizedBox(
                 width: double.infinity,
@@ -738,7 +713,6 @@ jobs:
                 ),
               ),
 
-            // INTERACTIVE FILE SELECTION & SEARCH PANEL
             if (_isWaitingForUserFileSelection) ...[
               Container(
                 padding: const EdgeInsets.all(14),
@@ -851,9 +825,6 @@ jobs:
               ),
             ),
 
-            // ==========================================
-            // LIVE GITHUB BUILD STATUS PANEL (Logs ke upar)
-            // ==========================================
             const SizedBox(height: 20),
             const Text('☁️ Live GitHub Build Status:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
             const SizedBox(height: 8),
@@ -865,7 +836,7 @@ jobs:
                 border: Border.all(color: buildStatusColor.withOpacity(0.5), width: 1),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.between,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
                     child: Column(
@@ -893,9 +864,6 @@ jobs:
             const Text('Live Telemetry & Logs:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
             const SizedBox(height: 8),
 
-            // ==========================================
-            // LOGS CONTAINER WITH 'SOLVE' BUTTON FOR ERRORS
-            // ==========================================
             Container(
               height: 220,
               padding: const EdgeInsets.all(10),
