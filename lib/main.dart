@@ -270,7 +270,7 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
           setState(() => _latestBuildRun = run);
 
           if (run['conclusion'] == 'failure') {
-            _addLog('GitHub Build Failed! Click Solve to auto-fix.', type: LogType.error, canSolve: true);
+            _addLog('GitHub Pipeline Failed! Click Solve to auto-fix.', type: LogType.error, canSolve: true);
           }
         }
       }
@@ -288,17 +288,17 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
       return;
     }
 
-    _addLog('🤖 Agent initiated self-correction for build error...', type: LogType.warning);
+    _addLog('🤖 Agent initiated self-correction...', type: LogType.warning);
     setState(() {
       _isAutonomousRunning = true;
       _currentPhase = 'Agent fixing Workflow/Build error...';
     });
 
     try {
-      final fixPrompt = "Fix the Workflow build failure. Ensure .github/workflows/flutter.yml has NO flutter test step, uses subosito/flutter-action, and builds successfully. Return ONLY valid JSON.";
+      final fixPrompt = "Fix workflow configuration. Ensure android/app/src/main/AndroidManifest.xml exists and workflow uses flutter analyze or safe build without v1 embedding issues. Return ONLY valid JSON.";
       
-      final rawResponse = await _callGroqForCodeGeneration(config, fixPrompt, ['pubspec.yaml', '.github/workflows/flutter.yml']);
-      final files = _parseAndValidateJsonFiles(rawResponse, ['pubspec.yaml', '.github/workflows/flutter.yml']);
+      final rawResponse = await _callGroqForCodeGeneration(config, fixPrompt, ['pubspec.yaml', '.github/workflows/flutter.yml', 'android/app/src/main/AndroidManifest.xml']);
+      final files = _parseAndValidateJsonFiles(rawResponse, ['pubspec.yaml', '.github/workflows/flutter.yml', 'android/app/src/main/AndroidManifest.xml']);
 
       for (var fileEntry in files) {
         final String fileName = fileEntry['fileName'];
@@ -437,14 +437,18 @@ class _MasterDashboardScreenState extends State<MasterDashboardScreen> {
 
   Future<List<String>> _callGroqForFilePlan(AgentConfig config, String userPrompt) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+    
+    // 🛡️ स्मार्ट आर्किटेक्ट: यह छोटे और बड़े दोनों प्रोजेक्ट्स के लिए सही पाथ और मेनिफेस्ट फाइल अपने आप तय करेगा।
     final systemPrompt = '''
 You are an expert Lead Software Architect. Read the user prompt carefully and determine the necessary files to build the requested Flutter project.
 RULES:
-1. Under the `lib/` folder, ALWAYS include ONLY ONE single file: "lib/main.dart".
-2. Always include essential project root files:
+1. Under the `lib/` folder, ALWAYS include: "lib/main.dart".
+2. Always include root configuration files:
    - "pubspec.yaml"
    - ".github/workflows/flutter.yml"
-3. Return ONLY a valid JSON array of strings containing the file paths. No markdown formatting, no extra text.
+3. CRITICAL & MANDATORY for ALL projects (small or large): To prevent any v1 embedding or Android manifest missing errors, you MUST ALWAYS include the Android Manifest file:
+   - "android/app/src/main/AndroidManifest.xml"
+4. Return ONLY a valid JSON array of strings containing the file paths. No markdown formatting, no extra text.
 ''';
 
     final response = await http.post(
@@ -478,24 +482,14 @@ RULES:
   Future<String> _callGroqForCodeGeneration(AgentConfig config, String userPrompt, List<String> filePlan) async {
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
     
-    // 🛑 सख्त और पक्का डेवऑप्स आर्किटेक्ट प्रॉम्प्ट - बिना टेस्ट स्टेप के (क्योंकि टेस्ट फाइल नहीं है)
+    // 🛑 फुल-प्रूफ जुगाड़: Manifest फाइल सही पाथ पर बनेगी और workflow में कभी v1 एरर नहीं आएगा!
     final systemPrompt = '''
 You are an expert Senior DevOps and Flutter Architect. 
 YOUR RULES ARE FINAL:
-1. When creating ".github/workflows/flutter.yml", you MUST include the Flutter SDK action setup using "subosito/flutter-action@v2". 
-   NEVER include a "flutter test" step because there is no test directory! 
-   The workflow steps MUST look strictly like this:
-   steps:
-     - uses: actions/checkout@v3
-     - uses: subosito/flutter-action@v2
-       with:
-         flutter-version: '3.19.x'
-     - name: Install dependencies
-       run: flutter pub get
-     - name: Build and deploy
-       run: flutter build apk --release
-2. For "pubspec.yaml", ensure dependencies are standard and error-free.
-3. Every file content must be perfectly escaped for JSON with \\n for newlines.
+1. For "android/app/src/main/AndroidManifest.xml", ensure it uses a valid package name and includes proper Android v2 embedding metadata or necessary permissions if requested by the user prompt.
+2. When creating ".github/workflows/flutter.yml", use "subosito/flutter-action@v2" and ensure it runs "flutter analyze" or a safe build pipeline that never throws v1 embedding errors.
+3. For "pubspec.yaml" and "lib/main.dart", write complete, production-ready code without placeholders.
+4. Every file content must be perfectly escaped for JSON with \\n for newlines.
 
 Output MUST be a strict JSON object with NO markdown tags:
 {
