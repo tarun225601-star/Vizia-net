@@ -192,7 +192,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   }
 
   // ==========================================
-  // STEP 1: ARCHITECT PLANNER (Conditional 4-File Logic)
+  // STEP 1: ARCHITECT PLANNER
   // ==========================================
   Future<void> _startAutonomousPipeline() async {
     final userPrompt = _promptController.text.trim();
@@ -212,16 +212,15 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     });
 
     _addLog('🚀 Enterprise Autonomous Agent Pipeline Initialized.');
-    _addLog('🧠 Evaluating prompt for permission requirements...');
+    _addLog('🧠 Evaluating prompt for file requirements...');
 
     try {
       final config = await _getStoredConfig();
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final systemPrompt = '''
-Return ONLY a JSON array of 4 file paths: ["pubspec.yaml", "lib/main.dart", "android/app/src/main/AndroidManifest.xml", ".github/workflows/build.yml"]. If user prompt mentions permission/access, add a config file. No markdown, no text.
+Return ONLY a JSON array of file paths: ["pubspec.yaml", "lib/main.dart", "android/app/src/main/AndroidManifest.xml"]. No markdown, no text, strictly valid JSON array.
 ''';
-
 
       final response = await http.post(
         uri,
@@ -280,7 +279,7 @@ Return ONLY a JSON array of 4 file paths: ["pubspec.yaml", "lib/main.dart", "and
   }
 
   // ==========================================
-  // STEP 2: CODE SYNTHESIS & GITHUB PUSH
+  // STEP 2: DIRECT CODE SYNTHESIS & GITHUB PUSH (NO BASE64)
   // ==========================================
   Future<void> _confirmAndExecuteBuild() async {
     final chosenFiles = _selectableFiles
@@ -299,25 +298,23 @@ Return ONLY a JSON array of 4 file paths: ["pubspec.yaml", "lib/main.dart", "and
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.40;
-      _currentPhase = 'Phase 2: Base64 Code Synthesis via Groq...';
+      _currentPhase = 'Phase 2: Direct Code Synthesis (Plain Text JSON)...';
     });
 
-    _addLog('⚡ Synthesizing code with Base64 safety packing...');
+    _addLog('⚡ Generating clean, plain-text code via Groq...');
 
     try {
       final config = await _getStoredConfig();
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
 
       final systemPrompt = '''
-You are an expert Flutter Developer & Enterprise Code Synthesizer.
-For each file in the requested list, generate production-ready code.
-CRITICAL ENCODING RULE:
-You MUST encode the file content into Base64 format so that newlines and special characters are safely preserved.
-Output MUST be a valid JSON array of objects with this exact structure:
+You are an expert Flutter Developer.
+For each file in the requested list, generate production-ready code in plain text.
+Output MUST be a valid JSON array of objects with this exact structure, with NO Base64 encoding:
 [
   {
     "fileName": "lib/main.dart",
-    "fileCode": "<BASE64_ENCODED_STRING_OF_THE_CODE>"
+    "fileCode": "actual clean code string here..."
   }
 ]
 Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON array.
@@ -349,16 +346,16 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
 
       setState(() {
         _progressValue = 0.60;
-        _currentPhase = 'Phase 3: Base64 Decoding & Syntax Verification...';
+        _currentPhase = 'Phase 3: Parsing & Verifying Code Files...';
       });
 
-      _addLog('🔍 Decoding Base64 strings and running verification...');
-      final files = _parseAndDecodeBase64Files(rawResponse);
-      _addLog('✅ All files successfully decoded and verified.');
+      _addLog('🔍 Parsing files directly without encoding...');
+      final files = _parsePlainFiles(rawResponse);
+      _addLog('✅ All files successfully verified.');
 
       setState(() {
         _progressValue = 0.75;
-        _currentPhase = 'Phase 4: GitHub Enterprise Secure Push...';
+        _currentPhase = 'Phase 4: GitHub Secure Push...';
       });
 
       _addLog('☁️ Connecting to GitHub REST API endpoints...');
@@ -392,7 +389,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
     }
   }
 
-  List<Map<String, dynamic>> _parseAndDecodeBase64Files(String rawResponse) {
+  List<Map<String, dynamic>> _parsePlainFiles(String rawResponse) {
     try {
       String cleaned = rawResponse.replaceAll('```json', '').replaceAll('```', '').trim();
       int startIndex = cleaned.indexOf('[');
@@ -402,40 +399,25 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
       }
 
       List<dynamic> list = [];
-try {
-  list = jsonDecode(cleaned);
-} catch (e) {
-  // अगर AI का रिस्पॉन्स बीच में कटा हुआ है, तो ऐप क्रैश होने के बजाय खाली लिस्ट मानकर आगे बढ़ जाएगा
-  list = [];
-}
+      try {
+        list = jsonDecode(cleaned);
+      } catch (_) {
+        list = [];
+      }
 
-      List<Map<String, dynamic>> decodedFiles = [];
-
+      List<Map<String, dynamic>> parsedFiles = [];
       for (var item in list) {
-        String fileName = item['fileName'] ?? '';
-        String base64Code = item['fileCode'] ?? '';
-        
-        String actualCode;
-try {
-  actualCode = utf8.decode(base64Decode(base64Code));
-  if (fileName.endsWith('.yml') || fileName.endsWith('.yaml')) {
-    actualCode = actualCode.replaceAll(r'\n', '\n');
-  }
-} catch (_) {
-  actualCode = base64Code;
-}
-
-
-        
-        decodedFiles.add({
-          'fileName': fileName,
-          'fileCode': actualCode,
+        parsedFiles.add({
+          'fileName': item['fileName'] ?? '',
+          'fileCode': item['fileCode'] ?? '',
         });
-      }  // परमानेंट YAML फिक्स ताकि कभी 'jobs missing' का एरर न आए
-  decodedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
-  decodedFiles.add({
-    'fileName': '.github/workflows/flutter.yml',
-    'fileCode': '''name: Build Flutter App
+      }
+
+      // सुनिश्चित करें कि GitHub Actions की डिफ़ॉल्ट वर्कफ़्लो फ़ाइल हमेशा सही रहे
+      parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
+      parsedFiles.add({
+        'fileName': '.github/workflows/flutter.yml',
+        'fileCode': '''name: Build Flutter App
 
 on:
   push:
@@ -455,11 +437,11 @@ jobs:
       - run: flutter pub get
       - run: flutter build apk --release
 ''',
-  });
+      });
 
-      return decodedFiles;
+      return parsedFiles;
     } catch (e) {
-      throw Exception('Base64 Parsing Error: $e');
+      throw Exception('Parsing Error: $e');
     }
   }
 
@@ -601,7 +583,7 @@ jobs:
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('🚀 Step 2: Synthesize Base64 & Push Code', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('🚀 Step 2: Synthesize & Push Code', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ] else ...[
               const Text('Live Telemetry & Diagnostics:', style: TextStyle(fontWeight: FontWeight.bold)),
