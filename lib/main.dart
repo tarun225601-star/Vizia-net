@@ -217,7 +217,8 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final systemPrompt = '''
-Return ONLY a JSON array of file paths: ["pubspec.yaml", "lib/main.dart", "android/app/src/main/AndroidManifest.xml"]. No markdown, no text, strictly valid JSON array.
+Return ONLY a JSON array of file paths: ["pubspec.yaml", "lib/main.dart", "android/app/src/main/AndroidManifest.xml", "Always create the android/gradle.properties file with android.useAndroidX=true and android.enableJetifier=true.
+"]. No markdown, no text, strictly valid JSON array.
 ''';
 
       final response = await http.post(
