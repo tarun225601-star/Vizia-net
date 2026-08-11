@@ -415,7 +415,32 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
           'fileName': fileName,
           'fileCode': actualCode,
         });
-      }
+      }  // परमानेंट YAML फिक्स ताकि कभी 'jobs missing' का एरर न आए
+  decodedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
+  decodedFiles.add({
+    'fileName': '.github/workflows/flutter.yml',
+    'fileCode': '''name: Build Flutter App
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.x'
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build apk --release
+''',
+  });
+
       return decodedFiles;
     } catch (e) {
       throw Exception('Base64 Parsing Error: $e');
