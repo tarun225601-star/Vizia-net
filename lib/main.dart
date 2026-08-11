@@ -236,7 +236,7 @@ Return ONLY a JSON array of 4 file paths: ["pubspec.yaml", "lib/main.dart", "and
             {"role": "user", "content": userPrompt}
           ],
           "temperature": 0.1,
-          "max_tokens": 8192,
+          "max_tokens": 4000,
         }),
       );
 
@@ -336,7 +336,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
             {"role": "user", "content": "Generate code for files: ${jsonEncode(chosenFiles)}"}
           ],
           "temperature": 0.2,
-          "max_tokens": 8192,
+          "max_tokens": 4000,
         }),
       );
 
