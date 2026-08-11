@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart0:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -481,7 +481,7 @@ dev_dependencies:
 </manifest>''',
       });
 
-      // 3. Gradle Build Files
+      // 3. Root build.gradle
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/build.gradle');
       parsedFiles.add({
         'fileName': 'android/build.gradle',
@@ -506,6 +506,7 @@ task clean(type: Delete) {
 ''',
       });
 
+      // 4. App build.gradle (FIXED: flutterVersionCode and flutterVersionName removed)
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/app/build.gradle');
       parsedFiles.add({
         'fileName': 'android/app/build.gradle',
@@ -529,8 +530,8 @@ android {
         applicationId "com.example.real_time"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        versionCode 1
+        versionName "1.0.0"
     }
 }
 
@@ -540,7 +541,7 @@ flutter {
 ''',
       });
 
-      // यहाँ पर pluginManagement और सही प्लगिन्स जोड़े गए हैं ताकि com.android.application न भटके
+      // 5. settings.gradle (FIXED: pluginManagement added)
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/settings.gradle');
       parsedFiles.add({
         'fileName': 'android/settings.gradle',
@@ -575,7 +576,7 @@ include ":app"
 ''',
       });
 
-      // 4. GitHub Actions Workflow
+      // 6. GitHub Actions Workflow
       parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
       parsedFiles.add({
         'fileName': '.github/workflows/flutter.yml',
