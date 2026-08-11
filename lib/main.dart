@@ -219,16 +219,9 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final systemPrompt = '''
-You are a precision Software Architect. Your task is to design a minimal Flutter architecture based on the user prompt.
-RULES FOR FILE TREE:
-1. MANDATORY FILES: You MUST ALWAYS include these 4 core files:
-   - "pubspec.yaml"
-   - "lib/main.dart"
-   - "android/app/src/main/AndroidManifest.xml"
-   - ".github/workflows/build.yml"
-2. CONDITIONAL FILES: Check the user prompt carefully. If the prompt explicitly mentions words like "permission", "camera", "location", "storage", or "special access", create an extra dedicated configuration/handler file or include necessary permissions. Otherwise, stick strictly to these 4 core files only.
-3. Output MUST be ONLY a valid JSON array of strings containing the file paths. Do NOT write any conversational introduction, markdown code-block tags, or extra text. Start directly with [ and end with ].
+Return ONLY a JSON array of 4 file paths: ["pubspec.yaml", "lib/main.dart", "android/app/src/main/AndroidManifest.xml", ".github/workflows/build.yml"]. If user prompt mentions permission/access, add a config file. No markdown, no text.
 ''';
+
 
       final response = await http.post(
         uri,
