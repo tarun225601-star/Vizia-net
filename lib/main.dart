@@ -122,6 +122,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       githubTokenController.text = config.githubToken;
       githubUserController.text = config.githubUser;
       githubRepoController.text = config.githubRepo;
+      selectedModel = config.selectedModel;
     });
 
     showDialog(
@@ -191,13 +192,13 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   }
 
   // ==========================================
-  // STEP 1: ARCHITECT MODULAR PLANNER
+  // STEP 1: ARCHITECT PLANNER (Conditional 4-File Logic)
   // ==========================================
   Future<void> _startAutonomousPipeline() async {
     final userPrompt = _promptController.text.trim();
     if (userPrompt.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Please enter a prompt or architecture requirement!')),
+        const SnackBar(content: Text('⚠️ Please enter a prompt or app requirement!')),
       );
       return;
     }
@@ -205,30 +206,27 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     setState(() {
       _isAutonomousRunning = true;
       _progressValue = 0.15;
-      _currentPhase = 'Analyzing prompt for multi-tier modular structure...';
+      _currentPhase = 'Analyzing prompt for architecture rules...';
       _selectableFiles.clear();
       _actionsUrl = '';
     });
 
     _addLog('🚀 Enterprise Autonomous Agent Pipeline Initialized.');
-    _addLog('🧠 Analyzing prompt for multi-tier modular structure...');
+    _addLog('🧠 Evaluating prompt for permission requirements...');
 
     try {
       final config = await _getStoredConfig();
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final systemPrompt = '''
-You are an Enterprise Chief Technology Officer (CTO). Design a professional, production-ready, multi-file modular architecture in Flutter for the user prompt.
+You are a precision Software Architect. Your task is to design a minimal Flutter architecture based on the user prompt.
 RULES FOR FILE TREE:
-1. Break down code into proper folders under `lib/`:
-   - "lib/main.dart"
-   - "lib/models/app_model.dart"
-   - "lib/services/api_service.dart"
-   - "lib/providers/app_provider.dart"
-   - "lib/screens/home_screen.dart"
-2. Always include essential project configurations:
+1. MANDATORY FILES: You MUST ALWAYS include these 4 core files:
    - "pubspec.yaml"
-   - ".github/workflows/flutter.yml"
+   - "lib/main.dart"
+   - "android/app/src/main/AndroidManifest.xml"
+   - ".github/workflows/build.yml"
+2. CONDITIONAL FILES: Check the user prompt carefully. If the prompt explicitly mentions words like "permission", "camera", "location", "storage", or "special access", create an extra dedicated configuration/handler file or include necessary permissions. Otherwise, stick strictly to these 4 core files only.
 3. Output MUST be ONLY a valid JSON array of strings containing the file paths. Do NOT write any conversational introduction, markdown code-block tags, or extra text. Start directly with [ and end with ].
 ''';
 
@@ -245,6 +243,7 @@ RULES FOR FILE TREE:
             {"role": "user", "content": userPrompt}
           ],
           "temperature": 0.1,
+          "max_tokens": 8192,
         }),
       );
 
@@ -266,14 +265,14 @@ RULES FOR FILE TREE:
       List<dynamic> parsedList = jsonDecode(content);
       List<String> filePlan = parsedList.map((e) => e.toString()).toList();
 
-      _addLog('📋 Architect designed ${filePlan.length} modular components.');
+      _addLog('📋 Architect designed ${filePlan.length} files.');
 
       setState(() {
         _selectableFiles = filePlan.map((path) => {'path': path, 'selected': true}).toList();
         _isAutonomousRunning = false;
         _isWaitingForUserFileSelection = true;
         _progressValue = 0.30;
-        _currentPhase = 'Paused: Review & Search Modular File Plan.';
+        _currentPhase = 'Paused: Review & Select Files.';
         _fileSearchQuery = '';
         _searchFileController.clear();
       });
@@ -344,6 +343,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
             {"role": "user", "content": "Generate code for files: ${jsonEncode(chosenFiles)}"}
           ],
           "temperature": 0.2,
+          "max_tokens": 8192,
         }),
       );
 
@@ -384,11 +384,11 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
-        _currentPhase = 'Enterprise Pipeline Completed Successfully!';
+        _currentPhase = 'Pipeline Completed Successfully!';
         _actionsUrl = 'https://github.com/${config.githubUser}/${config.githubRepo}/actions';
       });
 
-      _addLog('🎉 High-level modular architecture deployed to GitHub!');
+      _addLog('🎉 Files deployed to GitHub successfully!');
 
     } catch (e) {
       _addLog('⚠️ Build/Push Error: $e', type: 'error');
@@ -449,7 +449,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
     final encodedContent = base64Encode(utf8.encode(fileCode));
 
     final Map<String, dynamic> bodyData = {
-      "message": "Autonomous Agent: Add/Update $fileName via Enterprise Pipeline",
+      "message": "Autonomous Agent: Add/Update $fileName",
       "content": encodedContent,
       "branch": "main",
     };
@@ -486,7 +486,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: _showSettingsDialog, // Fixed settings trigger
+            onPressed: _showSettingsDialog,
           ),
         ],
       ),
@@ -513,7 +513,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: const Text('🔍 Step 1: Plan Modular Architecture', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('🔍 Step 1: Plan Core Architecture', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
             LinearProgressIndicator(
@@ -522,7 +522,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
               valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00F5D4)),
             ),
             const SizedBox(height: 8),
-            Text('Enterprise Pipeline Status: ${(_progressValue * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Pipeline Status: ${(_progressValue * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text(_currentPhase, style: const TextStyle(color: Color(0xFF00F5D4))),
             const SizedBox(height: 12),
@@ -531,14 +531,14 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
                 controller: _searchFileController,
                 onChanged: (val) => setState(() => _fileSearchQuery = val),
                 decoration: const InputDecoration(
-                  labelText: 'Search Modular Files...',
+                  labelText: 'Search Files...',
                   prefixIcon: Icon(Icons.search),
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text('Review & Select Modular Files to Build:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Review & Select Files to Build:', style: TextStyle(fontWeight: FontWeight.bold)),
               Expanded(
                 child: ListView.builder(
                   itemCount: filteredFiles.length,
