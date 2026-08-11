@@ -408,7 +408,16 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         String fileName = item['fileName'] ?? '';
         String base64Code = item['fileCode'] ?? '';
         
-        String actualCode = utf8.decode(base64Decode(base64Code)).replaceAll(r'\n', '\n');
+        String actualCode;
+try {
+  actualCode = utf8.decode(base64Decode(base64Code));
+  if (fileName.endsWith('.yml') || fileName.endsWith('.yaml')) {
+    actualCode = actualCode.replaceAll(r'\n', '\n');
+  }
+} catch (_) {
+  actualCode = base64Code;
+}
+
 
         
         decodedFiles.add({
