@@ -408,7 +408,8 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         String fileName = item['fileName'] ?? '';
         String base64Code = item['fileCode'] ?? '';
         
-        String actualCode = utf8.decode(base64Decode(base64Code));
+        String actualCode = utf8.decode(base64Decode(base64Code)).replaceAll(r'\n', '\n');
+
         
         decodedFiles.add({
           'fileName': fileName,
