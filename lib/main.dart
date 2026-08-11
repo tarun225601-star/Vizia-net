@@ -432,9 +432,8 @@ dev_dependencies:
 ''',
       });
 
-      // 2. फिक्स: AndroidManifest.xml (दोनों जगह ताकि GitHub कभी एरर न दे)
-      parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
-      
+      // 2. फिक्स: AndroidManifest.xml (सही वाला पाथ v2 embedding के साथ)
+      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/app/src/main/AndroidManifest.xml');
       parsedFiles.add({
         'fileName': 'android/app/src/main/AndroidManifest.xml',
         'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -469,10 +468,15 @@ dev_dependencies:
 ''',
       });
 
+      // रूट पाथ वाला मेनिफेस्ट (ताकि गिटहब एक्शन कभी एरर न फेके)
+      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/AndroidManifest.xml');
       parsedFiles.add({
         'fileName': 'android/AndroidManifest.xml',
         'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
     </application>
 </manifest>
 ''',
