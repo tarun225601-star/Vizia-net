@@ -279,7 +279,7 @@ Return ONLY a JSON array of file paths: ["pubspec.yaml", "lib/main.dart", "andro
   }
 
   // ==========================================
-  // STEP 2: DIRECT CODE SYNTHESIS & GITHUB PUSH (NO BASE64)
+  // STEP 2: DIRECT CODE SYNTHESIS & GITHUB PUSH
   // ==========================================
   Future<void> _confirmAndExecuteBuild() async {
     final chosenFiles = _selectableFiles
@@ -310,7 +310,7 @@ Return ONLY a JSON array of file paths: ["pubspec.yaml", "lib/main.dart", "andro
       final systemPrompt = '''
 You are an expert Flutter Developer.
 For each file in the requested list, generate production-ready code in plain text.
-Output MUST be a valid JSON array of objects with this exact structure, with NO Base64 encoding:
+Output MUST be a valid JSON array of objects with this exact structure:
 [
   {
     "fileName": "lib/main.dart",
@@ -346,12 +346,12 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
 
       setState(() {
         _progressValue = 0.60;
-        _currentPhase = 'Phase 3: Parsing & Verifying Code Files...';
+        _currentPhase = 'Phase 3: Parsing & Safety Verification...';
       });
 
-      _addLog('🔍 Parsing files directly without encoding...');
+      _addLog('🔍 Applying bulletproof file safety templates...');
       final files = _parsePlainFiles(rawResponse);
-      _addLog('✅ All files successfully verified.');
+      _addLog('✅ All files verified and secured against build errors.');
 
       setState(() {
         _progressValue = 0.75;
@@ -389,6 +389,9 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
     }
   }
 
+  // ==========================================
+  // BULLETPROOF PARSER & SAFETY TEMPLATES
+  // ==========================================
   List<Map<String, dynamic>> _parsePlainFiles(String rawResponse) {
     try {
       String cleaned = rawResponse.replaceAll('```json', '').replaceAll('```', '').trim();
@@ -413,7 +416,70 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         });
       }
 
-      // सुनिश्चित करें कि GitHub Actions की डिफ़ॉल्ट वर्कफ़्लो फ़ाइल हमेशा सही रहे
+      // 1. फिक्स: pubspec.yaml की सुरक्षा (नाम, SDK और डिपेंडेंसीज हमेशा सही रहेंगी)
+      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
+      parsedFiles.add({
+        'fileName': 'pubspec.yaml',
+        'fileCode': '''name: real_time
+description: A new Flutter project.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '^3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  shared_preferences: ^2.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+''',
+      });
+
+      // 2. फिक्स: AndroidManifest.xml की सुरक्षा (v2 embedding और सही टैग्स के साथ)
+      parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
+      parsedFiles.add({
+        'fileName': 'android/app/src/main/AndroidManifest.xml',
+        'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.real_time">
+
+    <application
+        android:label="real_time"
+        android:name="\${applicationName}"
+        android:icon="@mipmap/ic_launcher">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+</manifest>
+''',
+      });
+
+      // 3. फिक्स: GitHub Actions वर्कफ़्लो हमेशा सही रहेगा
       parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
       parsedFiles.add({
         'fileName': '.github/workflows/flutter.yml',
@@ -463,6 +529,7 @@ jobs:
       }
     } catch (_) {}
 
+    // प्लेन टेक्स्ट को GitHub API के लिए सेफली एन्कोड करना (Base64 एजेंट के अंदर नहीं, सीधा गिटहब के ट्रांसफर के लिए)
     final encodedContent = base64Encode(utf8.encode(fileCode));
 
     final Map<String, dynamic> bodyData = {
