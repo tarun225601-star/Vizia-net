@@ -407,7 +407,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         });
       }
 
-      // 1. फिक्स: pubspec.yaml
+      // 1. pubspec.yaml
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
       parsedFiles.add({
         'fileName': 'pubspec.yaml',
@@ -432,7 +432,7 @@ dev_dependencies:
 ''',
       });
 
-      // 2. फिक्स: AndroidManifest.xml (App level)
+      // 2. AndroidManifest.xml (App level)
       parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
       
       bool needsInternet = true; 
@@ -481,10 +481,11 @@ dev_dependencies:
 </manifest>''',
       });
 
-      // 3. फिक्स: Gradle Build Files (ताकि 'unsupported Gradle project' वाला एरर हमेशा के लिए गायब हो जाए)
+      // 3. Gradle Build Files (दिक्कत यहाँ से पूरी तरह साफ़ कर दी गई है)
+      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/build.gradle');
       parsedFiles.add({
         'fileName': 'android/build.gradle',
-        Allprojects: '''allprojects {
+        'fileCode': '''allprojects {
     repositories {
         google()
         mavenCentral()
@@ -493,7 +494,7 @@ dev_dependencies:
 
 rootProject.buildDir = '../build'
 subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
+    project.buildDir = "\${rootProject.buildDir}/\${project.name}"
 }
 subprojects {
     project.evaluationDependsOn(":app")
@@ -502,9 +503,10 @@ subprojects {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
-'''.replaceAll('Allprojects', 'fileCode'),
+''',
       });
 
+      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/app/build.gradle');
       parsedFiles.add({
         'fileName': 'android/app/build.gradle',
         'fileCode': '''plugins {
@@ -538,13 +540,14 @@ flutter {
 ''',
       });
 
+      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/settings.gradle');
       parsedFiles.add({
         'fileName': 'android/settings.gradle',
         'fileCode': '''include ":app"
 ''',
       });
 
-      // 4. फिक्स: GitHub Actions Workflow
+      // 4. GitHub Actions Workflow
       parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
       parsedFiles.add({
         'fileName': '.github/workflows/flutter.yml',
