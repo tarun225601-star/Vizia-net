@@ -416,7 +416,8 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         });
       }
 
-      // 1. फिक्स: pubspec.yaml की सुरक्षा (नाम, SDK और डिपेंडेंसीज हमेशा सही रहेंगी)
+      
+            // 1. फिक्स: pubspec.yaml की सुरक्षा
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
       parsedFiles.add({
         'fileName': 'pubspec.yaml',
@@ -441,13 +442,11 @@ dev_dependencies:
 ''',
       });
 
-      // 2. फिक्स: AndroidManifest.xml की सुरक्षा (v2 embedding और सही टैग्स के साथ)
+      // 2. फिक्स: AndroidManifest.xml (v2 embedding)
       parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
       parsedFiles.add({
         'fileName': 'android/app/src/main/AndroidManifest.xml',
-        'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.real_time">
-
+        'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
         android:label="real_time"
         android:name="\${applicationName}"
@@ -456,11 +455,11 @@ dev_dependencies:
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
+            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
@@ -470,14 +469,15 @@ dev_dependencies:
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+    <uses-permission android:name="android.permission.INTERNET"/>
 </manifest>
 ''',
       });
+
 
       // 3. फिक्स: GitHub Actions वर्कफ़्लो हमेशा सही रहेगा
       parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
