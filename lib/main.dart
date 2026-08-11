@@ -191,9 +191,6 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     );
   }
 
-  // ==========================================
-  // STEP 1: ARCHITECT PLANNER
-  // ==========================================
   Future<void> _startAutonomousPipeline() async {
     final userPrompt = _promptController.text.trim();
     if (userPrompt.isEmpty) {
@@ -278,9 +275,6 @@ Return ONLY a JSON array of file paths: ["pubspec.yaml", "lib/main.dart", "andro
     }
   }
 
-  // ==========================================
-  // STEP 2: DIRECT CODE SYNTHESIS & GITHUB PUSH
-  // ==========================================
   Future<void> _confirmAndExecuteBuild() async {
     final chosenFiles = _selectableFiles
         .where((f) => f['selected'] == true)
@@ -389,9 +383,6 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
     }
   }
 
-  // ==========================================
-  // BULLETPROOF PARSER & SAFETY TEMPLATES
-  // ==========================================
   List<Map<String, dynamic>> _parsePlainFiles(String rawResponse) {
     try {
       String cleaned = rawResponse.replaceAll('```json', '').replaceAll('```', '').trim();
@@ -416,8 +407,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         });
       }
 
-      
-            // 1. फिक्स: pubspec.yaml की सुरक्षा
+      // 1. फिक्स: pubspec.yaml की सुरक्षा
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
       parsedFiles.add({
         'fileName': 'pubspec.yaml',
@@ -442,8 +432,9 @@ dev_dependencies:
 ''',
       });
 
-      // 2. फिक्स: AndroidManifest.xml (v2 embedding)
+      // 2. फिक्स: AndroidManifest.xml (दोनों जगह ताकि GitHub कभी एरर न दे)
       parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
+      
       parsedFiles.add({
         'fileName': 'android/app/src/main/AndroidManifest.xml',
         'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -478,6 +469,14 @@ dev_dependencies:
 ''',
       });
 
+      parsedFiles.add({
+        'fileName': 'android/AndroidManifest.xml',
+        'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+    </application>
+</manifest>
+''',
+      });
 
       // 3. फिक्स: GitHub Actions वर्कफ़्लो हमेशा सही रहेगा
       parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
@@ -529,7 +528,6 @@ jobs:
       }
     } catch (_) {}
 
-    // प्लेन टेक्स्ट को GitHub API के लिए सेफली एन्कोड करना (Base64 एजेंट के अंदर नहीं, सीधा गिटहब के ट्रांसफर के लिए)
     final encodedContent = base64Encode(utf8.encode(fileCode));
 
     final Map<String, dynamic> bodyData = {
