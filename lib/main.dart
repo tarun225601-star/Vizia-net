@@ -481,7 +481,7 @@ dev_dependencies:
 </manifest>''',
       });
 
-      // 3. Gradle Build Files (दिक्कत यहाँ से पूरी तरह साफ़ कर दी गई है)
+      // 3. Gradle Build Files
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/build.gradle');
       parsedFiles.add({
         'fileName': 'android/build.gradle',
@@ -540,10 +540,38 @@ flutter {
 ''',
       });
 
+      // यहाँ पर pluginManagement और सही प्लगिन्स जोड़े गए हैं ताकि com.android.application न भटके
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/settings.gradle');
       parsedFiles.add({
         'fileName': 'android/settings.gradle',
-        'fileCode': '''include ":app"
+        'fileCode': '''pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        def flutterPropertiesFile = new File('local.properties')
+        if (flutterPropertiesFile.exists()) {
+            properties.load(new FileInputStream(flutterPropertiesFile))
+        }
+        def flutterSdkPath = properties.getProperty('flutter.sdk')
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        return flutterSdkPath
+    }()
+
+    includeBuild("\$flutterSdkPath/packages/flutter_tools/gradle")
+
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+    id "com.android.application" version "7.3.0" apply false
+    id "org.jetbrains.kotlin.android" version "1.8.0" apply false
+}
+
+include ":app"
 ''',
       });
 
