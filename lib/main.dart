@@ -401,7 +401,14 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         cleaned = cleaned.substring(startIndex, endIndex + 1);
       }
 
-      List<dynamic> list = jsonDecode(cleaned);
+      List<dynamic> list = [];
+try {
+  list = jsonDecode(cleaned);
+} catch (e) {
+  // अगर AI का रिस्पॉन्स बीच में कटा हुआ है, तो ऐप क्रैश होने के बजाय खाली लिस्ट मानकर आगे बढ़ जाएगा
+  list = [];
+}
+
       List<Map<String, dynamic>> decodedFiles = [];
 
       for (var item in list) {
