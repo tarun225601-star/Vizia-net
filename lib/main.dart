@@ -432,7 +432,7 @@ dev_dependencies:
 ''',
       });
 
-      // 2. फिक्स: स्मार्ट AndroidManifest.xml आर्किटेक्चर (प्रोफेशनल)
+      // 2. फिक्स: AndroidManifest.xml (App level)
       parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
       
       bool needsInternet = true; 
@@ -471,7 +471,7 @@ dev_dependencies:
         'fileCode': manifestContent,
       });
 
-      // रूट वाला पाथ (गिटहब बिल्ड चेकर के लिए)
+      // रूट वाला AndroidManifest.xml
       parsedFiles.add({
         'fileName': 'android/AndroidManifest.xml',
         'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -481,7 +481,70 @@ dev_dependencies:
 </manifest>''',
       });
 
-      // 3. फिक्स: GitHub Actions
+      // 3. फिक्स: Gradle Build Files (ताकि 'unsupported Gradle project' वाला एरर हमेशा के लिए गायब हो जाए)
+      parsedFiles.add({
+        'fileName': 'android/build.gradle',
+        Allprojects: '''allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = '../build'
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
+'''.replaceAll('Allprojects', 'fileCode'),
+      });
+
+      parsedFiles.add({
+        'fileName': 'android/app/build.gradle',
+        'fileCode': '''plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+android {
+    namespace "com.example.real_time"
+    compileSdkVersion flutter.compileSdkVersion
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+    defaultConfig {
+        applicationId "com.example.real_time"
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion flutter.targetSdkVersion
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+    }
+}
+
+flutter {
+    source = "../.."
+}
+''',
+      });
+
+      parsedFiles.add({
+        'fileName': 'android/settings.gradle',
+        'fileCode': '''include ":app"
+''',
+      });
+
+      // 4. फिक्स: GitHub Actions Workflow
       parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
       parsedFiles.add({
         'fileName': '.github/workflows/flutter.yml',
