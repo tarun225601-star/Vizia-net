@@ -407,7 +407,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         });
       }
 
-      // 1. फिक्स: pubspec.yaml की सुरक्षा
+      // 1. फिक्स: pubspec.yaml
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
       parsedFiles.add({
         'fileName': 'pubspec.yaml',
@@ -432,11 +432,11 @@ dev_dependencies:
 ''',
       });
 
-      // 2. फिक्स: AndroidManifest.xml (सही वाला पाथ v2 embedding के साथ)
-      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/app/src/main/AndroidManifest.xml');
-      parsedFiles.add({
-        'fileName': 'android/app/src/main/AndroidManifest.xml',
-        'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+      // 2. फिक्स: स्मार्ट AndroidManifest.xml आर्किटेक्चर (प्रोफेशनल)
+      parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
+      
+      bool needsInternet = true; 
+      String manifestContent = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
         android:label="real_time"
         android:name="\${applicationName}"
@@ -463,37 +463,32 @@ dev_dependencies:
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
-    <uses-permission android:name="android.permission.INTERNET"/>
-</manifest>
-''',
+    ${needsInternet ? '<uses-permission android:name="android.permission.INTERNET"/>' : ''}
+</manifest>''';
+
+      parsedFiles.add({
+        'fileName': 'android/app/src/main/AndroidManifest.xml',
+        'fileCode': manifestContent,
       });
 
-      // रूट पाथ वाला मेनिफेस्ट (ताकि गिटहब एक्शन कभी एरर न फेके)
-      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/AndroidManifest.xml');
+      // रूट वाला पाथ (गिटहब बिल्ड चेकर के लिए)
       parsedFiles.add({
         'fileName': 'android/AndroidManifest.xml',
         'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2" />
+        <meta-data android:name="flutterEmbedding" android:value="2" />
     </application>
-</manifest>
-''',
+</manifest>''',
       });
 
-      // 3. फिक्स: GitHub Actions वर्कफ़्लो हमेशा सही रहेगा
+      // 3. फिक्स: GitHub Actions
       parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
       parsedFiles.add({
         'fileName': '.github/workflows/flutter.yml',
         'fileCode': '''name: Build Flutter App
-
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -502,7 +497,6 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.x'
-          channel: 'stable'
       - run: flutter pub get
       - run: flutter build apk --release
 ''',
