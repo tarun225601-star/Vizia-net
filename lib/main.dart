@@ -434,15 +434,14 @@ dev_dependencies:
 ''',
       });
 
-      // 2. Android Manifest with safe fallback
+      // 2. Android Manifest WITHOUT icon reference (Fixes missing ic_launcher resource error permanently)
       parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
       parsedFiles.add({
         'fileName': 'android/app/src/main/AndroidManifest.xml',
         'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
         android:label="real_time"
-        android:name="\${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:name="\${applicationName}">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -478,7 +477,7 @@ dev_dependencies:
 </manifest>''',
       });
 
-      // 3. Force Android styles.xml & launch_background.xml (Fixes Theme/Launcher errors permanently)
+      // 3. Android styles.xml & launch_background.xml
       parsedFiles.removeWhere((file) => file['fileName'].toString().contains('styles.xml'));
       parsedFiles.add({
         'fileName': 'android/app/src/main/res/values/styles.xml',
