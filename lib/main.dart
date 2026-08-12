@@ -67,6 +67,9 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   String _actionsUrl = '';
   String _criticalErrorReason = '';
 
+  // To store current code states for targeted patching
+  final Map<String, String> _currentProjectFiles = {};
+
   @override
   void initState() {
     super.initState();
@@ -150,7 +153,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
               ),
               TextField(
                 controller: githubRepoController,
-                decoration: const InputDecoration(labelText: 'GitHub Repository Name (Package Name)'),
+                decoration: const InputDecoration(labelText: 'GitHub Repository Name'),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
@@ -218,10 +221,9 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final systemPrompt = '''
-Return ONLY a JSON array of essential file paths required for the Flutter application request. 
-CRITICAL RULE: The main application UI, logic, widgets, and backend handling MUST be entirely contained within "lib/main.dart". Do not create separate screen files, view files, or custom feature folders. 
-Always include essential configuration files: "pubspec.yaml", "lib/main.dart", "android/app/src/main/AndroidManifest.xml", "android/app/src/main/res/values/styles.xml", "android/app/src/main/res/drawable/launch_background.xml", "android/gradle.properties". 
-No markdown, no text, strictly valid JSON array.
+Return ONLY a valid JSON array string containing essential file paths for the requested Flutter app. Example: ["pubspec.yaml", "lib/main.dart"]
+CRITICAL RULE: The main application UI, logic, widgets MUST be entirely contained within "lib/main.dart".
+No markdown, strictly raw JSON array.
 ''';
 
       final response = await http.post(
@@ -237,12 +239,12 @@ No markdown, no text, strictly valid JSON array.
             {"role": "user", "content": userPrompt}
           ],
           "temperature": 0.1,
-          "max_tokens": 4000,
+          "max_tokens": 1000,
         }),
       );
 
       if (response.statusCode != 200) {
-        throw Exception('Architect Planner Error: ${response.body}');
+        throw Exception('Groq API Error (${response.statusCode}): Check API key or rate limit.');
       }
 
       final decoded = jsonDecode(response.body);
@@ -254,10 +256,15 @@ No markdown, no text, strictly valid JSON array.
       
       if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
         content = content.substring(startIndex, endIndex + 1);
+      } else {
+        content = '["pubspec.yaml", "lib/main.dart"]';
       }
       
       List<dynamic> parsedList = jsonDecode(content);
       List<String> filePlan = parsedList.map((e) => e.toString()).toList();
+
+      if (!filePlan.contains('lib/main.dart')) filePlan.add('lib/main.dart');
+      if (!filePlan.contains('pubspec.yaml')) filePlan.add('pubspec.yaml');
 
       _addLog('📋 Architect designed ${filePlan.length} files.');
 
@@ -298,116 +305,120 @@ No markdown, no text, strictly valid JSON array.
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.40;
-      _currentPhase = 'Phase 2: Code Synthesis & Self-Healing Loop...';
+      _currentPhase = 'Phase 2: Initial Code Generation & Setup...';
       _criticalErrorReason = '';
     });
 
-    String previousErrorContext = '';
-    int maxRetryAttempts = 2; // Maximum Self-Healing loops
-    bool buildSuccess = false;
+    try {
+      final config = await _getStoredConfig();
+      final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
 
-    for (int attempt = 1; attempt <= maxRetryAttempts; attempt++) {
-      _addLog('⚡ Attempt $attempt of $maxRetryAttempts: Generating & Pushing Code...');
-
-      try {
-        final config = await _getStoredConfig();
-        final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-
-        String repairInstruction = previousErrorContext.isEmpty 
-            ? '' 
-            : '\n\nPREVIOUS BUILD FAILED WITH THIS ERROR. FIX IT IN THIS ITERATION:\n$previousErrorContext';
-
-        final systemPrompt = '''
-You are an expert Flutter Developer. You are building the application requested by the user.
-CRITICAL ARCHITECTURE RULES:
-1. The package name and app namespace must strictly be '${config.githubRepo}' across all imports, pubspec, and build files.
-2. Put the ENTIRE application UI, screens, widgets, state management, and backend logic completely inside a single "lib/main.dart" file. Do NOT create separate files for screens or features.
-3. For any other required files, output them correctly without breaking paths.
-Output MUST be a valid JSON array of objects with this exact structure:
+      final systemPrompt = '''
+You are an expert Flutter Developer. Generate complete code for the requested files.
+CRITICAL: Put entire app code in "lib/main.dart". Include necessary imports.
+Output MUST be a valid JSON array:
 [
   {
     "fileName": "lib/main.dart",
-    "fileCode": "actual clean code string here..."
+    "fileCode": "code..."
   }
 ]
-Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON array.$repairInstruction
+No markdown outside JSON.
 ''';
 
-        final response = await http.post(
-          uri,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ${config.groqKey}',
-          },
-          body: jsonEncode({
-            "model": config.selectedModel,
-            "messages": [
-              {"role": "system", "content": systemPrompt},
-              {"role": "user", "content": "Generate code for files: ${jsonEncode(chosenFiles)} based on user requirement: ${_promptController.text.trim()}"}
-            ],
-            "temperature": 0.2,
-            "max_tokens": 4000,
-          }),
-        );
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${config.groqKey}',
+        },
+        body: jsonEncode({
+          "model": config.selectedModel,
+          "messages": [
+            {"role": "system", "content": systemPrompt},
+            {"role": "user", "content": "Generate code for files: ${jsonEncode(chosenFiles)} based on prompt: ${_promptController.text.trim()}"}
+          ],
+          "temperature": 0.2,
+          "max_tokens": 4000,
+        }),
+      );
 
-        if (response.statusCode != 200) {
-          throw Exception('Code Synthesis Error: ${response.body}');
+      if (response.statusCode != 200) throw Exception('Groq API Error: ${response.statusCode}');
+
+      final decoded = jsonDecode(response.body);
+      String rawResponse = decoded['choices'][0]['message']['content'];
+
+      _addLog('🔍 Processing files and applying build configurations...');
+      final files = _parsePlainFiles(rawResponse, config.githubRepo);
+
+      // Save locally for targeted patching
+      _currentProjectFiles.clear();
+      for (var f in files) {
+        _currentProjectFiles[f['fileName']] = f['fileCode'];
+      }
+
+      setState(() => _progressValue = 0.60);
+
+      for (var fileEntry in files) {
+        _addLog('📦 Pushing module: ${fileEntry['fileName']}');
+        await _pushFileToGitHub(config, fileEntry['fileName'], fileEntry['fileCode']);
+      }
+
+      _addLog('⏳ Waiting for GitHub Actions build verification...');
+      setState(() => _currentPhase = 'Phase 3: Monitoring GitHub Build Actions...');
+
+      // START TARGETED SELF-HEALING LOOP (Only fixes exact errors)
+      await _runTargetedSelfHealingLoop(config);
+
+    } catch (e) {
+      _addLog('⚠️ Execution Error: $e', type: 'error');
+      setState(() {
+        _isAutonomousRunning = false;
+        _progressValue = 1.0;
+        _currentPhase = 'Pipeline Halted.';
+        _criticalErrorReason = 'Error: $e';
+      });
+    }
+  }
+
+  Future<void> _runTargetedSelfHealingLoop(AgentConfig config) async {
+    int maxRetries = 3;
+    bool success = false;
+    String lastError = '';
+
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      String actionStatus = await _monitorGitHubAction(config);
+
+      if (actionStatus == 'success') {
+        success = true;
+        _addLog('🎉 Build Passed Successfully on attempt $attempt!');
+        break;
+      } else if (actionStatus == 'failure') {
+        _addLog('❌ Build Failed! Extracting exact error log...', type: 'error');
+        lastError = await _fetchLatestActionErrorLog(config);
+        _addLog('🔍 Captured Error: $lastError', type: 'error');
+
+        if (attempt == maxRetries) break;
+
+        _addLog('🤖 AI Targeted Patching: Fixing ONLY the reported error without touching other files...');
+        setState(() => _currentPhase = 'Phase 4: Targeted Error Patching (Attempt ${attempt + 1})...');
+
+        // Send ONLY the error and lib/main.dart to AI to fix the specific error line
+        String fixedCode = await _askAIToFixSpecificError(config, lastError, _currentProjectFiles['lib/main.dart'] ?? '');
+        
+        if (fixedCode.isNotEmpty) {
+          _currentProjectFiles['lib/main.dart'] = fixedCode;
+          _addLog('📦 Pushing patched lib/main.dart to GitHub...');
+          await _pushFileToGitHub(config, 'lib/main.dart', fixedCode);
         }
-
-        final decoded = jsonDecode(response.body);
-        String rawResponse = decoded['choices'][0]['message']['content'];
-
-        setState(() {
-          _progressValue = 0.50 + (attempt * 0.1);
-          _currentPhase = 'Phase 3: Parsing & Safety Verification...';
-        });
-
-        _addLog('🔍 Applying bulletproof build protection templates...');
-        final files = _parsePlainFiles(rawResponse, config.githubRepo);
-
-        setState(() {
-          _progressValue = 0.65 + (attempt * 0.05);
-          _currentPhase = 'Phase 4: GitHub Secure Push...';
-        });
-
-        _addLog('☁️ Connecting to GitHub REST API endpoints...');
-        for (int i = 0; i < files.length; i++) {
-          final fileEntry = files[i];
-          final String fileName = fileEntry['fileName'];
-          final String fileCode = fileEntry['fileCode'];
-
-          _addLog('📦 Pushing module: $fileName');
-          await _pushFileToGitHub(config, fileName, fileCode);
-        }
-
-        _addLog('⏳ Waiting for GitHub Actions workflow to run & verify build...');
-        setState(() => _currentPhase = 'Phase 5: Monitoring GitHub Build Actions...');
-
-        // Monitor GitHub Actions build status (Wait up to 60 seconds)
-        String actionStatus = await _monitorGitHubAction(config);
-
-        if (actionStatus == 'success') {
-          buildSuccess = true;
-          _addLog('🎉 GitHub Action Build Passed Successfully!');
-          break;
-        } else if (actionStatus == 'failure') {
-          _addLog('❌ GitHub Action Build Failed! Reading error logs for self-healing...', type: 'error');
-          previousErrorContext = await _fetchLatestActionErrorLog(config);
-          _addLog('🤖 AI analyzing failure reason to patch code...');
-        } else {
-          _addLog('⚠️ Build status timeout or unknown. Proceeding with caution.');
-          buildSuccess = true; // Assume success if status check takes too long
-          break;
-        }
-
-      } catch (e) {
-        _addLog('⚠️ Execution Error in Attempt $attempt: $e', type: 'error');
-        previousErrorContext = e.toString();
+      } else {
+        _addLog('⚠️ Build timeout or unknown state.');
+        success = true;
+        break;
       }
     }
 
-    if (buildSuccess) {
-      final config = await _getStoredConfig();
+    if (success) {
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
@@ -419,16 +430,52 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
       setState(() {
         _isAutonomousRunning = false;
         _progressValue = 1.0;
-        _currentPhase = 'Pipeline Halted: Unresolvable Critical Error.';
-        _criticalErrorReason = 'GitHub Actions Build failed continuously after self-healing attempts.\n\nReason/Last Error Log:\n$previousErrorContext\n\nAction Required: Please check the code logic or fix manually via GitHub repository.';
+        _currentPhase = 'Pipeline Halted: Unresolved Error.';
+        _criticalErrorReason = 'Could not auto-fix after $maxRetries attempts.\n\nFinal Error:\n$lastError';
       });
-      _addLog('🛑 Pipeline stopped because automatic fixes could not resolve the error.', type: 'error');
+      _addLog('🛑 Stopped: Automatic fixes could not resolve the error.', type: 'error');
     }
   }
 
+  Future<String> _askAIToFixSpecificError(AgentConfig config, String errorLog, String currentCode) async {
+    try {
+      final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+      final systemPrompt = '''
+You are a precise Flutter Code Fixer. You are given an existing Dart code and a specific compilation/build error.
+Your task is ONLY to fix the exact error mentioned in the error log. Do not rewrite unrelated parts.
+Return ONLY the corrected full Dart code string for lib/main.dart. Do not include markdown code blocks or explanations, return raw text or JSON if necessary, but preferred is just the raw code or JSON. Let's return a JSON object like {"fixedCode": "..."} or raw code. Let's ask for raw code directly:
+Start directly with code or wrap in a JSON object with key "fixedCode".
+''';
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${config.groqKey}',
+        },
+        body: jsonEncode({
+          "model": config.selectedModel,
+          "messages": [
+            {"role": "system", "content": systemPrompt},
+            {"role": "user", "content": "ERROR LOG:\n$errorLog\n\nCURRENT CODE:\n$currentCode"}
+          ],
+          "temperature": 0.1,
+          "max_tokens": 4000,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        String content = decoded['choices'][0]['message']['content'].trim();
+        content = content.replaceAll('```dart', '').replaceAll('```', '').trim();
+        return content;
+      }
+    } catch (_) {}
+    return '';
+  }
+
   Future<String> _monitorGitHubAction(AgentConfig config) async {
-    // Poll GitHub Actions run status for up to 60 seconds
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < 15; i++) {
       await Future.delayed(const Duration(seconds: 5));
       try {
         final url = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/actions/runs?per_page=1');
@@ -445,11 +492,8 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
           final runs = data['workflow_runs'] as List;
           if (runs.isNotEmpty) {
             final latestRun = runs.first;
-            String status = latestRun['status'] ?? ''; // queued, in_progress, completed
-            String conclusion = latestRun['conclusion'] ?? ''; // success, failure, null
-
-            if (status == 'completed') {
-              return conclusion; // 'success' or 'failure'
+            if (latestRun['status'] == 'completed') {
+              return latestRun['conclusion'] ?? '';
             }
           }
         }
@@ -460,7 +504,6 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
 
   Future<String> _fetchLatestActionErrorLog(AgentConfig config) async {
     try {
-      // Get the latest run jobs to find failed job ID or logs url
       final runsUrl = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/actions/runs?per_page=1');
       final response = await http.get(
         runsUrl,
@@ -492,7 +535,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
               final steps = job['steps'] as List;
               for (var step in steps) {
                 if (step['conclusion'] == 'failure') {
-                  return 'Failed at step: ${step['name']}. Please check syntax, missing dependencies or widget logic.';
+                  return 'Failed at step [${step['name']}]: syntax error or missing package import.';
                 }
               }
             }
@@ -500,7 +543,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         }
       }
     } catch (_) {}
-    return 'Unknown build failure inside Flutter gradle compile or test phase.';
+    return 'Flutter gradle compilation error.';
   }
 
   List<Map<String, dynamic>> _parsePlainFiles(String rawResponse, String packageName) {
@@ -527,7 +570,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         });
       }
 
-      // 1. Force robust pubspec.yaml using dynamic packageName from settings
+      // Mandatory Pubspec template
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
       parsedFiles.add({
         'fileName': 'pubspec.yaml',
@@ -544,6 +587,7 @@ dependencies:
     sdk: flutter
   http: ^1.2.0
   shared_preferences: ^2.2.2
+  image_picker: ^1.0.7
 
 dev_dependencies:
   flutter_test:
@@ -552,99 +596,24 @@ dev_dependencies:
 ''',
       });
 
-      // 2. Android Manifest with dynamic label/packageName
+      // Android Manifest & Gradle standard files
       parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
       parsedFiles.add({
         'fileName': 'android/app/src/main/AndroidManifest.xml',
         'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application
-        android:label="$packageName"
-        android:name="\${applicationName}">
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
-            android:theme="@style/LaunchTheme"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-            android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
-            <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
+    <application android:label="$packageName" android:name="\${applicationName}">
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:theme="@style/LaunchTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2" />
     </application>
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
 </manifest>''',
       });
 
-      parsedFiles.add({
-        'fileName': 'android/AndroidManifest.xml',
-        'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
-        <meta-data android:name="flutterEmbedding" android:value="2" />
-    </application>
-</manifest>''',
-      });
-
-      // 3. Android styles.xml & launch_background.xml
-      parsedFiles.removeWhere((file) => file['fileName'].toString().contains('styles.xml'));
-      parsedFiles.add({
-        'fileName': 'android/app/src/main/res/values/styles.xml',
-        'fileCode': '''<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowBackground">@drawable/launch_background</item>
-    </style>
-    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowBackground">@android:color/white</item>
-    </style>
-</resources>''',
-      });
-
-      parsedFiles.removeWhere((file) => file['fileName'].toString().contains('launch_background.xml'));
-      parsedFiles.add({
-        'fileName': 'android/app/src/main/res/drawable/launch_background.xml',
-        'fileCode': '''<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/white" />
-</layer-list>''',
-      });
-
-      // 4. Root build.gradle
-      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/build.gradle');
-      parsedFiles.add({
-        'fileName': 'android/build.gradle',
-        'fileCode': '''allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-rootProject.buildDir = '../build'
-subprojects {
-    project.buildDir = "\${rootProject.buildDir}/\${project.name}"
-}
-subprojects {
-    project.evaluationDependsOn(":app")
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
-}
-''',
-      });
-
-      // 5. App build.gradle with dynamic applicationId and namespace
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/app/build.gradle');
       parsedFiles.add({
         'fileName': 'android/app/build.gradle',
@@ -653,78 +622,23 @@ task clean(type: Delete) {
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
 }
-
 android {
     namespace "com.example.$packageName"
     compileSdkVersion flutter.compileSdkVersion
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-    kotlinOptions {
-        jvmTarget = '1.8'
-    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+    kotlinOptions { jvmTarget = '1.8' }
     defaultConfig {
         applicationId "com.example.$packageName"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 1; versionName "1.0.0"
     }
 }
-
-flutter {
-    source = "../.."
-}
+flutter { source = "../.." }
 ''',
       });
 
-      // 6. settings.gradle
-      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/settings.gradle');
-      parsedFiles.add({
-        'fileName': 'android/settings.gradle',
-        'fileCode': '''pluginManagement {
-    def flutterSdkPath = {
-        def properties = new Properties()
-        def flutterPropertiesFile = new File('local.properties')
-        if (flutterPropertiesFile.exists()) {
-            properties.load(new FileInputStream(flutterPropertiesFile))
-        }
-        def flutterSdkPath = properties.getProperty('flutter.sdk')
-        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-        return flutterSdkPath
-    }()
-
-    includeBuild("\$flutterSdkPath/packages/flutter_tools/gradle")
-
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-
-plugins {
-    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    id "com.android.application" version "7.3.0" apply false
-    id "org.jetbrains.kotlin.android" version "1.8.0" apply false
-}
-
-include ":app"
-''',
-      });
-
-      // 7. gradle.properties
-      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/gradle.properties');
-      parsedFiles.add({
-        'fileName': 'android/gradle.properties',
-        'fileCode': '''org.gradle.jvmargs=-Xmx1536M
-android.useAndroidX=true
-android.enableJetifier=true
-''',
-      });
-
-      // 8. GitHub Actions Workflow
+      // GitHub Actions Workflow
       parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
       parsedFiles.add({
         'fileName': '.github/workflows/flutter.yml',
@@ -770,16 +684,13 @@ jobs:
     } catch (_) {}
 
     final encodedContent = base64Encode(utf8.encode(fileCode));
-
     final Map<String, dynamic> bodyData = {
-      "message": "Autonomous Agent: Add/Update $fileName",
+      "message": "Autonomous Agent: Patch $fileName",
       "content": encodedContent,
       "branch": "main",
     };
 
-    if (existingSha != null) {
-      bodyData["sha"] = existingSha;
-    }
+    if (existingSha != null) bodyData["sha"] = existingSha;
 
     final response = await http.put(
       url,
@@ -792,7 +703,7 @@ jobs:
     );
 
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Failed to push $fileName to GitHub: ${response.body}');
+      throw Exception('Failed to push $fileName: ${response.body}');
     }
   }
 
@@ -908,7 +819,7 @@ jobs:
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('🚀 Step 2: Synthesize & Self-Heal Build', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('🚀 Step 2: Synthesize & Targeted Fix Loop', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ] else ...[
               const Text('Live Telemetry & Diagnostics:', style: TextStyle(fontWeight: FontWeight.bold)),
