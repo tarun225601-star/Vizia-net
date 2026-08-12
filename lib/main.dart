@@ -281,6 +281,7 @@ No markdown, no text, strictly valid JSON array.
     }
   }
 
+  // --- UPDATED SMART LOOP: TARGETED FILE PATCHING (अब सिर्फ वही फाइल सुधरेगी जिसमें एरर है) ---
   Future<void> _confirmAndExecuteBuild() async {
     final chosenFiles = _selectableFiles
         .where((f) => f['selected'] == true)
@@ -298,16 +299,19 @@ No markdown, no text, strictly valid JSON array.
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.40;
-      _currentPhase = 'Phase 2: Code Synthesis & Self-Healing Loop...';
+      _currentPhase = 'Phase 2: Targeted Self-Healing Loop Active...';
       _criticalErrorReason = '';
     });
 
     String previousErrorContext = '';
-    int maxRetryAttempts = 10; // 10 Self-Healing loops जैसा तूने चाहा था
+    int maxRetryAttempts = 10;
     bool buildSuccess = false;
 
+    // पहली बार में सभी चुनी हुई फाइलें पुश होंगी, उसके बाद सिर्फ 'फाल्टी फाइल' (Faulty File) टारगेट होगी
+    bool isInitialPush = true;
+
     for (int attempt = 1; attempt <= maxRetryAttempts; attempt++) {
-      _addLog('⚡ Attempt $attempt of $maxRetryAttempts: Generating & Pushing Code...');
+      _addLog('⚡ Attempt $attempt of $maxRetryAttempts: Processing code sync...');
 
       try {
         final config = await _getStoredConfig();
@@ -315,22 +319,21 @@ No markdown, no text, strictly valid JSON array.
 
         String repairInstruction = previousErrorContext.isEmpty 
             ? '' 
-            : '\n\nPREVIOUS BUILD FAILED WITH THIS EXACT LOG (Bottom-to-Top Scanned). FIX IT IN THIS ITERATION:\n$previousErrorContext';
+            : '\n\nPREVIOUS BUILD FAILED. READ THIS ERROR LOG (BOTTOM-TO-TOP SCANNED):\n$previousErrorContext\n\nCRITICAL FIX RULE: Do NOT rewrite the entire project. Identify the exact file causing this error and output ONLY that specific file code for fixing.';
 
         final systemPrompt = '''
-You are an expert Flutter Developer. You are building the application requested by the user.
-CRITICAL ARCHITECTURE RULES:
-1. The package name and app namespace must strictly be '${config.githubRepo}' across all imports, pubspec, and build files.
-2. Put the ENTIRE application UI, screens, widgets, state management, and backend logic completely inside a single "lib/main.dart" file. Do NOT create separate files for screens or features.
-3. For any other required files, output them correctly without breaking paths.
-Output MUST be a valid JSON array of objects with this exact structure:
+You are an expert Flutter Developer. 
+${isInitialPush ? "Generate code for the requested files." : "FIX ONLY THE FAULTY FILE CAUSING THE BUILD ERROR. DO NOT RE-GENERATE UNRELATED FILES."}
+CRITICAL RULES:
+1. Package namespace must be '${config.githubRepo}'.
+2. Output MUST be a valid JSON array of objects with this exact structure:
 [
   {
     "fileName": "lib/main.dart",
-    "fileCode": "actual clean code string here..."
+    "fileCode": "..."
   }
 ]
-Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON array.$repairInstruction
+No markdown outside JSON.$repairInstruction
 ''';
 
         final response = await http.post(
@@ -343,7 +346,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
             "model": config.selectedModel,
             "messages": [
               {"role": "system", "content": systemPrompt},
-              {"role": "user", "content": "Generate code for files: ${jsonEncode(chosenFiles)} based on user requirement: ${_promptController.text.trim()}"}
+              {"role": "user", "content": isInitialPush ? "Generate code for files: ${jsonEncode(chosenFiles)} based on: ${_promptController.text.trim()}" : "Fix the build error using the error logs provided."}
             ],
             "temperature": 0.2,
             "max_tokens": 4000,
@@ -362,7 +365,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
           _currentPhase = 'Phase 3: Parsing & Safety Verification...';
         });
 
-        _addLog('🔍 Applying bulletproof build protection templates...');
+        _addLog('🔍 Processing file patches...');
         final files = _parsePlainFiles(rawResponse, config.githubRepo);
 
         setState(() {
@@ -370,20 +373,28 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
           _currentPhase = 'Phase 4: GitHub Secure Push...';
         });
 
-        _addLog('☁️ Connecting to GitHub REST API endpoints...');
+        // अगर यह री-ट्राय है, तो हम सिर्फ वही फाइल पुश करेंगे जो एरर दे रही है या जिसे एजेंट ने सुधारा है, सारा प्रोजेक्ट दोबारा नहीं डालेंगे!
         for (int i = 0; i < files.length; i++) {
           final fileEntry = files[i];
           final String fileName = fileEntry['fileName'];
           final String fileCode = fileEntry['fileCode'];
 
-          _addLog('📦 Pushing module: $fileName');
+          if (!isInitialPush && previousErrorContext.isNotEmpty) {
+            // चेक करो कि क्या यह फाइल एरर लॉग से मैच करती है, ताकि फालतू फाइलें बार-बार पुश न हों
+            if (!previousErrorContext.toLowerCase().contains(fileName.toLowerCase()) && fileName != 'pubspec.yaml' && fileName != 'lib/main.dart') {
+              continue; // स्किप करो उन फाइलों को जिनमें कोई दिक्कत ही नहीं है!
+            }
+          }
+
+          _addLog('📦 Pushing target module: $fileName');
           await _pushFileToGitHub(config, fileName, fileCode);
         }
+
+        isInitialPush = false; // पहली बार के बाद अब हमेशा टारगेटेड पैचिंग चालू रहेगी
 
         _addLog('⏳ Waiting for GitHub Actions workflow to run & verify build...');
         setState(() => _currentPhase = 'Phase 5: Monitoring GitHub Build Actions...');
 
-        // Monitor GitHub Actions build status
         String actionStatus = await _monitorGitHubAction(config);
 
         if (actionStatus == 'success') {
@@ -393,7 +404,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         } else if (actionStatus == 'failure') {
           _addLog('❌ GitHub Action Build Failed! Reading raw error logs bottom-to-top...', type: 'error');
           previousErrorContext = await _fetchLatestActionErrorLog(config);
-          _addLog('🤖 AI analyzing failure logs to patch code...');
+          _addLog('🤖 AI analyzing failure logs to patch only the faulty file...');
         } else {
           _addLog('⚠️ Build status timeout or unknown. Proceeding with caution.');
           buildSuccess = true;
@@ -420,7 +431,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         _isAutonomousRunning = false;
         _progressValue = 1.0;
         _currentPhase = 'Pipeline Halted: Unresolvable Critical Error.';
-        _criticalErrorReason = 'GitHub Actions Build failed continuously after 10 self-healing attempts.\n\nReason/Last Error Log:\n$previousErrorContext\n\nAction Required: Please check the code logic or fix manually via GitHub repository.';
+        _criticalErrorReason = 'GitHub Actions Build failed continuously after 10 self-healing attempts.\n\nLast Error Log:\n$previousErrorContext';
       });
       _addLog('🛑 Pipeline stopped because automatic fixes could not resolve the error.', type: 'error');
     }
@@ -457,7 +468,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
     return 'timeout';
   }
 
-  // --- UPDATED: BOTTOM-TO-TOP ERROR SCANNER (नीचे से ऊपर पूरा पढ़ने वाला असली लॉजिक) ---
+  // --- BOTTOM-TO-TOP ERROR SCANNER ---
   Future<String> _fetchLatestActionErrorLog(AgentConfig config) async {
     try {
       final runsUrl = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/actions/runs?per_page=1');
@@ -489,7 +500,6 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
             final jobs = jobsData['jobs'] as List;
             if (jobs.isNotEmpty) {
               final jobId = jobs.first['id'];
-              // यह गिटहब के जॉब की असली रॉ लॉग फाइल डाउनलोड करेगा
               final logUrl = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/actions/jobs/$jobId/logs');
               final logRes = await http.get(
                 logUrl,
@@ -504,7 +514,7 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
                 List<String> lines = rawLogs.split('\n');
                 List<String> relevantLines = [];
                 
-                // नीचे से ऊपर (Bottom-to-Top) स्कैनिंग ताकि आखिरी एरर मिल जाए
+                // नीचे से ऊपर (Bottom-to-Top) स्कैनिंग ताकि आखिरी सटीक एरर मिल जाए
                 for (int i = lines.length - 1; i >= 0; i--) {
                   String line = lines[i].toLowerCase();
                   if (line.contains('error') || line.contains('fail') || line.contains('exception') || line.contains('undefined') || line.contains('syntax') || line.contains('missing')) {
