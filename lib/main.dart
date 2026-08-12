@@ -67,7 +67,6 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   String _actionsUrl = '';
   String _criticalErrorReason = '';
 
-  // To store current code states for targeted patching
   final Map<String, String> _currentProjectFiles = {};
 
   @override
@@ -78,7 +77,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
 
   Future<void> _loadSavedConfig() async {
     final config = await _getStoredConfig();
-    if (config.groqKey == 'YOUR_GROQ_API_KEY') {
+    if (config.groqKey == 'YOUR_GROQ_API_KEY' || config.groqKey.isEmpty) {
       _addLog('⚠️ Default configuration detected. Please check settings.');
     } else {
       _addLog('⚙️ Loaded stored configurations successfully.');
@@ -216,6 +215,8 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     _addLog('🚀 Enterprise Autonomous Agent Pipeline Initialized.');
     _addLog('🧠 Evaluating prompt for file requirements...');
 
+    List<String> filePlan = ["pubspec.yaml", "lib/main.dart"];
+
     try {
       final config = await _getStoredConfig();
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
@@ -243,49 +244,43 @@ No markdown, strictly raw JSON array.
         }),
       );
 
-      if (response.statusCode != 200) {
-        throw Exception('Groq API Error (${response.statusCode}): Check API key or rate limit.');
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        String content = decoded['choices'][0]['message']['content'].trim();
+        
+        content = content.replaceAll('```json', '').replaceAll('```', '').trim();
+        int startIndex = content.indexOf('[');
+        int endIndex = content.lastIndexOf(']');
+        
+        if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
+          try {
+            String jsonSubstring = content.substring(startIndex, endIndex + 1);
+            List<dynamic> parsedList = jsonDecode(jsonSubstring);
+            List<String> dynamicFiles = parsedList.map((e) => e.toString()).toList();
+            if (dynamicFiles.isNotEmpty) {
+              filePlan = dynamicFiles;
+            }
+          } catch (_) {}
+        }
       }
-
-      final decoded = jsonDecode(response.body);
-      String content = decoded['choices'][0]['message']['content'].trim();
-      
-      content = content.replaceAll('```json', '').replaceAll('```', '').trim();
-      int startIndex = content.indexOf('[');
-      int endIndex = content.lastIndexOf(']');
-      
-      if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
-        content = content.substring(startIndex, endIndex + 1);
-      } else {
-        content = '["pubspec.yaml", "lib/main.dart"]';
-      }
-      
-      List<dynamic> parsedList = jsonDecode(content);
-      List<String> filePlan = parsedList.map((e) => e.toString()).toList();
-
-      if (!filePlan.contains('lib/main.dart')) filePlan.add('lib/main.dart');
-      if (!filePlan.contains('pubspec.yaml')) filePlan.add('pubspec.yaml');
-
-      _addLog('📋 Architect designed ${filePlan.length} files.');
-
-      setState(() {
-        _selectableFiles = filePlan.map((path) => {'path': path, 'selected': true}).toList();
-        _isAutonomousRunning = false;
-        _isWaitingForUserFileSelection = true;
-        _progressValue = 0.30;
-        _currentPhase = 'Paused: Review & Select Files.';
-        _fileSearchQuery = '';
-        _searchFileController.clear();
-      });
-
     } catch (e) {
-      _addLog('⚠️ Planning Error: $e', type: 'error');
-      setState(() {
-        _isAutonomousRunning = false;
-        _currentPhase = 'Pipeline Aborted.';
-        _criticalErrorReason = 'Planning Phase Failed: $e';
-      });
+      _addLog('⚠️ Minor warning during planning, falling back to standard files: $e');
     }
+
+    if (!filePlan.contains('lib/main.dart')) filePlan.add('lib/main.dart');
+    if (!filePlan.contains('pubspec.yaml')) filePlan.add('pubspec.yaml');
+
+    _addLog('📋 Architect designed ${filePlan.length} files.');
+
+    setState(() {
+      _selectableFiles = filePlan.map((path) => {'path': path, 'selected': true}).toList();
+      _isAutonomousRunning = false;
+      _isWaitingForUserFileSelection = true;
+      _progressValue = 0.30;
+      _currentPhase = 'Paused: Review & Select Files.';
+      _fileSearchQuery = '';
+      _searchFileController.clear();
+    });
   }
 
   Future<void> _confirmAndExecuteBuild() async {
@@ -305,7 +300,7 @@ No markdown, strictly raw JSON array.
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.40;
-      _currentPhase = 'Phase 2: Initial Code Generation & Setup...';
+      _currentPhase = 'Phase 2: Initial Fresh Code Generation...';
       _criticalErrorReason = '';
     });
 
@@ -314,8 +309,8 @@ No markdown, strictly raw JSON array.
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
 
       final systemPrompt = '''
-You are an expert Flutter Developer. Generate complete code for the requested files.
-CRITICAL: Put entire app code in "lib/main.dart". Include necessary imports.
+You are an expert Flutter Developer. Generate complete, production-ready code for the requested files.
+CRITICAL: Put entire app code in "lib/main.dart". Include necessary imports like 'package:flutter/material.dart'.
 Output MUST be a valid JSON array:
 [
   {
@@ -348,10 +343,9 @@ No markdown outside JSON.
       final decoded = jsonDecode(response.body);
       String rawResponse = decoded['choices'][0]['message']['content'];
 
-      _addLog('🔍 Processing files and applying build configurations...');
+      _addLog('🔍 Processing files and applying bulletproof templates...');
       final files = _parsePlainFiles(rawResponse, config.githubRepo);
 
-      // Save locally for targeted patching
       _currentProjectFiles.clear();
       for (var f in files) {
         _currentProjectFiles[f['fileName']] = f['fileCode'];
@@ -367,8 +361,8 @@ No markdown outside JSON.
       _addLog('⏳ Waiting for GitHub Actions build verification...');
       setState(() => _currentPhase = 'Phase 3: Monitoring GitHub Build Actions...');
 
-      // START TARGETED SELF-HEALING LOOP (Only fixes exact errors)
-      await _runTargetedSelfHealingLoop(config);
+      // 10 ATTEMPTS RIGOROUS RE-GENERATION LOOP
+      await _runFreshRegenerationLoop(config);
 
     } catch (e) {
       _addLog('⚠️ Execution Error: $e', type: 'error');
@@ -381,12 +375,14 @@ No markdown outside JSON.
     }
   }
 
-  Future<void> _runTargetedSelfHealingLoop(AgentConfig config) async {
-    int maxRetries = 3;
+  // --- 10 ATTEMPTS RIGOROUS FRESH RE-GENERATION LOOP ---
+  Future<void> _runFreshRegenerationLoop(AgentConfig config) async {
+    int maxRetries = 10;
     bool success = false;
     String lastError = '';
 
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      _addLog('🔄 Attempt $attempt/$maxRetries: Monitoring GitHub Build status...');
       String actionStatus = await _monitorGitHubAction(config);
 
       if (actionStatus == 'success') {
@@ -394,27 +390,27 @@ No markdown outside JSON.
         _addLog('🎉 Build Passed Successfully on attempt $attempt!');
         break;
       } else if (actionStatus == 'failure') {
-        _addLog('❌ Build Failed! Extracting exact error log...', type: 'error');
+        _addLog('❌ Build Failed on attempt $attempt! Fetching exact error logs...', type: 'error');
         lastError = await _fetchLatestActionErrorLog(config);
         _addLog('🔍 Captured Error: $lastError', type: 'error');
 
-        if (attempt == maxRetries) break;
+        if (attempt == maxRetries) {
+          _addLog('🛑 Reached maximum limit of 10 attempts.', type: 'error');
+          break;
+        }
 
-        _addLog('🤖 AI Targeted Patching: Fixing ONLY the reported error without touching other files...');
-        setState(() => _currentPhase = 'Phase 4: Targeted Error Patching (Attempt ${attempt + 1})...');
+        _addLog('🛠️ Attempting full re-write (${attempt + 1}/$maxRetries) to resolve the error...');
+        setState(() => _currentPhase = 'Phase 4: Full Code Re-write (${attempt + 1}/$maxRetries)...');
 
-        // Send ONLY the error and lib/main.dart to AI to fix the specific error line
-        String fixedCode = await _askAIToFixSpecificError(config, lastError, _currentProjectFiles['lib/main.dart'] ?? '');
+        String freshCode = await _askAIToGenerateFullCodeFresh(config, lastError);
         
-        if (fixedCode.isNotEmpty) {
-          _currentProjectFiles['lib/main.dart'] = fixedCode;
-          _addLog('📦 Pushing patched lib/main.dart to GitHub...');
-          await _pushFileToGitHub(config, 'lib/main.dart', fixedCode);
+        if (freshCode.isNotEmpty) {
+          _currentProjectFiles['lib/main.dart'] = freshCode;
+          _addLog('📦 Pushing freshly rewritten lib/main.dart to GitHub...');
+          await _pushFileToGitHub(config, 'lib/main.dart', freshCode);
         }
       } else {
-        _addLog('⚠️ Build timeout or unknown state.');
-        success = true;
-        break;
+        _addLog('⚠️ Build timeout or unknown state on attempt $attempt, re-checking...');
       }
     }
 
@@ -422,29 +418,29 @@ No markdown outside JSON.
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
-        _currentPhase = 'Pipeline Completed Successfully!';
+        _currentPhase = 'Pipeline Completed Successfully after rigorous fixes!';
         _actionsUrl = 'https://github.com/${config.githubUser}/${config.githubRepo}/actions';
       });
-      _addLog('🎉 Application successfully verified and deployed!');
+      _addLog('🎉 Application successfully verified and deployed after rigorous fixes!');
     } else {
       setState(() {
         _isAutonomousRunning = false;
         _progressValue = 1.0;
-        _currentPhase = 'Pipeline Halted: Unresolved Error.';
-        _criticalErrorReason = 'Could not auto-fix after $maxRetries attempts.\n\nFinal Error:\n$lastError';
+        _currentPhase = 'Pipeline Halted: Unresolved Error after 10 attempts.';
+        _criticalErrorReason = 'Could not auto-fix after 10 full attempts.\n\nFinal Error:\n$lastError';
       });
-      _addLog('🛑 Stopped: Automatic fixes could not resolve the error.', type: 'error');
+      _addLog('🛑 Stopped: Tried 10 times but could not bypass the compilation barrier.', type: 'error');
     }
   }
 
-  Future<String> _askAIToFixSpecificError(AgentConfig config, String errorLog, String currentCode) async {
+  Future<String> _askAIToGenerateFullCodeFresh(AgentConfig config, String previousError) async {
     try {
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       final systemPrompt = '''
-You are a precise Flutter Code Fixer. You are given an existing Dart code and a specific compilation/build error.
-Your task is ONLY to fix the exact error mentioned in the error log. Do not rewrite unrelated parts.
-Return ONLY the corrected full Dart code string for lib/main.dart. Do not include markdown code blocks or explanations, return raw text or JSON if necessary, but preferred is just the raw code or JSON. Let's return a JSON object like {"fixedCode": "..."} or raw code. Let's ask for raw code directly:
-Start directly with code or wrap in a JSON object with key "fixedCode".
+You are a senior Flutter expert. The previous build failed with this error:
+"$previousError"
+Rewrite the ENTIRE lib/main.dart file cleanly from scratch. Ensure all types, parameters, and package imports match correctly so there are no compilation or missing import errors.
+Return ONLY the raw Dart code string or valid JSON. Do not include markdown code blocks.
 ''';
 
       final response = await http.post(
@@ -457,9 +453,9 @@ Start directly with code or wrap in a JSON object with key "fixedCode".
           "model": config.selectedModel,
           "messages": [
             {"role": "system", "content": systemPrompt},
-            {"role": "user", "content": "ERROR LOG:\n$errorLog\n\nCURRENT CODE:\n$currentCode"}
+            {"role": "user", "content": "Original Prompt was: ${_promptController.text.trim()}"}
           ],
-          "temperature": 0.1,
+          "temperature": 0.2,
           "max_tokens": 4000,
         }),
       );
@@ -570,7 +566,6 @@ Start directly with code or wrap in a JSON object with key "fixedCode".
         });
       }
 
-      // Mandatory Pubspec template
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
       parsedFiles.add({
         'fileName': 'pubspec.yaml',
@@ -596,7 +591,6 @@ dev_dependencies:
 ''',
       });
 
-      // Android Manifest & Gradle standard files
       parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
       parsedFiles.add({
         'fileName': 'android/app/src/main/AndroidManifest.xml',
@@ -638,7 +632,6 @@ flutter { source = "../.." }
 ''',
       });
 
-      // GitHub Actions Workflow
       parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
       parsedFiles.add({
         'fileName': '.github/workflows/flutter.yml',
@@ -685,7 +678,7 @@ jobs:
 
     final encodedContent = base64Encode(utf8.encode(fileCode));
     final Map<String, dynamic> bodyData = {
-      "message": "Autonomous Agent: Patch $fileName",
+      "message": "Autonomous Agent: Fresh Full Write $fileName",
       "content": encodedContent,
       "branch": "main",
     };
@@ -819,7 +812,7 @@ jobs:
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('🚀 Step 2: Synthesize & Targeted Fix Loop', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('🚀 Step 2: Synthesize & 10-Attempt Fresh Rewrite', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ] else ...[
               const Text('Live Telemetry & Diagnostics:', style: TextStyle(fontWeight: FontWeight.bold)),
