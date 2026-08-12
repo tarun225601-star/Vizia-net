@@ -219,8 +219,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       
       final systemPrompt = '''
 Return ONLY a JSON array of essential file paths required for the Flutter application request. 
-CRITICAL RULE: The main application UI, logic, widgets, and backend handling MUST be entirely contained within "lib/main.dart". Do not create separate screen files, view files, or custom feature folders. 
-Always include essential configuration files: "pubspec.yaml", "lib/main.dart", "android/app/src/main/AndroidManifest.xml", "android/app/src/main/res/values/styles.xml", "android/app/src/main/res/drawable/launch_background.xml", "android/gradle.properties". 
+CRITICAL RULE: To avoid missing file errors, consolidate the entire app inside "lib/main.dart". 
 No markdown, no text, strictly valid JSON array.
 ''';
 
@@ -259,6 +258,10 @@ No markdown, no text, strictly valid JSON array.
       List<dynamic> parsedList = jsonDecode(content);
       List<String> filePlan = parsedList.map((e) => e.toString()).toList();
 
+      if (!filePlan.contains('lib/main.dart')) {
+        filePlan.add('lib/main.dart');
+      }
+
       _addLog('📋 Architect designed ${filePlan.length} files.');
 
       setState(() {
@@ -281,7 +284,6 @@ No markdown, no text, strictly valid JSON array.
     }
   }
 
-  // --- UPDATED SMART LOOP: TARGETED FILE PATCHING (अब सिर्फ वही फाइल सुधरेगी जिसमें एरर है) ---
   Future<void> _confirmAndExecuteBuild() async {
     final chosenFiles = _selectableFiles
         .where((f) => f['selected'] == true)
@@ -299,7 +301,7 @@ No markdown, no text, strictly valid JSON array.
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.40;
-      _currentPhase = 'Phase 2: Targeted Self-Healing Loop Active...';
+      _currentPhase = 'Phase 2: Surgical Laborer Active (Self-Healing Loop)...';
       _criticalErrorReason = '';
     });
 
@@ -307,33 +309,39 @@ No markdown, no text, strictly valid JSON array.
     int maxRetryAttempts = 10;
     bool buildSuccess = false;
 
-    // पहली बार में सभी चुनी हुई फाइलें पुश होंगी, उसके बाद सिर्फ 'फाल्टी फाइल' (Faulty File) टारगेट होगी
-    bool isInitialPush = true;
-
     for (int attempt = 1; attempt <= maxRetryAttempts; attempt++) {
-      _addLog('⚡ Attempt $attempt of $maxRetryAttempts: Processing code sync...');
+      _addLog('⚡ Attempt $attempt of $maxRetryAttempts: Laborer executing code fix...');
 
       try {
         final config = await _getStoredConfig();
         final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
 
+        // --- यहाँ लेबर और सर्जरी वाले सख्त निर्देश डाले गए हैं ---
         String repairInstruction = previousErrorContext.isEmpty 
             ? '' 
-            : '\n\nPREVIOUS BUILD FAILED. READ THIS ERROR LOG (BOTTOM-TO-TOP SCANNED):\n$previousErrorContext\n\nCRITICAL FIX RULE: Do NOT rewrite the entire project. Identify the exact file causing this error and output ONLY that specific file code for fixing.';
+            : '''
+\n\n=== SURGICAL ERROR LOG SCAN (BOTTOM-TO-TOP) ===
+The previous build failed with the exact log below. You are a code laborer. Read the file name in the error and fix ONLY that specific file:
+$previousErrorContext
+--------------------------------------------------
+''';
 
         final systemPrompt = '''
-You are an expert Flutter Developer. 
-${isInitialPush ? "Generate code for the requested files." : "FIX ONLY THE FAULTY FILE CAUSING THE BUILD ERROR. DO NOT RE-GENERATE UNRELATED FILES."}
-CRITICAL RULES:
-1. Package namespace must be '${config.githubRepo}'.
-2. Output MUST be a valid JSON array of objects with this exact structure:
+You are an automated code-fixing laborer. You have only two objectives:
+1. SCAN & ANALYZE: Read the build log errors. Find the exact file name and line mentioned.
+2. EXECUTE: 
+   - IF THE ERROR SAYS 'No such file or directory': You MUST generate that missing file immediately in the JSON.
+   - IF THE ERROR IS A SYNTAX OR COMPILATION ERROR: Fix it directly in the affected file.
+   - MERGE RULE: To completely avoid missing file issues, ensure all necessary logic is robustly implemented inside "lib/main.dart".
+
+Output MUST be a valid JSON array of objects with this exact structure:
 [
   {
     "fileName": "lib/main.dart",
-    "fileCode": "..."
+    "fileCode": "actual clean code string here..."
   }
 ]
-No markdown outside JSON.$repairInstruction
+Do NOT output markdown outside the JSON. Strictly valid JSON array.$repairInstruction
 ''';
 
         final response = await http.post(
@@ -346,9 +354,9 @@ No markdown outside JSON.$repairInstruction
             "model": config.selectedModel,
             "messages": [
               {"role": "system", "content": systemPrompt},
-              {"role": "user", "content": isInitialPush ? "Generate code for files: ${jsonEncode(chosenFiles)} based on: ${_promptController.text.trim()}" : "Fix the build error using the error logs provided."}
+              {"role": "user", "content": "Generate code for files: ${jsonEncode(chosenFiles)} based on user requirement: ${_promptController.text.trim()}"}
             ],
-            "temperature": 0.2,
+            "temperature": 0.1,
             "max_tokens": 4000,
           }),
         );
@@ -365,7 +373,7 @@ No markdown outside JSON.$repairInstruction
           _currentPhase = 'Phase 3: Parsing & Safety Verification...';
         });
 
-        _addLog('🔍 Processing file patches...');
+        _addLog('🔍 Applying bulletproof build protection templates...');
         final files = _parsePlainFiles(rawResponse, config.githubRepo);
 
         setState(() {
@@ -373,24 +381,15 @@ No markdown outside JSON.$repairInstruction
           _currentPhase = 'Phase 4: GitHub Secure Push...';
         });
 
-        // अगर यह री-ट्राय है, तो हम सिर्फ वही फाइल पुश करेंगे जो एरर दे रही है या जिसे एजेंट ने सुधारा है, सारा प्रोजेक्ट दोबारा नहीं डालेंगे!
+        _addLog('☁️ Connecting to GitHub REST API endpoints...');
         for (int i = 0; i < files.length; i++) {
           final fileEntry = files[i];
           final String fileName = fileEntry['fileName'];
           final String fileCode = fileEntry['fileCode'];
 
-          if (!isInitialPush && previousErrorContext.isNotEmpty) {
-            // चेक करो कि क्या यह फाइल एरर लॉग से मैच करती है, ताकि फालतू फाइलें बार-बार पुश न हों
-            if (!previousErrorContext.toLowerCase().contains(fileName.toLowerCase()) && fileName != 'pubspec.yaml' && fileName != 'lib/main.dart') {
-              continue; // स्किप करो उन फाइलों को जिनमें कोई दिक्कत ही नहीं है!
-            }
-          }
-
-          _addLog('📦 Pushing target module: $fileName');
+          _addLog('📦 Pushing module: $fileName');
           await _pushFileToGitHub(config, fileName, fileCode);
         }
-
-        isInitialPush = false; // पहली बार के बाद अब हमेशा टारगेटेड पैचिंग चालू रहेगी
 
         _addLog('⏳ Waiting for GitHub Actions workflow to run & verify build...');
         setState(() => _currentPhase = 'Phase 5: Monitoring GitHub Build Actions...');
@@ -404,7 +403,7 @@ No markdown outside JSON.$repairInstruction
         } else if (actionStatus == 'failure') {
           _addLog('❌ GitHub Action Build Failed! Reading raw error logs bottom-to-top...', type: 'error');
           previousErrorContext = await _fetchLatestActionErrorLog(config);
-          _addLog('🤖 AI analyzing failure logs to patch only the faulty file...');
+          _addLog('🤖 Laborer analyzing failure logs to patch the exact file...');
         } else {
           _addLog('⚠️ Build status timeout or unknown. Proceeding with caution.');
           buildSuccess = true;
@@ -431,7 +430,7 @@ No markdown outside JSON.$repairInstruction
         _isAutonomousRunning = false;
         _progressValue = 1.0;
         _currentPhase = 'Pipeline Halted: Unresolvable Critical Error.';
-        _criticalErrorReason = 'GitHub Actions Build failed continuously after 10 self-healing attempts.\n\nLast Error Log:\n$previousErrorContext';
+        _criticalErrorReason = 'GitHub Actions Build failed continuously after 10 attempts.\n\nLast Error Log:\n$previousErrorContext';
       });
       _addLog('🛑 Pipeline stopped because automatic fixes could not resolve the error.', type: 'error');
     }
@@ -468,7 +467,7 @@ No markdown outside JSON.$repairInstruction
     return 'timeout';
   }
 
-  // --- BOTTOM-TO-TOP ERROR SCANNER ---
+  // --- BOTTOM-TO-TOP ERROR SCANNER (नीचे से ऊपर स्कैन करने वाला सटीक स्कैनर) ---
   Future<String> _fetchLatestActionErrorLog(AgentConfig config) async {
     try {
       final runsUrl = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/actions/runs?per_page=1');
@@ -514,15 +513,16 @@ No markdown outside JSON.$repairInstruction
                 List<String> lines = rawLogs.split('\n');
                 List<String> relevantLines = [];
                 
-                // नीचे से ऊपर (Bottom-to-Top) स्कैनिंग ताकि आखिरी सटीक एरर मिल जाए
+                // एकदम सटीक Bottom-to-Top स्कैनिंग
                 for (int i = lines.length - 1; i >= 0; i--) {
-                  String line = lines[i].toLowerCase();
-                  if (line.contains('error') || line.contains('fail') || line.contains('exception') || line.contains('undefined') || line.contains('syntax') || line.contains('missing')) {
-                    relevantLines.insert(0, lines[i]);
-                    if (relevantLines.length >= 35) break; 
+                  String line = lines[i];
+                  String lower = line.toLowerCase();
+                  if (lower.contains('error') || lower.contains('fail') || lower.contains('exception') || lower.contains('no such file') || lower.contains('undefined') || lower.contains('syntax')) {
+                    relevantLines.insert(0, line);
+                    if (relevantLines.length >= 40) break; 
                   }
                 }
-                return relevantLines.isNotEmpty ? relevantLines.join('\n') : (rawLogs.length > 800 ? rawLogs.substring(rawLogs.length - 800) : rawLogs);
+                return relevantLines.isNotEmpty ? relevantLines.join('\n') : (rawLogs.length > 1000 ? rawLogs.substring(rawLogs.length - 1000) : rawLogs);
               }
             }
           }
@@ -612,15 +612,6 @@ dev_dependencies:
             android:value="2" />
     </application>
     <uses-permission android:name="android.permission.INTERNET"/>
-</manifest>''',
-      });
-
-      parsedFiles.add({
-        'fileName': 'android/AndroidManifest.xml',
-        'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
-        <meta-data android:name="flutterEmbedding" android:value="2" />
-    </application>
 </manifest>''',
       });
 
@@ -795,7 +786,7 @@ jobs:
     final encodedContent = base64Encode(utf8.encode(fileCode));
 
     final Map<String, dynamic> bodyData = {
-      "message": "Autonomous Agent: Add/Update $fileName",
+      "message": "Autonomous Laborer: Fix/Add $fileName",
       "content": encodedContent,
       "branch": "main",
     };
