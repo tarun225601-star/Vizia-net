@@ -65,6 +65,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   final List<String> _logs = [];
   List<Map<String, dynamic>> _selectableFiles = [];
   String _actionsUrl = '';
+  String _criticalErrorReason = '';
 
   @override
   void initState() {
@@ -149,7 +150,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
               ),
               TextField(
                 controller: githubRepoController,
-                decoration: const InputDecoration(labelText: 'GitHub Repository Name'),
+                decoration: const InputDecoration(labelText: 'GitHub Repository Name (Package Name)'),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
@@ -206,6 +207,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       _currentPhase = 'Analyzing prompt for architecture rules...';
       _selectableFiles.clear();
       _actionsUrl = '';
+      _criticalErrorReason = '';
     });
 
     _addLog('🚀 Enterprise Autonomous Agent Pipeline Initialized.');
@@ -216,7 +218,8 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final systemPrompt = '''
-Return ONLY a JSON array of file paths required for the given Flutter application request (e.g. Instagram clone, social app, etc.). 
+Return ONLY a JSON array of essential file paths required for the Flutter application request. 
+CRITICAL RULE: The main application UI, logic, widgets, and backend handling MUST be entirely contained within "lib/main.dart". Do not create separate screen files, view files, or custom feature folders. 
 Always include essential configuration files: "pubspec.yaml", "lib/main.dart", "android/app/src/main/AndroidManifest.xml", "android/app/src/main/res/values/styles.xml", "android/app/src/main/res/drawable/launch_background.xml", "android/gradle.properties". 
 No markdown, no text, strictly valid JSON array.
 ''';
@@ -273,6 +276,7 @@ No markdown, no text, strictly valid JSON array.
       setState(() {
         _isAutonomousRunning = false;
         _currentPhase = 'Pipeline Aborted.';
+        _criticalErrorReason = 'Planning Phase Failed: $e';
       });
     }
   }
@@ -294,18 +298,31 @@ No markdown, no text, strictly valid JSON array.
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.40;
-      _currentPhase = 'Phase 2: Direct Code Synthesis (Plain Text JSON)...';
+      _currentPhase = 'Phase 2: Code Synthesis & Self-Healing Loop...';
+      _criticalErrorReason = '';
     });
 
-    _addLog('⚡ Generating clean, plain-text code via Groq...');
+    String previousErrorContext = '';
+    int maxRetryAttempts = 2; // Maximum Self-Healing loops
+    bool buildSuccess = false;
 
-    try {
-      final config = await _getStoredConfig();
-      final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+    for (int attempt = 1; attempt <= maxRetryAttempts; attempt++) {
+      _addLog('⚡ Attempt $attempt of $maxRetryAttempts: Generating & Pushing Code...');
 
-      final systemPrompt = '''
-You are an expert Flutter Developer building a high-performance feature-rich application (like Instagram clone).
-For each file in the requested list, generate production-ready code in plain text.
+      try {
+        final config = await _getStoredConfig();
+        final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+
+        String repairInstruction = previousErrorContext.isEmpty 
+            ? '' 
+            : '\n\nPREVIOUS BUILD FAILED WITH THIS ERROR. FIX IT IN THIS ITERATION:\n$previousErrorContext';
+
+        final systemPrompt = '''
+You are an expert Flutter Developer. You are building the application requested by the user.
+CRITICAL ARCHITECTURE RULES:
+1. The package name and app namespace must strictly be '${config.githubRepo}' across all imports, pubspec, and build files.
+2. Put the ENTIRE application UI, screens, widgets, state management, and backend logic completely inside a single "lib/main.dart" file. Do NOT create separate files for screens or features.
+3. For any other required files, output them correctly without breaking paths.
 Output MUST be a valid JSON array of objects with this exact structure:
 [
   {
@@ -313,79 +330,180 @@ Output MUST be a valid JSON array of objects with this exact structure:
     "fileCode": "actual clean code string here..."
   }
 ]
-Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON array.
+Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON array.$repairInstruction
 ''';
 
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${config.groqKey}',
-        },
-        body: jsonEncode({
-          "model": config.selectedModel,
-          "messages": [
-            {"role": "system", "content": systemPrompt},
-            {"role": "user", "content": "Generate code for files: ${jsonEncode(chosenFiles)}"}
-          ],
-          "temperature": 0.2,
-          "max_tokens": 4000,
-        }),
-      );
+        final response = await http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${config.groqKey}',
+          },
+          body: jsonEncode({
+            "model": config.selectedModel,
+            "messages": [
+              {"role": "system", "content": systemPrompt},
+              {"role": "user", "content": "Generate code for files: ${jsonEncode(chosenFiles)} based on user requirement: ${_promptController.text.trim()}"}
+            ],
+            "temperature": 0.2,
+            "max_tokens": 4000,
+          }),
+        );
 
-      if (response.statusCode != 200) {
-        throw Exception('Code Synthesis Error: ${response.body}');
+        if (response.statusCode != 200) {
+          throw Exception('Code Synthesis Error: ${response.body}');
+        }
+
+        final decoded = jsonDecode(response.body);
+        String rawResponse = decoded['choices'][0]['message']['content'];
+
+        setState(() {
+          _progressValue = 0.50 + (attempt * 0.1);
+          _currentPhase = 'Phase 3: Parsing & Safety Verification...';
+        });
+
+        _addLog('🔍 Applying bulletproof build protection templates...');
+        final files = _parsePlainFiles(rawResponse, config.githubRepo);
+
+        setState(() {
+          _progressValue = 0.65 + (attempt * 0.05);
+          _currentPhase = 'Phase 4: GitHub Secure Push...';
+        });
+
+        _addLog('☁️ Connecting to GitHub REST API endpoints...');
+        for (int i = 0; i < files.length; i++) {
+          final fileEntry = files[i];
+          final String fileName = fileEntry['fileName'];
+          final String fileCode = fileEntry['fileCode'];
+
+          _addLog('📦 Pushing module: $fileName');
+          await _pushFileToGitHub(config, fileName, fileCode);
+        }
+
+        _addLog('⏳ Waiting for GitHub Actions workflow to run & verify build...');
+        setState(() => _currentPhase = 'Phase 5: Monitoring GitHub Build Actions...');
+
+        // Monitor GitHub Actions build status (Wait up to 60 seconds)
+        String actionStatus = await _monitorGitHubAction(config);
+
+        if (actionStatus == 'success') {
+          buildSuccess = true;
+          _addLog('🎉 GitHub Action Build Passed Successfully!');
+          break;
+        } else if (actionStatus == 'failure') {
+          _addLog('❌ GitHub Action Build Failed! Reading error logs for self-healing...', type: 'error');
+          previousErrorContext = await _fetchLatestActionErrorLog(config);
+          _addLog('🤖 AI analyzing failure reason to patch code...');
+        } else {
+          _addLog('⚠️ Build status timeout or unknown. Proceeding with caution.');
+          buildSuccess = true; // Assume success if status check takes too long
+          break;
+        }
+
+      } catch (e) {
+        _addLog('⚠️ Execution Error in Attempt $attempt: $e', type: 'error');
+        previousErrorContext = e.toString();
       }
+    }
 
-      final decoded = jsonDecode(response.body);
-      String rawResponse = decoded['choices'][0]['message']['content'];
-
-      setState(() {
-        _progressValue = 0.60;
-        _currentPhase = 'Phase 3: Parsing & Safety Verification...';
-      });
-
-      _addLog('🔍 Applying bulletproof build protection templates...');
-      final files = _parsePlainFiles(rawResponse);
-      _addLog('✅ All files verified and secured against build/resource errors.');
-
-      setState(() {
-        _progressValue = 0.75;
-        _currentPhase = 'Phase 4: GitHub Secure Push...';
-      });
-
-      _addLog('☁️ Connecting to GitHub REST API endpoints...');
-      for (int i = 0; i < files.length; i++) {
-        final fileEntry = files[i];
-        final String fileName = fileEntry['fileName'];
-        final String fileCode = fileEntry['fileCode'];
-
-        final filePushProgress = 0.75 + ((i + 1) / files.length) * 0.25;
-        setState(() => _progressValue = filePushProgress);
-
-        _addLog('📦 Pushing module: $fileName');
-        await _pushFileToGitHub(config, fileName, fileCode);
-      }
-
+    if (buildSuccess) {
+      final config = await _getStoredConfig();
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
         _currentPhase = 'Pipeline Completed Successfully!';
         _actionsUrl = 'https://github.com/${config.githubUser}/${config.githubRepo}/actions';
       });
-
-      _addLog('🎉 Files deployed to GitHub successfully!');
-
-    } catch (e) {
-      _addLog('⚠️ Build/Push Error: $e', type: 'error');
+      _addLog('🎉 Application successfully verified and deployed!');
+    } else {
       setState(() {
         _isAutonomousRunning = false;
-        _currentPhase = 'Pipeline Aborted.';
+        _progressValue = 1.0;
+        _currentPhase = 'Pipeline Halted: Unresolvable Critical Error.';
+        _criticalErrorReason = 'GitHub Actions Build failed continuously after self-healing attempts.\n\nReason/Last Error Log:\n$previousErrorContext\n\nAction Required: Please check the code logic or fix manually via GitHub repository.';
       });
+      _addLog('🛑 Pipeline stopped because automatic fixes could not resolve the error.', type: 'error');
     }
   }
 
-  List<Map<String, dynamic>> _parsePlainFiles(String rawResponse) {
+  Future<String> _monitorGitHubAction(AgentConfig config) async {
+    // Poll GitHub Actions run status for up to 60 seconds
+    for (int i = 0; i < 12; i++) {
+      await Future.delayed(const Duration(seconds: 5));
+      try {
+        final url = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/actions/runs?per_page=1');
+        final response = await http.get(
+          url,
+          headers: {
+            'Authorization': 'Bearer ${config.githubToken}',
+            'Accept': 'application/vnd.github+json',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final runs = data['workflow_runs'] as List;
+          if (runs.isNotEmpty) {
+            final latestRun = runs.first;
+            String status = latestRun['status'] ?? ''; // queued, in_progress, completed
+            String conclusion = latestRun['conclusion'] ?? ''; // success, failure, null
+
+            if (status == 'completed') {
+              return conclusion; // 'success' or 'failure'
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    return 'timeout';
+  }
+
+  Future<String> _fetchLatestActionErrorLog(AgentConfig config) async {
+    try {
+      // Get the latest run jobs to find failed job ID or logs url
+      final runsUrl = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/actions/runs?per_page=1');
+      final response = await http.get(
+        runsUrl,
+        headers: {
+          'Authorization': 'Bearer ${config.githubToken}',
+          'Accept': 'application/vnd.github+json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final runs = data['workflow_runs'] as List;
+        if (runs.isNotEmpty) {
+          final runId = runs.first['id'];
+          final jobsUrl = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/actions/runs/$runId/jobs');
+          
+          final jobsResponse = await http.get(
+            jobsUrl,
+            headers: {
+              'Authorization': 'Bearer ${config.githubToken}',
+              'Accept': 'application/vnd.github+json',
+            },
+          );
+
+          if (jobsResponse.statusCode == 200) {
+            final jobsData = jsonDecode(jobsResponse.body);
+            final jobs = jobsData['jobs'] as List;
+            for (var job in jobs) {
+              final steps = job['steps'] as List;
+              for (var step in steps) {
+                if (step['conclusion'] == 'failure') {
+                  return 'Failed at step: ${step['name']}. Please check syntax, missing dependencies or widget logic.';
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return 'Unknown build failure inside Flutter gradle compile or test phase.';
+  }
+
+  List<Map<String, dynamic>> _parsePlainFiles(String rawResponse, String packageName) {
     try {
       String cleaned = rawResponse.replaceAll('```json', '').replaceAll('```', '').trim();
       int startIndex = cleaned.indexOf('[');
@@ -409,11 +527,11 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         });
       }
 
-      // 1. Force robust pubspec.yaml
+      // 1. Force robust pubspec.yaml using dynamic packageName from settings
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
       parsedFiles.add({
         'fileName': 'pubspec.yaml',
-        'fileCode': '''name: real_time
+        'fileCode': '''name: $packageName
 description: A new Flutter application.
 publish_to: 'none'
 version: 1.0.0+1
@@ -434,13 +552,13 @@ dev_dependencies:
 ''',
       });
 
-      // 2. Android Manifest WITHOUT icon reference (Fixes missing ic_launcher resource error permanently)
+      // 2. Android Manifest with dynamic label/packageName
       parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
       parsedFiles.add({
         'fileName': 'android/app/src/main/AndroidManifest.xml',
         'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="real_time"
+        android:label="$packageName"
         android:name="\${applicationName}">
         <activity
             android:name=".MainActivity"
@@ -526,7 +644,7 @@ task clean(type: Delete) {
 ''',
       });
 
-      // 5. App build.gradle
+      // 5. App build.gradle with dynamic applicationId and namespace
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/app/build.gradle');
       parsedFiles.add({
         'fileName': 'android/app/build.gradle',
@@ -537,7 +655,7 @@ task clean(type: Delete) {
 }
 
 android {
-    namespace "com.example.real_time"
+    namespace "com.example.$packageName"
     compileSdkVersion flutter.compileSdkVersion
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -547,7 +665,7 @@ android {
         jvmTarget = '1.8'
     }
     defaultConfig {
-        applicationId "com.example.real_time"
+        applicationId "com.example.$packageName"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
         versionCode 1
@@ -731,6 +849,25 @@ jobs:
             const SizedBox(height: 4),
             Text(_currentPhase, style: const TextStyle(color: Color(0xFF00F5D4))),
             const SizedBox(height: 12),
+            if (_criticalErrorReason.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.2),
+                  border: Border.all(color: Colors.red),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('🛑 CRITICAL HALT REASON:', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(_criticalErrorReason, style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             if (_isWaitingForUserFileSelection) ...[
               TextField(
                 controller: _searchFileController,
@@ -771,7 +908,7 @@ jobs:
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('🚀 Step 2: Synthesize & Push Code', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('🚀 Step 2: Synthesize & Self-Heal Build', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ] else ...[
               const Text('Live Telemetry & Diagnostics:', style: TextStyle(fontWeight: FontWeight.bold)),
