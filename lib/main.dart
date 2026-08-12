@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,10 +17,10 @@ class AutonomousEnterpriseApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0B132B),
         primaryColor: const Color(0xFF00F5D4),
-        colorScheme: ColorScheme.dark(
-          primary: const Color(0xFF00F5D4),
-          secondary: const Color(0xFF7209B7),
-          surface: const Color(0xFF1D3557),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF00F5D4),
+          secondary: Color(0xFF7209B7),
+          surface: Color(0xFF1D3557),
         ),
       ),
       home: const EnterpriseStudioScreen(),
@@ -217,8 +216,9 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final systemPrompt = '''
-Return ONLY a JSON array of file paths: ["pubspec.yaml", "lib/main.dart", "android/app/src/main/AndroidManifest.xml", "Always create the android/gradle.properties file with android.useAndroidX=true and android.enableJetifier=true.
-"]. No markdown, no text, strictly valid JSON array.
+Return ONLY a JSON array of file paths required for the given Flutter application request (e.g. Instagram clone, social app, etc.). 
+Always include essential configuration files: "pubspec.yaml", "lib/main.dart", "android/app/src/main/AndroidManifest.xml", "android/app/src/main/res/values/styles.xml", "android/app/src/main/res/drawable/launch_background.xml", "android/gradle.properties". 
+No markdown, no text, strictly valid JSON array.
 ''';
 
       final response = await http.post(
@@ -304,7 +304,7 @@ Return ONLY a JSON array of file paths: ["pubspec.yaml", "lib/main.dart", "andro
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
 
       final systemPrompt = '''
-You are an expert Flutter Developer.
+You are an expert Flutter Developer building a high-performance feature-rich application (like Instagram clone).
 For each file in the requested list, generate production-ready code in plain text.
 Output MUST be a valid JSON array of objects with this exact structure:
 [
@@ -345,9 +345,9 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         _currentPhase = 'Phase 3: Parsing & Safety Verification...';
       });
 
-      _addLog('🔍 Applying bulletproof file safety templates...');
+      _addLog('🔍 Applying bulletproof build protection templates...');
       final files = _parsePlainFiles(rawResponse);
-      _addLog('✅ All files verified and secured against build errors.');
+      _addLog('✅ All files verified and secured against build/resource errors.');
 
       setState(() {
         _progressValue = 0.75;
@@ -409,12 +409,12 @@ Do NOT output markdown outside the JSON or text greetings. Strictly valid JSON a
         });
       }
 
-      // 1. pubspec.yaml
+      // 1. Force robust pubspec.yaml
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
       parsedFiles.add({
         'fileName': 'pubspec.yaml',
         'fileCode': '''name: real_time
-description: A new Flutter project.
+description: A new Flutter application.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -434,11 +434,11 @@ dev_dependencies:
 ''',
       });
 
-      // 2. AndroidManifest.xml (App level)
+      // 2. Android Manifest with safe fallback
       parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
-      
-      bool needsInternet = true; 
-      String manifestContent = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+      parsedFiles.add({
+        'fileName': 'android/app/src/main/AndroidManifest.xml',
+        'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
         android:label="real_time"
         android:name="\${applicationName}"
@@ -465,15 +465,10 @@ dev_dependencies:
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
-    ${needsInternet ? '<uses-permission android:name="android.permission.INTERNET"/>' : ''}
-</manifest>''';
-
-      parsedFiles.add({
-        'fileName': 'android/app/src/main/AndroidManifest.xml',
-        'fileCode': manifestContent,
+    <uses-permission android:name="android.permission.INTERNET"/>
+</manifest>''',
       });
 
-      // रूट वाला AndroidManifest.xml
       parsedFiles.add({
         'fileName': 'android/AndroidManifest.xml',
         'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -483,7 +478,31 @@ dev_dependencies:
 </manifest>''',
       });
 
-      // 3. Root build.gradle
+      // 3. Force Android styles.xml & launch_background.xml (Fixes Theme/Launcher errors permanently)
+      parsedFiles.removeWhere((file) => file['fileName'].toString().contains('styles.xml'));
+      parsedFiles.add({
+        'fileName': 'android/app/src/main/res/values/styles.xml',
+        'fileCode': '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>''',
+      });
+
+      parsedFiles.removeWhere((file) => file['fileName'].toString().contains('launch_background.xml'));
+      parsedFiles.add({
+        'fileName': 'android/app/src/main/res/drawable/launch_background.xml',
+        'fileCode': '''<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/white" />
+</layer-list>''',
+      });
+
+      // 4. Root build.gradle
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/build.gradle');
       parsedFiles.add({
         'fileName': 'android/build.gradle',
@@ -508,7 +527,7 @@ task clean(type: Delete) {
 ''',
       });
 
-      // 4. App build.gradle (FIXED: flutterVersionCode and flutterVersionName removed)
+      // 5. App build.gradle
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/app/build.gradle');
       parsedFiles.add({
         'fileName': 'android/app/build.gradle',
@@ -543,7 +562,7 @@ flutter {
 ''',
       });
 
-      // 5. settings.gradle (FIXED: pluginManagement added)
+      // 6. settings.gradle
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/settings.gradle');
       parsedFiles.add({
         'fileName': 'android/settings.gradle',
@@ -578,7 +597,17 @@ include ":app"
 ''',
       });
 
-      // 6. GitHub Actions Workflow
+      // 7. gradle.properties
+      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/gradle.properties');
+      parsedFiles.add({
+        'fileName': 'android/gradle.properties',
+        'fileCode': '''org.gradle.jvmargs=-Xmx1536M
+android.useAndroidX=true
+android.enableJetifier=true
+''',
+      });
+
+      // 8. GitHub Actions Workflow
       parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
       parsedFiles.add({
         'fileName': '.github/workflows/flutter.yml',
