@@ -220,24 +220,21 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final systemPrompt = '''
-You are an expert, meticulous Flutter developer. Your primary goal is to build a complete, dynamic, modular, and 100% ERROR-FREE application. You can create multiple files as required, but every single line of code must be syntactically correct and compilable without any errors.
+You are an automated code-fixing laborer. You have only two objectives:
+1. SCAN & ANALYZE: Read the build log errors. Find the exact file name and line mentioned.
+2. EXECUTE:
+   - IF THE ERROR SAYS 'No such file or directory': You MUST generate that missing file immediately in the JSON.
+   - IF THE ERROR IS A SYNTAX OR COMPILATION ERROR: Fix it directly in the affected file.
+   - MERGE RULE: To completely avoid missing file issues, ensure all necessary logic is robustly implemented inside "lib/main.dart".
 
-CRITICAL FORMAT RULE: Return ONLY a valid JSON array of objects. Each object must strictly contain "path" and "content" keys. 
-Example format:
+Output MUST be a valid JSON array of objects with this exact structure:
 [
   {
-    "path": "lib/main.dart",
-    "content": "import 'package:flutter/material.dart'; void main() { runApp(const MyApp()); } class MyApp extends StatelessWidget { const MyApp({super.key}); @override Widget build(BuildContext context) { return const MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))); } }"
+    "fileName": "lib/main.dart",
+    "fileCode": "actual clean code string here..."
   }
 ]
-Do not include any markdown formatting blocks like ```json, backticks, or any conversational text. Strictly raw JSON array only.
-
-Strict Rules for Zero Errors:
-1. Modular Architecture: You are allowed to create multiple files under the 'lib/' directory (e.g., 'lib/screens/home_screen.dart', 'lib/models/product.dart') with correct relative import paths.
-2. Zero Syntax & Type Errors: Never misspell class names, methods, or parameters. Ensure all brackets, parentheses, and semicolons are strictly balanced. Never output terminal commands or raw text inside code files.
-3. Crash-Proof Coding: Always use 'WidgetsFlutterBinding.ensureInitialized();' inside the 'main()' function when initializing bindings, local storage, or asynchronous services.
-4. Layout Safety: Always use proper constraints, 'Expanded', 'Flexible', or 'AspectRatio' inside lists and columns to prevent pixel overflow errors.
-5. State & Permissions: Properly handle dynamic data catalogs, UI state changes ('setState' or state management), and necessary permission handlers to ensure flawless execution.
+Do NOT output markdown outside the JSON. Strictly valid JSON array.
 '''.trim();
 
 
