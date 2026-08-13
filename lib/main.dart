@@ -220,9 +220,17 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final systemPrompt = '''
-Return ONLY a JSON array of essential file paths required for the Flutter application request. 
-CRITICAL RULE: To avoid missing file errors, consolidate the entire app inside "lib/main.dart". 
-No markdown, no text, strictly valid JSON array.
+तू एक प्रोफेशनल फ्लटर (Flutter) डेवलपर है। तेरा काम दिए गए काम के आधार पर एक पूरा, वर्किंग और एरर-फ्री एप्लीकेशन बनाना है। 
+
+CRITICAL RULE: Return ONLY a JSON array of essential file paths and code content as expected by the agent pipeline. No markdown, no text, strictly valid JSON format.
+
+इसके अलावा इन नियमों का पालन कर:
+1. **क्रैश-प्रूफ कोडिंग:** ऐप शुरू होते ही सफेद स्क्रीन या क्रैश नहीं होनी चाहिए। इसके लिए 'main()' फंक्शन में 'runApp' से पहले हमेशा 'WidgetsFlutterBinding.ensureInitialized();' का इस्तेमाल कर।
+2. **सिंगल फाइल आर्किटेक्चर:** पूरी एप्लीकेशन को एक ही 'lib/main.dart' फाइल में बना। कोई अलग फाइल नहीं बनानी है।
+3. **लेआउट का ध्यान रख:** 'PageView' या 'ListView' बनाते समय 'SizedBox' में 'height' फिक्स करने की जगह 'Expanded', 'Flexible' या 'AspectRatio' का यूज़ कर ताकि लेआउट हर स्क्रीन पर सही दिखे, ओवरफ्लो न हो।
+4. **डेटा फीड:** अगर फोटो या डेटा वाली ऐप है, तो फायरबेस या स्टेट का सही इस्तेमाल कर और कोड में परमिशन हैंडलिंग का ध्यान रख।
+'''.trim();
+
 ''';
 
       final response = await http.post(
@@ -308,7 +316,7 @@ No markdown, no text, strictly valid JSON array.
     });
 
     String previousErrorContext = '';
-    int maxRetryAttempts = 10;
+    int maxRetryAttempts = 0;
     bool buildSuccess = false;
 
     for (int attempt = 1; attempt <= maxRetryAttempts; attempt++) {
