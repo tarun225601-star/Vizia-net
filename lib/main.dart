@@ -64,6 +64,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
 
   final List<String> _logs = [];
   List<Map<String, dynamic>> _selectableFiles = [];
+  final List<Map<String, String>> _detectedErrors = [];
   String _actionsUrl = '';
   String _criticalErrorReason = '';
 
@@ -150,7 +151,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
               ),
               TextField(
                 controller: githubRepoController,
-                decoration: const InputDecoration(labelText: 'GitHub Repository Name (Package Name)'),
+                decoration: const InputDecoration(labelText: 'GitHub Repository Name'),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
@@ -206,6 +207,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       _progressValue = 0.15;
       _currentPhase = 'Analyzing prompt for architecture rules...';
       _selectableFiles.clear();
+      _detectedErrors.clear();
       _actionsUrl = '';
       _criticalErrorReason = '';
     });
@@ -316,7 +318,6 @@ No markdown, no text, strictly valid JSON array.
         final config = await _getStoredConfig();
         final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
 
-        // --- यहाँ लेबर और सर्जरी वाले सख्त निर्देश डाले गए हैं ---
         String repairInstruction = previousErrorContext.isEmpty 
             ? '' 
             : '''
@@ -467,7 +468,6 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.$repairInstru
     return 'timeout';
   }
 
-  // --- BOTTOM-TO-TOP ERROR SCANNER (नीचे से ऊपर स्कैन करने वाला सटीक स्कैनर) ---
   Future<String> _fetchLatestActionErrorLog(AgentConfig config) async {
     try {
       final runsUrl = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/actions/runs?per_page=1');
@@ -513,7 +513,6 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.$repairInstru
                 List<String> lines = rawLogs.split('\n');
                 List<String> relevantLines = [];
                 
-                // एकदम सटीक Bottom-to-Top स्कैनिंग
                 for (int i = lines.length - 1; i >= 0; i--) {
                   String line = lines[i];
                   String lower = line.toLowerCase();
@@ -532,6 +531,113 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.$repairInstru
       return 'Log fetching error: $e';
     }
     return 'Unknown build failure inside Flutter gradle compile phase.';
+  }
+
+  Future<void> _scanActionErrors() async {
+    setState(() {
+      _currentPhase = 'Scanning GitHub Action logs for errors...';
+      _detectedErrors.clear();
+    });
+    _addLog('🔍 Scanning latest build logs from bottom-to-top...');
+
+    try {
+      final config = await _getStoredConfig();
+      String rawLog = await _fetchLatestActionErrorLog(config);
+
+      List<String> lines = rawLog.split('\n');
+      List<Map<String, String>> foundErrors = [];
+
+      for (String line in lines) {
+        String lower = line.toLowerCase();
+        if (lower.contains('error') || lower.contains('fail') || lower.contains('undefined') || lower.contains('exception') || lower.contains('syntax')) {
+          String targetFile = 'lib/main.dart';
+          if (line.contains('pubspec.yaml')) targetFile = 'pubspec.yaml';
+          if (line.contains('.dart')) {
+            RegExp regExp = RegExp(r'([\w\-/]+\.dart)');
+            var match = regExp.firstMatch(line);
+            if (match != null) targetFile = match.group(0)!;
+          }
+          foundErrors.add({'file': targetFile, 'error': line});
+        }
+      }
+
+      setState(() {
+        _detectedErrors.addAll(foundErrors.take(10));
+        _currentPhase = foundErrors.isEmpty ? 'Build looks clean! No errors found.' : 'Errors detected! Tap "Fix" on specific error.';
+      });
+
+      _addLog(foundErrors.isEmpty ? '🎉 No errors found in latest logs!' : '⚠️ Found ${foundErrors.length} issues.');
+
+    } catch (e) {
+      _addLog('⚠️ Scan failed: $e', type: 'error');
+      setState(() => _currentPhase = 'Scan failed.');
+    }
+  }
+
+  Future<void> _fixSpecificError(String targetFile, String errorMessage) async {
+    setState(() {
+      _isAutonomousRunning = true;
+      _currentPhase = 'Surgically fixing file: $targetFile...';
+    });
+    _addLog('🛠️ Laborer dispatching surgical fix for file: $targetFile');
+
+    try {
+      final config = await _getStoredConfig();
+      String existingCode = await _fetchFileFromGitHub(config, targetFile);
+
+      final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+      final systemPrompt = '''
+You are a surgical code debugger. You are given a specific file and a specific error message. 
+Fix ONLY the error inside this file. Do not touch other files. Return ONLY the corrected raw code for this file without markdown wrappers.
+Target File: $targetFile
+Error Message: $errorMessage
+''';
+
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ${config.groqKey}'},
+        body: jsonEncode({
+          "model": config.selectedModel,
+          "messages": [
+            {"role": "system", "content": systemPrompt},
+            {"role": "user", "content": "Existing Code:\n$existingCode"}
+          ],
+          "temperature": 0.1,
+        }),
+      );
+
+      if (response.statusCode != 200) throw Exception(response.body);
+
+      final decoded = jsonDecode(response.body);
+      String fixedCode = decoded['choices'][0]['message']['content'];
+      fixedCode = fixedCode.replaceAll('```dart', '').replaceAll('```', '').trim();
+
+      _addLog('☁️ Pushing surgically patched $targetFile to GitHub...');
+      await _pushFileToGitHub(config, targetFile, fixedCode);
+
+      setState(() {
+        _isAutonomousRunning = false;
+        _currentPhase = 'Patch applied to $targetFile successfully. Re-scan to verify.';
+        _detectedErrors.removeWhere((e) => e['file'] == targetFile);
+      });
+      _addLog('✨ Successfully patched and pushed $targetFile!');
+
+    } catch (e) {
+      _addLog('⚠️ Surgical fix error: $e', type: 'error');
+      setState(() => _isAutonomousRunning = false);
+    }
+  }
+
+  Future<String> _fetchFileFromGitHub(AgentConfig config, String path) async {
+    try {
+      final url = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/contents/$path');
+      final res = await http.get(url, headers: {'Authorization': 'Bearer ${config.githubToken}', 'Accept': 'application/vnd.github+json'});
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        return utf8.decode(base64Decode(data['content'].replaceAll('\n', '')));
+      }
+    } catch (_) {}
+    return '// Code not found or new file';
   }
 
   List<Map<String, dynamic>> _parsePlainFiles(String rawResponse, String packageName) {
@@ -925,8 +1031,65 @@ jobs:
                 child: const Text('🚀 Step 2: Synthesize & Self-Heal Build', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ] else ...[
-              const Text('Live Telemetry & Diagnostics:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Live Telemetry & Diagnostics:', style: TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
               const SizedBox(height: 6),
+              ElevatedButton.icon(
+                onPressed: _isAutonomousRunning ? null : _scanActionErrors,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orangeAccent, 
+                  foregroundColor: Colors.black,
+                  minimumSize: const Size.fromHeight(36),
+                ),
+                icon: const Icon(Icons.search, size: 16),
+                label: const Text('Scan Build Errors & Show Fix Buttons'),
+              ),
+              const SizedBox(height: 6),
+              if (_detectedErrors.isNotEmpty) ...[
+                const Text('🛠️ Detected Errors & Surgical Fix:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent, fontSize: 12)),
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 120,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.05), 
+                      borderRadius: BorderRadius.circular(8), 
+                      border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                    ),
+                    child: ListView.builder(
+                      itemCount: _detectedErrors.length,
+                      itemBuilder: (context, index) {
+                        final err = _detectedErrors[index];
+                        return Card(
+                          color: const Color(0xFF1D3557),
+                          margin: const EdgeInsets.symmetric(vertical: 2),
+                          child: ListTile(
+                            dense: true,
+                            title: Text(err['file']!, style: const TextStyle(color: Color(0xFF00F5D4), fontWeight: FontWeight.bold, fontSize: 11)),
+                            subtitle: Text(err['error']!, style: const TextStyle(fontFamily: 'monospace', fontSize: 9, color: Colors.white70), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            trailing: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent, 
+                                foregroundColor: Colors.white, 
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                minimumSize: const Size(50, 28),
+                              ),
+                              onPressed: _isAutonomousRunning ? null : () => _fixSpecificError(err['file']!, err['error']!),
+                              child: const Text('Fix', style: TextStyle(fontSize: 11)),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.all(8),
