@@ -54,19 +54,14 @@ class EnterpriseStudioScreen extends StatefulWidget {
 
 class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   final TextEditingController _promptController = TextEditingController();
-  final TextEditingController _searchFileController = TextEditingController();
 
   bool _isAutonomousRunning = false;
-  bool _isWaitingForUserFileSelection = false;
   double _progressValue = 0.0;
   String _currentPhase = 'Idle - Ready for Enterprise Task.';
-  String _fileSearchQuery = '';
 
   final List<String> _logs = [];
-  List<Map<String, dynamic>> _selectableFiles = [];
   final List<Map<String, String>> _detectedErrors = [];
   String _actionsUrl = '';
-  String _criticalErrorReason = '';
 
   @override
   void initState() {
@@ -204,29 +199,22 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
 
     setState(() {
       _isAutonomousRunning = true;
-      _progressValue = 0.15;
-      _currentPhase = 'Analyzing prompt for architecture rules...';
-      _selectableFiles.clear();
+      _progressValue = 0.20;
+      _currentPhase = 'Phase 1: Agent generating application files...';
       _detectedErrors.clear();
       _actionsUrl = '';
-      _criticalErrorReason = '';
     });
 
     _addLog('🚀 Enterprise Autonomous Agent Pipeline Initialized.');
-    _addLog('🧠 Evaluating prompt for file requirements...');
+    _addLog('🧠 Generating full project structure automatically...');
 
     try {
       final config = await _getStoredConfig();
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final systemPrompt = '''
-You are an automated code-fixing laborer. You have only two objectives:
-1. SCAN & ANALYZE: Read the build log errors. Find the exact file name and line mentioned.
-2. EXECUTE:
-   - IF THE ERROR SAYS 'No such file or directory': You MUST generate that missing file immediately in the JSON.
-   - IF THE ERROR IS A SYNTAX OR COMPILATION ERROR: Fix it directly in the affected file.
-   - MERGE RULE: To completely avoid missing file issues, ensure all necessary logic is robustly implemented inside "lib/main.dart".
-
+You are an expert autonomous Flutter developer and architect. 
+Analyze the user requirements and generate all necessary application files.
 Output MUST be a valid JSON array of objects with this exact structure:
 [
   {
@@ -236,10 +224,6 @@ Output MUST be a valid JSON array of objects with this exact structure:
 ]
 Do NOT output markdown outside the JSON. Strictly valid JSON array.
 '''.trim();
-
-
-
-''';
 
       final response = await http.post(
         uri,
@@ -259,229 +243,51 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.
       );
 
       if (response.statusCode != 200) {
-        throw Exception('Architect Planner Error: ${response.body}');
+        throw Exception('Code Synthesis Error: ${response.body}');
       }
 
       final decoded = jsonDecode(response.body);
-      String content = decoded['choices'][0]['message']['content'].trim();
-      
-      content = content.replaceAll('```json', '').replaceAll('```', '').trim();
-      int startIndex = content.indexOf('[');
-      int endIndex = content.lastIndexOf(']');
-      
-      if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
-        content = content.substring(startIndex, endIndex + 1);
-      }
-      
-      List<dynamic> parsedList = jsonDecode(content);
-      List<String> filePlan = parsedList.map((e) => e.toString()).toList();
-
-      if (!filePlan.contains('lib/main.dart')) {
-        filePlan.add('lib/main.dart');
-      }
-
-      _addLog('📋 Architect designed ${filePlan.length} files.');
+      String rawResponse = decoded['choices'][0]['message']['content'];
 
       setState(() {
-        _selectableFiles = filePlan.map((path) => {'path': path, 'selected': true}).toList();
-        _isAutonomousRunning = false;
-        _isWaitingForUserFileSelection = true;
-        _progressValue = 0.30;
-        _currentPhase = 'Paused: Review & Select Files.';
-        _fileSearchQuery = '';
-        _searchFileController.clear();
+        _progressValue = 0.60;
+        _currentPhase = 'Phase 2: Parsing & Packaging Files...';
       });
 
-    } catch (e) {
-      _addLog('⚠️ Planning Error: $e', type: 'error');
+      _addLog('🔍 Applying bulletproof build protection templates...');
+      final files = _parsePlainFiles(rawResponse, config.githubRepo);
+
       setState(() {
-        _isAutonomousRunning = false;
-        _currentPhase = 'Pipeline Aborted.';
-        _criticalErrorReason = 'Planning Phase Failed: $e';
+        _progressValue = 0.80;
+        _currentPhase = 'Phase 3: GitHub Secure Push...';
       });
-    }
-  }
 
-  Future<void> _confirmAndExecuteBuild() async {
-    final chosenFiles = _selectableFiles
-        .where((f) => f['selected'] == true)
-        .map((f) => f['path'].toString())
-        .toList();
+      _addLog('☁️ Connecting to GitHub REST API endpoints...');
+      for (int i = 0; i < files.length; i++) {
+        final fileEntry = files[i];
+        final String fileName = fileEntry['fileName'];
+        final String fileCode = fileEntry['fileCode'];
 
-    if (chosenFiles.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Please select at least one file to build!')),
-      );
-      return;
-    }
-
-    setState(() {
-      _isWaitingForUserFileSelection = false;
-      _isAutonomousRunning = true;
-      _progressValue = 0.40;
-      _currentPhase = 'Phase 2: Surgical Laborer Active (Self-Healing Loop)...';
-      _criticalErrorReason = '';
-    });
-
-    String previousErrorContext = '';
-    int maxRetryAttempts = 0;
-    bool buildSuccess = false;
-
-    for (int attempt = 1; attempt <= maxRetryAttempts; attempt++) {
-      _addLog('⚡ Attempt $attempt of $maxRetryAttempts: Laborer executing code fix...');
-
-      try {
-        final config = await _getStoredConfig();
-        final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-
-        String repairInstruction = previousErrorContext.isEmpty 
-            ? '' 
-            : '''
-\n\n=== SURGICAL ERROR LOG SCAN (BOTTOM-TO-TOP) ===
-The previous build failed with the exact log below. You are a code laborer. Read the file name in the error and fix ONLY that specific file:
-$previousErrorContext
---------------------------------------------------
-''';
-
-        final systemPrompt = '''
-You are an automated code-fixing laborer. You have only two objectives:
-1. SCAN & ANALYZE: Read the build log errors. Find the exact file name and line mentioned.
-2. EXECUTE: 
-   - IF THE ERROR SAYS 'No such file or directory': You MUST generate that missing file immediately in the JSON.
-   - IF THE ERROR IS A SYNTAX OR COMPILATION ERROR: Fix it directly in the affected file.
-   - MERGE RULE: To completely avoid missing file issues, ensure all necessary logic is robustly implemented inside "lib/main.dart".
-
-Output MUST be a valid JSON array of objects with this exact structure:
-[
-  {
-    "fileName": "lib/main.dart",
-    "fileCode": "actual clean code string here..."
-  }
-]
-Do NOT output markdown outside the JSON. Strictly valid JSON array.$repairInstruction
-''';
-
-        final response = await http.post(
-          uri,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ${config.groqKey}',
-          },
-          body: jsonEncode({
-            "model": config.selectedModel,
-            "messages": [
-              {"role": "system", "content": systemPrompt},
-              {"role": "user", "content": "Generate code for files: ${jsonEncode(chosenFiles)} based on user requirement: ${_promptController.text.trim()}"}
-            ],
-            "temperature": 0.1,
-            "max_tokens": 4000,
-          }),
-        );
-
-        if (response.statusCode != 200) {
-          throw Exception('Code Synthesis Error: ${response.body}');
-        }
-
-        final decoded = jsonDecode(response.body);
-        String rawResponse = decoded['choices'][0]['message']['content'];
-
-        setState(() {
-          _progressValue = 0.50 + (attempt * 0.05);
-          _currentPhase = 'Phase 3: Parsing & Safety Verification...';
-        });
-
-        _addLog('🔍 Applying bulletproof build protection templates...');
-        final files = _parsePlainFiles(rawResponse, config.githubRepo);
-
-        setState(() {
-          _progressValue = 0.65 + (attempt * 0.03);
-          _currentPhase = 'Phase 4: GitHub Secure Push...';
-        });
-
-        _addLog('☁️ Connecting to GitHub REST API endpoints...');
-        for (int i = 0; i < files.length; i++) {
-          final fileEntry = files[i];
-          final String fileName = fileEntry['fileName'];
-          final String fileCode = fileEntry['fileCode'];
-
-          _addLog('📦 Pushing module: $fileName');
-          await _pushFileToGitHub(config, fileName, fileCode);
-        }
-
-        _addLog('⏳ Waiting for GitHub Actions workflow to run & verify build...');
-        setState(() => _currentPhase = 'Phase 5: Monitoring GitHub Build Actions...');
-
-        String actionStatus = await _monitorGitHubAction(config);
-
-        if (actionStatus == 'success') {
-          buildSuccess = true;
-          _addLog('🎉 GitHub Action Build Passed Successfully!');
-          break;
-        } else if (actionStatus == 'failure') {
-          _addLog('❌ GitHub Action Build Failed! Reading raw error logs bottom-to-top...', type: 'error');
-          previousErrorContext = await _fetchLatestActionErrorLog(config);
-          _addLog('🤖 Laborer analyzing failure logs to patch the exact file...');
-        } else {
-          _addLog('⚠️ Build status timeout or unknown. Proceeding with caution.');
-          buildSuccess = true;
-          break;
-        }
-
-      } catch (e) {
-        _addLog('⚠️ Execution Error in Attempt $attempt: $e', type: 'error');
-        previousErrorContext = e.toString();
+        _addLog('📦 Pushing module: $fileName');
+        await _pushFileToGitHub(config, fileName, fileCode);
       }
-    }
 
-    if (buildSuccess) {
-      final config = await _getStoredConfig();
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
-        _currentPhase = 'Pipeline Completed Successfully!';
+        _currentPhase = 'Pipeline Completed Successfully! Ready to scan errors.';
         _actionsUrl = 'https://github.com/${config.githubUser}/${config.githubRepo}/actions';
       });
-      _addLog('🎉 Application successfully verified and deployed!');
-    } else {
+      _addLog('🎉 Application successfully generated and pushed to GitHub!');
+
+    } catch (e) {
+      _addLog('⚠️ Execution Error: $e', type: 'error');
       setState(() {
         _isAutonomousRunning = false;
         _progressValue = 1.0;
-        _currentPhase = 'Pipeline Halted: Unresolvable Critical Error.';
-        _criticalErrorReason = 'GitHub Actions Build failed continuously after 10 attempts.\n\nLast Error Log:\n$previousErrorContext';
+        _currentPhase = 'Pipeline Halted due to Error.';
       });
-      _addLog('🛑 Pipeline stopped because automatic fixes could not resolve the error.', type: 'error');
     }
-  }
-
-  Future<String> _monitorGitHubAction(AgentConfig config) async {
-    for (int i = 0; i < 24; i++) {
-      await Future.delayed(const Duration(seconds: 5));
-      try {
-        final url = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/actions/runs?per_page=1');
-        final response = await http.get(
-          url,
-          headers: {
-            'Authorization': 'Bearer ${config.githubToken}',
-            'Accept': 'application/vnd.github+json',
-          },
-        );
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final runs = data['workflow_runs'] as List;
-          if (runs.isNotEmpty) {
-            final latestRun = runs.first;
-            String status = latestRun['status'] ?? ''; 
-            String conclusion = latestRun['conclusion'] ?? ''; 
-
-            if (status == 'completed') {
-              return conclusion; 
-            }
-          }
-        }
-      } catch (_) {}
-    }
-    return 'timeout';
   }
 
   Future<String> _fetchLatestActionErrorLog(AgentConfig config) async {
@@ -680,6 +486,7 @@ Error Message: $errorMessage
         });
       }
 
+      // Default necessary configs
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
       parsedFiles.add({
         'fileName': 'pubspec.yaml',
@@ -689,7 +496,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '^3.3.0'
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -715,15 +522,10 @@ dev_dependencies:
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -737,131 +539,7 @@ dev_dependencies:
 </manifest>''',
       });
 
-      parsedFiles.removeWhere((file) => file['fileName'].toString().contains('styles.xml'));
-      parsedFiles.add({
-        'fileName': 'android/app/src/main/res/values/styles.xml',
-        'fileCode': '''<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowBackground">@drawable/launch_background</item>
-    </style>
-    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowBackground">@android:color/white</item>
-    </style>
-</resources>''',
-      });
-
-      parsedFiles.removeWhere((file) => file['fileName'].toString().contains('launch_background.xml'));
-      parsedFiles.add({
-        'fileName': 'android/app/src/main/res/drawable/launch_background.xml',
-        'fileCode': '''<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/white" />
-</layer-list>''',
-      });
-
-      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/build.gradle');
-      parsedFiles.add({
-        'fileName': 'android/build.gradle',
-        'fileCode': '''allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-rootProject.buildDir = '../build'
-subprojects {
-    project.buildDir = "\${rootProject.buildDir}/\${project.name}"
-}
-subprojects {
-    project.evaluationDependsOn(":app")
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
-}
-''',
-      });
-
-      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/app/build.gradle');
-      parsedFiles.add({
-        'fileName': 'android/app/build.gradle',
-        'fileCode': '''plugins {
-    id "com.android.application"
-    id "kotlin-android"
-    id "dev.flutter.flutter-gradle-plugin"
-}
-
-android {
-    namespace "com.example.$packageName"
-    compileSdkVersion flutter.compileSdkVersion
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-    kotlinOptions {
-        jvmTarget = '1.8'
-    }
-    defaultConfig {
-        applicationId "com.example.$packageName"
-        minSdkVersion flutter.minSdkVersion
-        targetSdkVersion flutter.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
-    }
-}
-
-flutter {
-    source = "../.."
-}
-''',
-      });
-
-      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/settings.gradle');
-      parsedFiles.add({
-        'fileName': 'android/settings.gradle',
-        'fileCode': '''pluginManagement {
-    def flutterSdkPath = {
-        def properties = new Properties()
-        def flutterPropertiesFile = new File('local.properties')
-        if (flutterPropertiesFile.exists()) {
-            properties.load(new FileInputStream(flutterPropertiesFile))
-        }
-        def flutterSdkPath = properties.getProperty('flutter.sdk')
-        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-        return flutterSdkPath
-    }()
-
-    includeBuild("\$flutterSdkPath/packages/flutter_tools/gradle")
-
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-
-plugins {
-    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    id "com.android.application" version "7.3.0" apply false
-    id "org.jetbrains.kotlin.android" version "1.8.0" apply false
-}
-
-include ":app"
-''',
-      });
-
-      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/gradle.properties');
-      parsedFiles.add({
-        'fileName': 'android/gradle.properties',
-        'fileCode': '''org.gradle.jvmargs=-Xmx1536M
-android.useAndroidX=true
-android.enableJetifier=true
-''',
-      });
-
-      parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
+      parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml') && file['fileName'].toString() != 'pubspec.yaml');
       parsedFiles.add({
         'fileName': '.github/workflows/flutter.yml',
         'fileCode': '''name: Build Flutter App
@@ -908,7 +586,7 @@ jobs:
     final encodedContent = base64Encode(utf8.encode(fileCode));
 
     final Map<String, dynamic> bodyData = {
-      "message": "Autonomous Laborer: Fix/Add $fileName",
+      "message": "Autonomous Agent: Add/Update $fileName",
       "content": encodedContent,
       "branch": "main",
     };
@@ -934,10 +612,6 @@ jobs:
 
   @override
   Widget build(BuildContext context) {
-    final filteredFiles = _selectableFiles.where((f) {
-      return f['path'].toLowerCase().contains(_fileSearchQuery.toLowerCase());
-    }).toList();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Autonomous Enterprise Studio'),
@@ -966,13 +640,13 @@ jobs:
             ),
             const SizedBox(height: 12),
             ElevatedButton(
-              onPressed: _isAutonomousRunning || _isWaitingForUserFileSelection ? null : _startAutonomousPipeline,
+              onPressed: _isAutonomousRunning ? null : _startAutonomousPipeline,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00F5D4), 
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: const Text('🔍 Step 1: Plan Core Architecture', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('🚀 Start Autonomous Build & Push', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
             LinearProgressIndicator(
@@ -985,156 +659,93 @@ jobs:
             const SizedBox(height: 4),
             Text(_currentPhase, style: const TextStyle(color: Color(0xFF00F5D4))),
             const SizedBox(height: 12),
-            if (_criticalErrorReason.isNotEmpty) ...[
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.2),
-                  border: Border.all(color: Colors.red),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('🛑 CRITICAL HALT REASON:', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text(_criticalErrorReason, style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (_isWaitingForUserFileSelection) ...[
-              TextField(
-                controller: _searchFileController,
-                onChanged: (val) => setState(() => _fileSearchQuery = val),
-                decoration: const InputDecoration(
-                  labelText: 'Search Files...',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text('Review & Select Files to Build:', style: TextStyle(fontWeight: FontWeight.bold)),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: filteredFiles.length,
-                  itemBuilder: (context, index) {
-                    final fileItem = filteredFiles[index];
-                    return CheckboxListTile(
-                      title: Text(fileItem['path']),
-                      value: fileItem['selected'],
-                      activeColor: const Color(0xFF00F5D4),
-                      checkColor: Colors.black,
-                      onChanged: (val) {
-                        setState(() {
-                          fileItem['selected'] = val ?? true;
-                        });
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: _confirmAndExecuteBuild,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00F5D4), 
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: const Text('🚀 Step 2: Synthesize & Self-Heal Build', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ] else ...[
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Live Telemetry & Diagnostics:', style: TextStyle(fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              ElevatedButton.icon(
-                onPressed: _isAutonomousRunning ? null : _scanActionErrors,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orangeAccent, 
-                  foregroundColor: Colors.black,
-                  minimumSize: const Size.fromHeight(36),
-                ),
-                icon: const Icon(Icons.search, size: 16),
-                label: const Text('Scan Build Errors & Show Fix Buttons'),
-              ),
-              const SizedBox(height: 6),
-              if (_detectedErrors.isNotEmpty) ...[
-                const Text('🛠️ Detected Errors & Surgical Fix:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent, fontSize: 12)),
-                const SizedBox(height: 4),
-                SizedBox(
-                  height: 120,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.05), 
-                      borderRadius: BorderRadius.circular(8), 
-                      border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
-                    ),
-                    child: ListView.builder(
-                      itemCount: _detectedErrors.length,
-                      itemBuilder: (context, index) {
-                        final err = _detectedErrors[index];
-                        return Card(
-                          color: const Color(0xFF1D3557),
-                          margin: const EdgeInsets.symmetric(vertical: 2),
-                          child: ListTile(
-                            dense: true,
-                            title: Text(err['file']!, style: const TextStyle(color: Color(0xFF00F5D4), fontWeight: FontWeight.bold, fontSize: 11)),
-                            subtitle: Text(err['error']!, style: const TextStyle(fontFamily: 'monospace', fontSize: 9, color: Colors.white70), maxLines: 1, overflow: TextOverflow.ellipsis),
-                            trailing: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.redAccent, 
-                                foregroundColor: Colors.white, 
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                                minimumSize: const Size(50, 28),
-                              ),
-                              onPressed: _isAutonomousRunning ? null : () => _fixSpecificError(err['file']!, err['error']!),
-                              child: const Text('Fix', style: TextStyle(fontSize: 11)),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Live Telemetry & Diagnostics:', style: TextStyle(fontWeight: FontWeight.bold)),
               ],
-              Expanded(
+            ),
+            const SizedBox(height: 6),
+            ElevatedButton.icon(
+              onPressed: _isAutonomousRunning ? null : _scanActionErrors,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orangeAccent, 
+                foregroundColor: Colors.black,
+                minimumSize: const Size.fromHeight(36),
+              ),
+              icon: const Icon(Icons.search, size: 16),
+              label: const Text('Scan Build Errors & Show Fix Buttons'),
+            ),
+            const SizedBox(height: 6),
+            if (_detectedErrors.isNotEmpty) ...[
+              const Text('🛠️ Detected Errors & Surgical Fix:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent, fontSize: 12)),
+              const SizedBox(height: 4),
+              SizedBox(
+                height: 120,
                 child: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white12),
+                    color: Colors.red.withOpacity(0.05), 
+                    borderRadius: BorderRadius.circular(8), 
+                    border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
                   ),
                   child: ListView.builder(
-                    itemCount: _logs.length,
+                    itemCount: _detectedErrors.length,
                     itemBuilder: (context, index) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.0),
-                        child: Text(
-                          _logs[index], 
-                          style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.greenAccent),
+                      final err = _detectedErrors[index];
+                      return Card(
+                        color: const Color(0xFF1D3557),
+                        margin: const EdgeInsets.symmetric(vertical: 2),
+                        child: ListTile(
+                          dense: true,
+                          title: Text(err['file']!, style: const TextStyle(color: Color(0xFF00F5D4), fontWeight: FontWeight.bold, fontSize: 11)),
+                          subtitle: Text(err['error']!, style: const TextStyle(fontFamily: 'monospace', fontSize: 9, color: Colors.white70), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          trailing: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.redAccent, 
+                              foregroundColor: Colors.white, 
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                              minimumSize: const Size(50, 28),
+                            ),
+                            onPressed: _isAutonomousRunning ? null : () => _fixSpecificError(err['file']!, err['error']!),
+                            child: const Text('Fix', style: TextStyle(fontSize: 11)),
+                          ),
                         ),
                       );
                     },
                   ),
                 ),
               ),
-              if (_actionsUrl.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () {},
-                  child: Text('Actions URL: $_actionsUrl', style: const TextStyle(color: Color(0xFF00F5D4))),
+              const SizedBox(height: 6),
+            ],
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white12),
                 ),
-              ],
+                child: ListView.builder(
+                  itemCount: _logs.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2.0),
+                      child: Text(
+                        _logs[index], 
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.greenAccent),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            if (_actionsUrl.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () {},
+                child: Text('Actions URL: $_actionsUrl', style: const TextStyle(color: Color(0xFF00F5D4))),
+              ),
             ],
           ],
         ),
