@@ -58,16 +58,13 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
 
   bool _isAutonomousRunning = false;
   bool _isWaitingForUserFileSelection = false;
-  bool _isPausedForUserInstruction = false; // नया फ्लैग: जब तक यूजर नया प्रॉम्प्ट न दे, तब तक रुका रहे
   double _progressValue = 0.0;
   String _currentPhase = 'Idle - Ready for Enterprise Task.';
   String _fileSearchQuery = '';
 
   final List<String> _logs = [];
   List<Map<String, dynamic>> _selectableFiles = [];
-  final List<Map<String, String>> _detectedErrors = [];
   String _actionsUrl = '';
-  String _criticalErrorReason = '';
 
   @override
   void initState() {
@@ -194,36 +191,46 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     );
   }
 
-  // 1. स्टेप 1: प्रॉम्प्ट विश्लेषण (अगर पाइपलाइन रुकी हुई है, तो नए निर्देश के साथ आगे बढ़ेगी)
-  Future<void> _startOrResumePipeline() async {
+  Future<void> _startAutonomousPipeline() async {
     final userPrompt = _promptController.text.trim();
     if (userPrompt.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Please enter a prompt, fix instructions, or error text!')),
+        const SnackBar(content: Text('⚠️ Please enter a prompt or app requirement!')),
       );
       return;
     }
 
     setState(() {
       _isAutonomousRunning = true;
-      _isPausedForUserInstruction = false;
-      _progressValue = 0.15;
-      _currentPhase = 'Analyzing your prompt / fix instructions...';
+      _progressValue = 0.2;
+      _currentPhase = 'Analyzing prompt and generating correct file paths...';
       _selectableFiles.clear();
-      _detectedErrors.clear();
-      _criticalErrorReason = '';
+      _actionsUrl = '';
     });
 
-    _addLog('🚀 Processing user instruction/prompt.');
+    _addLog('🚀 Generating strict project structure and files from prompt...');
 
     try {
       final config = await _getStoredConfig();
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final systemPrompt = '''
-You are an autonomous senior Flutter developer agent. Analyze the user prompt or error correction instructions and return a valid JSON array of file paths (strings) that need to be created or updated.
-Example: ["lib/main.dart", "lib/screens/home_screen.dart", "pubspec.yaml"]
-Do NOT output markdown outside the JSON. Strictly valid JSON array.
+You are an expert, meticulous Flutter developer and senior architect. Your task is to generate the exact set of files and code required for the user's prompt, ensuring every single file is placed in its STRICT AND CORRECT project path.
+
+CRITICAL PATH RULES:
+1. Flutter main UI/Logic code MUST always be inside the "lib/" directory (e.g., "lib/main.dart", "lib/screens/home_screen.dart").
+2. Configuration files MUST follow Flutter standards (e.g., "pubspec.yaml", "android/app/build.gradle", "android/app/src/main/AndroidManifest.xml").
+3. DO NOT invent arbitrary or broken paths. Use standard Flutter workspace hierarchies.
+4. Generate ONLY the necessary number of files based on the prompt complexity—no bloated or redundant files.
+
+Output MUST be a valid JSON array of objects with this exact structure:
+[
+  {
+    "fileName": "lib/main.dart",
+    "fileCode": "actual clean code string here..."
+  }
+]
+Do NOT output any markdown outside the JSON block. Strictly return a valid JSON array.
 '''.trim();
 
       final response = await http.post(
@@ -238,13 +245,13 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.
             {"role": "system", "content": systemPrompt},
             {"role": "user", "content": userPrompt}
           ],
-          "temperature": 0.1,
+          "temperature": 0.2,
           "max_tokens": 4000,
         }),
       );
 
       if (response.statusCode != 200) {
-        throw Exception('Architect Planner Error: ${response.body}');
+        throw Exception('API Error: ${response.body}');
       }
 
       final decoded = jsonDecode(response.body);
@@ -259,36 +266,33 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.
       }
       
       List<dynamic> parsedList = jsonDecode(content);
-      List<String> filePlan = parsedList.map((e) => e.toString()).toList();
+      List<String> filePlan = parsedList.map((e) => e['fileName'].toString()).toList();
 
       if (!filePlan.contains('lib/main.dart')) {
         filePlan.add('lib/main.dart');
       }
 
-      _addLog('📋 Architect designed ${filePlan.length} files.');
+      _addLog('📋 Generated ${filePlan.length} files with correct paths successfully.');
 
       setState(() {
         _selectableFiles = filePlan.map((path) => {'path': path, 'selected': true}).toList();
         _isAutonomousRunning = false;
         _isWaitingForUserFileSelection = true;
-        _progressValue = 0.30;
-        _currentPhase = 'Paused: Review & Select Files, then tap Build.';
+        _progressValue = 0.5;
+        _currentPhase = 'Review paths & files, then push to GitHub.';
         _fileSearchQuery = '';
         _searchFileController.clear();
       });
 
     } catch (e) {
-      _addLog('⚠️ Planning Error: $e', type: 'error');
+      _addLog('⚠️ Generation Error: $e', type: 'error');
       setState(() {
         _isAutonomousRunning = false;
-        _isPausedForUserInstruction = true; // एरर आने पर सिस्टम रुक जाएगा
-        _currentPhase = 'Pipeline Paused due to error. Enter fix prompt and resume.';
-        _criticalErrorReason = 'Planning Phase Failed: $e';
+        _currentPhase = 'Failed to generate files.';
       });
     }
   }
 
-  // 2. स्टेप 2: कोड सिंथेसिस और गिटहब डिप्लॉयमेंट (यदि बिल्ड फेल हुआ, तो रुक जाएगा)
   Future<void> _confirmAndExecuteBuild() async {
     final chosenFiles = _selectableFiles
         .where((f) => f['selected'] == true)
@@ -297,7 +301,7 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.
 
     if (chosenFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Please select at least one file to build!')),
+        const SnackBar(content: Text('⚠️ Please select at least one file!')),
       );
       return;
     }
@@ -305,9 +309,8 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.
     setState(() {
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
-      _progressValue = 0.40;
-      _currentPhase = 'Synthesizing code based on your prompt...';
-      _criticalErrorReason = '';
+      _progressValue = 0.7;
+      _currentPhase = 'Synthesizing final code and pushing to GitHub...';
     });
 
     try {
@@ -315,7 +318,7 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
 
       final systemPrompt = '''
-You are an autonomous full-stack Flutter developer agent. Given the user prompt and selected files, generate the production code.
+You are an expert Flutter developer. Generate the code for the requested files based on the user requirement. Ensure correct paths.
 Output MUST be a valid JSON array of objects with this exact structure:
 [
   {
@@ -336,113 +339,48 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.
           "model": config.selectedModel,
           "messages": [
             {"role": "system", "content": systemPrompt},
-            {"role": "user", "content": "Generate code for files: ${jsonEncode(chosenFiles)} based on prompt: ${_promptController.text.trim()}"}
+            {"role": "user", "content": "Generate code for files: ${jsonEncode(chosenFiles)} based on user requirement: ${_promptController.text.trim()}"}
           ],
-          "temperature": 0.1,
+          "temperature": 0.2,
           "max_tokens": 4000,
         }),
       );
 
       if (response.statusCode != 200) {
-        throw Exception('Code Synthesis Error: ${response.body}');
+        throw Exception('Synthesis Error: ${response.body}');
       }
 
       final decoded = jsonDecode(response.body);
       String rawResponse = decoded['choices'][0]['message']['content'];
 
-      setState(() {
-        _progressValue = 0.55;
-        _currentPhase = 'Parsing files & enforcing configuration templates...';
-      });
-
+      _addLog('📦 Verifying Android folder structures and config files...');
       final files = _parsePlainFiles(rawResponse, config.githubRepo);
 
-      setState(() {
-        _progressValue = 0.70;
-        _currentPhase = 'Pushing updates to GitHub...';
-      });
-
+      _addLog('☁️ Pushing files to correct GitHub repository paths...');
       for (int i = 0; i < files.length; i++) {
         final fileEntry = files[i];
-        await _pushFileToGitHub(config, fileEntry['fileName'], fileEntry['fileCode']);
+        final String fileName = fileEntry['fileName'];
+        final String fileCode = fileEntry['fileCode'];
+
+        _addLog('📤 Uploading to path -> $fileName');
+        await _pushFileToGitHub(config, fileName, fileCode);
       }
 
-      setState(() => _currentPhase = 'Monitoring GitHub Build Actions...');
-      String actionStatus = await _monitorGitHubAction(config);
-
-      if (actionStatus == 'success') {
-        setState(() {
-          _progressValue = 1.0;
-          _isAutonomousRunning = false;
-          _isPausedForUserInstruction = false;
-          _currentPhase = 'Pipeline Completed Successfully!';
-          _actionsUrl = 'https://github.com/${config.githubUser}/${config.githubRepo}/actions';
-        });
-        _addLog('🎉 Build Passed Successfully & APK Deployed!');
-      } else {
-        // **यहाँ सबसे बड़ा बदलाव है**: अगर बिल्ड फेल हुआ, तो प्रक्रिया यहीं रुक जाएगी (Pause)
-        setState(() {
-          _isAutonomousRunning = false;
-          _isPausedForUserInstruction = true; 
-          _progressValue = 1.0;
-          _currentPhase = '🛑 Build Failed! Pipeline Paused. Enter fix prompt below & click Resume.';
-          _criticalErrorReason = 'GitHub Actions Build Failed with error code conclusion: $actionStatus';
-        });
-        _addLog('❌ Build Failed! System paused. Please type the fix instruction in the prompt box and resume.', type: 'error');
-      }
+      setState(() {
+        _progressValue = 1.0;
+        _isAutonomousRunning = false;
+        _currentPhase = 'Successfully committed all files to correct paths!';
+        _actionsUrl = 'https://github.com/${config.githubUser}/${config.githubRepo}/actions';
+      });
+      _addLog('🎉 All files successfully committed to correct repository paths!');
 
     } catch (e) {
-      _addLog('⚠️ Execution Error: $e', type: 'error');
+      _addLog('⚠️ Push Error: $e', type: 'error');
       setState(() {
         _isAutonomousRunning = false;
-        _isPausedForUserInstruction = true; // एरर आने पर रोक दिया
-        _currentPhase = 'Pipeline Paused due to exception. Enter fix instruction.';
-        _criticalErrorReason = 'Execution Error: $e';
+        _currentPhase = 'Failed to push files.';
       });
     }
-  }
-
-  Future<String> _monitorGitHubAction(AgentConfig config) async {
-    for (int i = 0; i < 24; i++) {
-      await Future.delayed(const Duration(seconds: 5));
-      try {
-        final url = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/actions/runs?per_page=1');
-        final response = await http.get(
-          url,
-          headers: {
-            'Authorization': 'Bearer ${config.githubToken}',
-            'Accept': 'application/vnd.github+json',
-          },
-        );
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final runs = data['workflow_runs'] as List;
-          if (runs.isNotEmpty) {
-            final latestRun = runs.first;
-            String status = latestRun['status'] ?? ''; 
-            String conclusion = latestRun['conclusion'] ?? ''; 
-
-            if (status == 'completed') {
-              return conclusion; 
-            }
-          }
-        }
-      } catch (_) {}
-    }
-    return 'timeout';
-  }
-
-  Future<String> _fetchFileFromGitHub(AgentConfig config, String path) async {
-    try {
-      final url = Uri.parse('https://api.github.com/repos/${config.githubUser}/${config.githubRepo}/contents/$path');
-      final res = await http.get(url, headers: {'Authorization': 'Bearer ${config.githubToken}', 'Accept': 'application/vnd.github+json'});
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        return utf8.decode(base64Decode(data['content'].replaceAll('\n', '')));
-      }
-    } catch (_) {}
-    return '// Code not found';
   }
 
   List<Map<String, dynamic>> _parsePlainFiles(String rawResponse, String packageName) {
@@ -485,6 +423,7 @@ dependencies:
     sdk: flutter
   http: ^1.2.0
   shared_preferences: ^2.2.2
+  provider: ^6.1.2
 
 dev_dependencies:
   flutter_test:
@@ -537,20 +476,25 @@ dev_dependencies:
 
 android {
     namespace "com.example.$packageName"
-    compileSdkVersion flutter.compileSdkVersion
+    compileSdkVersion 34
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-    kotlinOptions {
-        jvmTarget = '1.8'
-    }
+
     defaultConfig {
         applicationId "com.example.$packageName"
-        minSdkVersion flutter.minSdkVersion
-        targetSdkVersion flutter.targetSdkVersion
+        minSdkVersion 21
+        targetSdkVersion 34
         versionCode 1
-        versionName "1.0.0"
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+        }
     }
 }
 
@@ -560,23 +504,30 @@ flutter {
 ''',
       });
 
-      parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml') && file['fileName'].toString().contains('workflows'));
+      parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
       parsedFiles.add({
         'fileName': '.github/workflows/flutter.yml',
         'fileCode': '''name: Build Flutter App
+
 on:
   push:
     branches: [ "main" ]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.x'
       - run: flutter pub get
       - run: flutter build apk --release
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
 ''',
       });
 
@@ -607,7 +558,7 @@ jobs:
     final encodedContent = base64Encode(utf8.encode(fileCode));
 
     final Map<String, dynamic> bodyData = {
-      "message": "Autonomous Laborer: Update $fileName",
+      "message": "Autonomous Structure Generator: Update $fileName",
       "content": encodedContent,
       "branch": "main",
     };
@@ -656,62 +607,34 @@ jobs:
             TextField(
               controller: _promptController,
               maxLines: 3,
-              decoration: InputDecoration(
-                labelText: _isPausedForUserInstruction 
-                  ? '🛑 एरर आ गया है! यहाँ सही करने के लिए नया प्रॉम्प्ट/एरर लिखें...' 
-                  : 'यहाँ ऐप की रिक्वायरमेंट या निर्देश दर्ज करें...',
-                border: const OutlineInputBorder(),
+              decoration: const InputDecoration(
+                labelText: 'Enter App Requirement / Prompt',
+                border: OutlineInputBorder(),
                 filled: true,
-                fillColor: _isPausedForUserInstruction ? Colors.red.withOpacity(0.1) : Colors.black26,
+                fillColor: Colors.black26,
               ),
             ),
             const SizedBox(height: 12),
-            
-            // यहाँ बटन का डायनेमिक नाम और रंग बदल जाता है जब सिस्टम रुक जाता है (Paused)
             ElevatedButton(
-              onPressed: _isAutonomousRunning ? null : _startOrResumePipeline,
+              onPressed: _isAutonomousRunning || _isWaitingForUserFileSelection ? null : _startAutonomousPipeline,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _isPausedForUserInstruction ? Colors.redAccent : const Color(0xFF00F5D4), 
+                backgroundColor: const Color(0xFF00F5D4), 
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: Text(
-                _isPausedForUserInstruction ? '🔄 Fix एरर & Resume Pipeline' : '🔍 Step 1: Analyze & Plan', 
-                style: const TextStyle(fontWeight: FontWeight.bold)
-              ),
+              child: const Text('🔍 Step 1: Generate Correct Paths & Files', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
             LinearProgressIndicator(
               value: _progressValue,
               backgroundColor: Colors.white24,
-              valueColor: AlwaysStoppedAnimation<Color>(_isPausedForUserInstruction ? Colors.redAccent : const Color(0xFF00F5D4)),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00F5D4)),
             ),
             const SizedBox(height: 8),
-            Text('Pipeline Status: ${(_progressValue * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Status: ${(_progressValue * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(_currentPhase, style: TextStyle(color: _isPausedForUserInstruction ? Colors.redAccent : const Color(0xFF00F5D4), fontWeight: FontWeight.w500)),
+            Text(_currentPhase, style: const TextStyle(color: Color(0xFF00F5D4))),
             const SizedBox(height: 12),
-            
-            if (_criticalErrorReason.isNotEmpty) ...[
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.2),
-                  border: Border.all(color: Colors.red),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('🛑 STOPPED / PAUSED ON ERROR:', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text(_criticalErrorReason, style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-
             if (_isWaitingForUserFileSelection) ...[
               TextField(
                 controller: _searchFileController,
@@ -724,7 +647,7 @@ jobs:
                 ),
               ),
               const SizedBox(height: 8),
-              const Text('Review & Select Files to Build:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Review Paths & Select Files to Push:', style: TextStyle(fontWeight: FontWeight.bold)),
               Expanded(
                 child: ListView.builder(
                   itemCount: filteredFiles.length,
@@ -752,11 +675,9 @@ jobs:
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('🚀 Step 2: Synthesize Code & Build APK', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('🚀 Step 2: Push Files to Correct GitHub Paths', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ] else ...[
-              const Text('Live Telemetry & Logs:', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.all(8),
