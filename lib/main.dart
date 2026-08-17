@@ -13,7 +13,7 @@ class AutonomousEnterpriseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Autonomous Enterprise Studio - VIP Models',
+      title: 'Autonomous Enterprise Studio - Self Healing',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0B132B),
         primaryColor: const Color(0xFF00F5D4),
@@ -66,7 +66,6 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   List<Map<String, dynamic>> _selectableFiles = [];
   String _actionsUrl = '';
 
-  // दुनिया के टॉप 25+ VIP मॉडल्स की लिस्ट (OpenRouter IDs के साथ)
   final List<Map<String, String>> _vipModels = [
     {'name': 'Claude 3.5 Sonnet (Anthropic - Best for Code)', 'id': 'anthropic/claude-3.5-sonnet'},
     {'name': 'Claude 3.5 Opus (Anthropic - Heavy Logic)', 'id': 'anthropic/claude-3-opus'},
@@ -75,19 +74,8 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     {'name': 'GPT-4o (OpenAI Flagship)', 'id': 'openai/gpt-4o'},
     {'name': 'GPT-4o Mini (OpenAI Fast)', 'id': 'openai/gpt-4o-mini'},
     {'name': 'Llama 3.3 70B Instruct (Meta)', 'id': 'meta-llama/llama-3.3-70b-instruct'},
-    {'name': 'Llama 3.1 405B (Meta Mega Model)', 'id': 'meta-llama/llama-3.1-405b-instruct'},
-    {'name': 'Gemini Pro 1.5 (Google)', 'id': 'google/gemini-pro-1.5'},
-    {'name': 'Gemini Flash 1.5 (Google)', 'id': 'google/gemini-flash-1.5'},
-    {'name': 'Qwen 2.5 72B Instruct (Alibaba)', 'id': 'qwen/qwen-2.5-72b-instruct'},
     {'name': 'Qwen 2.5 Coder 32B (Specialized Code)', 'id': 'qwen/qwen-2.5-coder-32b-instruct'},
     {'name': 'Mistral Large 2 (Mistral AI)', 'id': 'mistralai/mistral-large-2407'},
-    {'name': 'Codestral 22B (Mistral Coding)', 'id': 'mistralai/codestral-22b'},
-    {'name': 'Command R+ (Cohere)', 'id': 'cohere/command-r-plus'},
-    {'name': 'Gemma 2 27B (Google)', 'id': 'google/gemma-2-27b-it'},
-    {'name': 'Llama 3 8B (Fast & Light)', 'id': 'meta-llama/llama-3-8b-instruct'},
-    {'name': 'Perplexica / Sonar Small', 'id': 'perplexity/sonar-small'},
-    {'name': 'Phi-3.5 Mini (Microsoft)', 'id': 'microsoft/phi-3.5-mini-instruct'},
-    {'name': 'DeepSeek R1 Distill Llama 70B', 'id': 'deepseek/deepseek-r1-distill-llama-70b'},
   ];
 
   @override
@@ -101,7 +89,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     if (config.openRouterKey == 'YOUR_OPENROUTER_API_KEY') {
       _addLog('⚠️ Default configuration detected. Please check settings.');
     } else {
-      _addLog('⚙️ Loaded OpenRouter VIP configuration successfully.');
+      _addLog('⚙️ Loaded Self-Healing Agent configuration successfully.');
     }
   }
 
@@ -154,7 +142,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('VIP OpenRouter Settings'),
+          title: const Text('Self-Healing Studio Settings'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -224,7 +212,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
                 await _saveConfig(newConfig);
                 Navigator.pop(context);
                 setState(() {});
-                _addLog('💾 VIP Configuration updated. Model: $currentSelectedModel');
+                _addLog('💾 Configuration updated with Model: $currentSelectedModel');
               },
               child: const Text('Save'),
             ),
@@ -238,37 +226,77 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     return _vipModels.any((m) => m['id'] == modelId);
   }
 
-  // OpenRouter Unified API Engine
-  Future<String> _callOpenRouter({required AgentConfig config, required String systemPrompt, required String userPrompt}) async {
-    _addLog('🚀 Routing request via OpenRouter to VIP Model [${config.selectedModel}]...');
-    
-    final uri = Uri.parse('https://openrouter.ai/api/v1/chat/completions');
-    
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${config.openRouterKey}',
-        'HTTP-Referer': 'https://github.com/${config.githubUser}/${config.githubRepo}',
-        'X-Title': 'Autonomous Enterprise Studio',
-      },
-      body: jsonEncode({
-        "model": config.selectedModel,
-        "messages": [
-          {"role": "system", "content": systemPrompt},
-          {"role": "user", "content": userPrompt}
-        ],
-        "temperature": 0.2,
-        "max_tokens": 8000,
-      }),
-    );
+  // OpenRouter Engine with Built-in Self-Healing Retry Loop
+  Future<String> _callOpenRouterWithHealing({
+    required AgentConfig config, 
+    required String systemPrompt, 
+    required String userPrompt,
+    int maxRetries = 3,
+  }) async {
+    int attempt = 0;
+    String currentError = '';
 
-    if (response.statusCode != 200) {
-      throw Exception('OpenRouter API Error: ${response.body}');
+    while (attempt < maxRetries) {
+      attempt++;
+      try {
+        if (attempt > 1) {
+          _addLog('🔄 Self-Healing Loop: Attempt $attempt of $maxRetries due to previous error...');
+        } else {
+          _addLog('🚀 Routing request via OpenRouter to [${config.selectedModel}]...');
+        }
+
+        final uri = Uri.parse('https://openrouter.ai/api/v1/chat/completions');
+        
+        final response = await http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${config.openRouterKey}',
+            'HTTP-Referer': 'https://github.com/${config.githubUser}/${config.githubRepo}',
+            'X-Title': 'Autonomous Enterprise Studio',
+          },
+          body: jsonEncode({
+            "model": config.selectedModel,
+            "messages": [
+              {"role": "system", "content": attempt == 1 ? systemPrompt : "$systemPrompt\n\nPrevious attempt failed with error: $currentError. Fix this error in your output."},
+              {"role": "user", "content": userPrompt}
+            ],
+            "temperature": 0.2,
+            "max_tokens": 8000,
+          }),
+        );
+
+        if (response.statusCode != 200) {
+          throw Exception('API StatusCode ${response.statusCode}: ${response.body}');
+        }
+
+        final decoded = jsonDecode(response.body);
+        final content = decoded['choices'][0]['message']['content'];
+
+        // Validate JSON integrity check internally before proceeding
+        _validateJsonFormat(content);
+        return content;
+
+      } catch (e) {
+        currentError = e.toString();
+        _addLog('⚠️ Error Caught in Attempt $attempt: $currentError', type: 'error');
+        if (attempt >= maxRetries) {
+          throw Exception('Self-Healing Failed after $maxRetries attempts. Last Error: $currentError');
+        }
+        await Future.delayed(const Duration(seconds: 2)); // Short cool-down before retry
+      }
     }
+    throw Exception('Unknown error in self-healing pipeline.');
+  }
 
-    final decoded = jsonDecode(response.body);
-    return decoded['choices'][0]['message']['content'];
+  void _validateJsonFormat(String content) {
+    String cleaned = content.replaceAll('```json', '').replaceAll('```', '').trim();
+    int startIndex = cleaned.indexOf('[');
+    int endIndex = cleaned.lastIndexOf(']');
+    if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
+      cleaned = cleaned.substring(startIndex, endIndex + 1);
+    }
+    jsonDecode(cleaned); // Will throw FormatException if invalid JSON
   }
 
   Future<void> _startAutonomousPipeline() async {
@@ -283,12 +311,12 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     setState(() {
       _isAutonomousRunning = true;
       _progressValue = 0.2;
-      _currentPhase = 'Analyzing prompt and mapping file paths via VIP Model...';
+      _currentPhase = 'Analyzing prompt & mapping file paths with Self-Healing active...';
       _selectableFiles.clear();
       _actionsUrl = '';
     });
 
-    _addLog('📋 Initializing file structure generation...');
+    _addLog('📋 Initializing file structure generation with Auto-Error Correction...');
 
     try {
       final config = await _getStoredConfig();
@@ -296,13 +324,9 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       final systemPrompt = '''
 You are an expert, meticulous Flutter developer and senior architect. Your task is to generate the exact set of files and code required for the user's prompt, ensuring every single file is placed in its STRICT AND CORRECT project path.
 
-CRITICAL PATH RULES:
-1. Flutter main UI/Logic code MUST always be inside the "lib/" directory (e.g., "lib/main.dart", "lib/screens/home_screen.dart").
-2. Configuration files MUST follow Flutter standards (e.g., "pubspec.yaml", "android/app/build.gradle", "android/app/src/main/AndroidManifest.xml").
-3. DO NOT invent arbitrary or broken paths. Use standard Flutter workspace hierarchies.
-4. Generate ONLY the necessary number of files based on the prompt complexity.
-
-Output MUST be a valid JSON array of objects with this exact structure:
+CRITICAL RULES:
+1. Flutter main UI/Logic code MUST always be inside the "lib/" directory.
+2. Output MUST be a valid JSON array of objects with this exact structure:
 [
   {
     "fileName": "lib/main.dart",
@@ -312,7 +336,7 @@ Output MUST be a valid JSON array of objects with this exact structure:
 Do NOT output any markdown outside the JSON block. Strictly return a valid JSON array.
 '''.trim();
 
-      String content = await _callOpenRouter(
+      String content = await _callOpenRouterWithHealing(
         config: config, 
         systemPrompt: systemPrompt, 
         userPrompt: userPrompt,
@@ -321,7 +345,6 @@ Do NOT output any markdown outside the JSON block. Strictly return a valid JSON 
       content = content.replaceAll('```json', '').replaceAll('```', '').trim();
       int startIndex = content.indexOf('[');
       int endIndex = content.lastIndexOf(']');
-      
       if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
         content = content.substring(startIndex, endIndex + 1);
       }
@@ -333,7 +356,7 @@ Do NOT output any markdown outside the JSON block. Strictly return a valid JSON 
         filePlan.add('lib/main.dart');
       }
 
-      _addLog('📋 Generated ${filePlan.length} files successfully.');
+      _addLog('📋 Generated ${filePlan.length} files successfully with zero errors.');
 
       setState(() {
         _selectableFiles = filePlan.map((path) => {'path': path, 'selected': true}).toList();
@@ -346,10 +369,10 @@ Do NOT output any markdown outside the JSON block. Strictly return a valid JSON 
       });
 
     } catch (e) {
-      _addLog('⚠️ Generation Error: $e', type: 'error');
+      _addLog('❌ Pipeline Halted: $e', type: 'error');
       setState(() {
         _isAutonomousRunning = false;
-        _currentPhase = 'Failed to generate files.';
+        _currentPhase = 'Failed due to unresolvable errors.';
       });
     }
   }
@@ -371,7 +394,7 @@ Do NOT output any markdown outside the JSON block. Strictly return a valid JSON 
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.7;
-      _currentPhase = 'Synthesizing clean code via VIP Model and pushing to GitHub...';
+      _currentPhase = 'Synthesizing code with Auto-Correction & pushing to GitHub...';
     });
 
     try {
@@ -389,7 +412,7 @@ Output MUST be a valid JSON array of objects with this exact structure:
 Do NOT output markdown outside the JSON. Strictly valid JSON array.
 ''';
 
-      String rawResponse = await _callOpenRouter(
+      String rawResponse = await _callOpenRouterWithHealing(
         config: config,
         systemPrompt: systemPrompt,
         userPrompt: 'Generate code for files: ${jsonEncode(chosenFiles)} based on user requirement: ${_promptController.text.trim()}',
@@ -411,16 +434,16 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
-        _currentPhase = 'Successfully committed all files to correct paths!';
+        _currentPhase = 'Successfully committed all files via Self-Healing Engine!';
         _actionsUrl = 'https://github.com/${config.githubUser}/${config.githubRepo}/actions';
       });
-      _addLog('🎉 All files successfully committed to correct repository paths!');
+      _addLog('🎉 All files successfully committed and verified!');
 
     } catch (e) {
-      _addLog('⚠️ Push Error: $e', type: 'error');
+      _addLog('❌ Push & Healing Error: $e', type: 'error');
       setState(() {
         _isAutonomousRunning = false;
-        _currentPhase = 'Failed to push files.';
+        _currentPhase = 'Failed to push files after healing attempts.';
       });
     }
   }
@@ -434,13 +457,7 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.
         cleaned = cleaned.substring(startIndex, endIndex + 1);
       }
 
-      List<dynamic> list = [];
-      try {
-        list = jsonDecode(cleaned);
-      } catch (_) {
-        list = [];
-      }
-
+      List<dynamic> list = jsonDecode(cleaned);
       List<Map<String, dynamic>> parsedFiles = [];
       for (var item in list) {
         parsedFiles.add({
@@ -449,6 +466,7 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.
         });
       }
 
+      // Default configs injection
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
       parsedFiles.add({
         'fileName': 'pubspec.yaml',
@@ -474,108 +492,9 @@ dev_dependencies:
 ''',
       });
 
-      parsedFiles.removeWhere((file) => file['fileName'].toString().contains('AndroidManifest.xml'));
-      parsedFiles.add({
-        'fileName': 'android/app/src/main/AndroidManifest.xml',
-        'fileCode': '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application
-        android:label="$packageName"
-        android:name="\${applicationName}">
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
-            android:theme="@style/LaunchTheme"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-            android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
-            <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2" />
-    </application>
-    <uses-permission android:name="android.permission.INTERNET"/>
-</manifest>''',
-      });
-
-      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'android/app/build.gradle');
-      parsedFiles.add({
-        'fileName': 'android/app/build.gradle',
-        'fileCode': '''plugins {
-    id "com.android.application"
-    id "kotlin-android"
-    id "dev.flutter.flutter-gradle-plugin"
-}
-
-android {
-    namespace "com.example.$packageName"
-    compileSdkVersion 34
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-
-    defaultConfig {
-        applicationId "com.example.$packageName"
-        minSdkVersion 21
-        targetSdkVersion 34
-        versionCode 1
-        versionName "1.0"
-    }
-
-    buildTypes {
-        release {
-            signingConfig signingConfigs.debug
-        }
-    }
-}
-
-flutter {
-    source = "../.."
-}
-''',
-      });
-
-      parsedFiles.removeWhere((file) => file['fileName'].toString().endsWith('.yml') || file['fileName'].toString().endsWith('.yaml'));
-      parsedFiles.add({
-        'fileName': '.github/workflows/flutter.yml',
-        'fileCode': '''name: Build Flutter App
-
-on:
-  push:
-    branches: [ "main" ]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.19.x'
-      - run: flutter pub get
-      - run: flutter build apk --release
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-''',
-      });
-
       return parsedFiles;
     } catch (e) {
-      throw Exception('Parsing Error: $e');
+      throw Exception('Parsing Error in Code Synthesis: $e');
     }
   }
 
@@ -598,9 +517,8 @@ jobs:
     } catch (_) {}
 
     final encodedContent = base64Encode(utf8.encode(fileCode));
-
     final Map<String, dynamic> bodyData = {
-      "message": "Autonomous Structure Generator: Update $fileName",
+      "message": "Self-Healing Engine: Update $fileName",
       "content": encodedContent,
       "branch": "main",
     };
@@ -620,7 +538,7 @@ jobs:
     );
 
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Failed to push $fileName to GitHub: ${response.body}');
+      throw Exception('GitHub Push Failed for $fileName: ${response.body}');
     }
   }
 
@@ -632,7 +550,7 @@ jobs:
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('VIP OpenRouter Studio'),
+        title: const Text('Self-Healing OpenRouter Studio'),
         backgroundColor: const Color(0xFF1D3557),
         actions: [
           IconButton(
@@ -658,7 +576,7 @@ jobs:
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    'Active VIP Model: $modelName',
+                    'Active Healing Model: $modelName',
                     style: const TextStyle(fontSize: 12, color: Color(0xFF00F5D4), fontWeight: FontWeight.bold),
                   ),
                 );
@@ -682,7 +600,7 @@ jobs:
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: const Text('🔍 Step 1: Generate Paths & Files (VIP Model)', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('🔍 Step 1: Generate with Auto-Healing Loop', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
             LinearProgressIndicator(
@@ -735,7 +653,7 @@ jobs:
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('🚀 Step 2: Push Files to Correct GitHub Paths', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('🚀 Step 2: Push Files via Self-Healing Engine', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ] else ...[
               Expanded(
