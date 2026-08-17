@@ -285,12 +285,9 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
 You are an expert Flutter Architect. Analyze the user prompt:
 1. FOR SIMPLE APPS (Calculator, Notes): Return only ['lib/main.dart'].
 2. FOR MASSIVE/COMPLEX APPS (Marketplace, E-commerce, Instagram): Return structured paths like ['lib/main.dart', 'lib/screens/home_screen.dart', 'lib/models/item.dart', 'lib/services/api_service.dart'].
-3. Output MUST be a strictly valid JSON array of objects with this format, NO markdown outside:
+3. Output MUST be a strictly valid JSON array of strings, NO markdown outside:
 [
-  {
-    "fileName": "lib/main.dart",
-    "fileCode": "// code placeholder"
-  }
+  "lib/main.dart"
 ]
 ''';
 
@@ -308,7 +305,7 @@ You are an expert Flutter Architect. Analyze the user prompt:
       }
       
       List<dynamic> parsedList = jsonDecode(content);
-      List<String> filePlan = parsedList.map((e) => e['fileName'].toString()).toList();
+      List<String> filePlan = parsedList.map((e) => e.toString()).toList();
 
       if (!filePlan.contains('lib/main.dart')) {
         filePlan.add('lib/main.dart');
@@ -327,14 +324,21 @@ You are an expert Flutter Architect. Analyze the user prompt:
       });
 
     } catch (e) {
-      _addLog('❌ Scale Analysis Error: $e', type: 'error');
+      // Fallback agar plan parse na ho
       setState(() {
+        _selectableFiles = [
+          {'path': 'lib/main.dart', 'selected': true}
+        ];
         _isAutonomousRunning = false;
-        _currentPhase = 'Failed during scale analysis.';
+        _isWaitingForUserFileSelection = true;
+        _progressValue = 0.5;
+        _currentPhase = 'Fallback: Single file mode activated.';
       });
+      _addLog('⚠️ Scale Analysis fallback to main.dart due to: $e');
     }
   }
 
+  // --- टुकड़ों में कोड जनरेट करने वाला सेफ और नया मेथड ---
   Future<void> _confirmAndPushBuild() async {
     final chosenFiles = _selectableFiles
         .where((f) => f['selected'] == true)
@@ -351,41 +355,69 @@ You are an expert Flutter Architect. Analyze the user prompt:
     setState(() {
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
-      _progressValue = 0.7;
-      _currentPhase = 'Generating code with Settings Gear Icon & Token Manager...';
+      _progressValue = 0.6;
+      _currentPhase = 'Generating code file-by-file to prevent token errors...';
     });
 
     try {
       final config = await _getStoredConfig();
 
-      final systemPrompt = '''
-You are an expert Flutter Developer. Generate 100% bug-free code for the requested files.
-CRITICAL MANDATORY RULES:
-1. If multi-file, ensure absolute package imports: `import 'package:${config.githubRepo}/...';`.
-2. EVERY generated app MUST include a Settings Gear Icon in its top app bar. Clicking this icon must open a Dialog/Screen allowing users to input and save custom API Keys, Firebase/Grok tokens, or backend URLs locally using `SharedPreferences`.
-3. Output MUST be a valid JSON array matching this exact format:
-[
-  {
-    "fileName": "lib/main.dart",
-    "fileCode": "..."
-  }
-]
+      // हर फाइल को एक-एक करके टुकड़ों में बनाएंगे ताकि टोकन और पार्सिंग का लोचा खत्म हो जाए
+      for (int i = 0; i < chosenFiles.length; i++) {
+        String fileName = chosenFiles[i];
+        double progress = 0.6 + ((i + 1) / chosenFiles.length) * 0.3;
+        
+        setState(() {
+          _progressValue = progress > 0.9 ? 0.9 : progress;
+          _currentPhase = 'Generating code for: $fileName';
+        });
+
+        _addLog('🤖 Requesting code for $fileName...');
+
+        final systemPrompt = '''
+You are an expert Flutter Developer. Write production-ready, 100% bug-free code ONLY for the file: $fileName.
+CRITICAL RULES:
+1. Ensure absolute package imports if multi-file: `import 'package:${config.githubRepo}/...';`.
+2. Include a Settings Gear Icon in the app bar that opens a dialog to save local API keys using SharedPreferences.
+3. Return ONLY clean Dart code inside standard markdown code blocks (```dart ... ```) or plain text. Do not wrap in complex JSON arrays.
 ''';
 
-      String rawResponse = await _callOpenRouter(
-        config: config,
-        systemPrompt: systemPrompt,
-        userPrompt: 'Generate code for files: ${jsonEncode(chosenFiles)} for requirement: ${_promptController.text.trim()}',
-      );
+        String rawResponse = await _callOpenRouter(
+          config: config,
+          systemPrompt: systemPrompt,
+          userPrompt: 'App Requirement: ${_promptController.text.trim()}\nTarget File: $fileName',
+        );
 
-      _addLog('📦 Parsing code files...');
-      final files = _parseFiles(rawResponse, config.githubRepo);
+        // कोड को क्लीन करना
+        String fileCode = _extractCleanCode(rawResponse);
 
-      _addLog('☁️ Pushing files to GitHub repository...');
-      for (var fileEntry in files) {
-        await _pushFileToGitHub(config, fileEntry['fileName'], fileEntry['fileCode']);
-        _addLog('📤 Uploaded -> ${fileEntry['fileName']}');
+        _addLog('📤 Pushing $fileName to GitHub...');
+        await _pushFileToGitHub(config, fileName, fileCode);
       }
+
+      // अंत में pubspec.yaml जोड़ेंगे
+      _addLog('📦 Creating & Pushing pubspec.yaml...');
+      String pubspecCode = '''name: ${config.githubRepo}
+description: A smart-scale Flutter application with API key settings.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '^3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  shared_preferences: ^2.2.2
+  provider: ^6.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+''';
+      await _pushFileToGitHub(config, 'pubspec.yaml', pubspecCode);
 
       _addLog('⚙️ Injecting GitHub Actions Workflow with APK Artifact support...');
       await _pushFileToGitHub(config, '.github/workflows/flutter.yml', _getArtifactWorkflowYaml());
@@ -407,52 +439,27 @@ CRITICAL MANDATORY RULES:
     }
   }
 
-  List<Map<String, dynamic>> _parseFiles(String rawResponse, String packageName) {
+  // एआई के रिस्पॉन्स से सिर्फ डार्ट कोड निकालने का सेफ तरीका (पार्सिंग एरर प्रूफ)
+  String _extractCleanCode(String rawResponse) {
     try {
-      String cleaned = rawResponse.replaceAll('```json', '').replaceAll('```', '').trim();
-      int startIndex = cleaned.indexOf('[');
-      int endIndex = cleaned.lastIndexOf(']');
-      if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
-        cleaned = cleaned.substring(startIndex, endIndex + 1);
+      String cleaned = rawResponse.trim();
+      // अगर मार्कडाउन ब्लॉक है तो उसे एक्सट्रेक्ट करो
+      if (cleaned.contains('```dart')) {
+        int start = cleaned.indexOf('```dart') + 7;
+        int end = cleaned.lastIndexOf('```');
+        if (end > start) {
+          cleaned = cleaned.substring(start, end).trim();
+        }
+      } else if (cleaned.contains('```')) {
+        int start = cleaned.indexOf('```') + 3;
+        int end = cleaned.lastIndexOf('```');
+        if (end > start) {
+          cleaned = cleaned.substring(start, end).trim();
+        }
       }
-
-      List<dynamic> list = jsonDecode(cleaned);
-      List<Map<String, dynamic>> parsedFiles = [];
-      for (var item in list) {
-        parsedFiles.add({
-          'fileName': item['fileName'] ?? '',
-          'fileCode': item['fileCode'] ?? '',
-        });
-      }
-
-      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
-      parsedFiles.add({
-        'fileName': 'pubspec.yaml',
-        'fileCode': '''name: $packageName
-description: A smart-scale Flutter marketplace application with API key settings.
-publish_to: 'none'
-version: 1.0.0+1
-
-environment:
-  sdk: '^3.3.0'
-
-dependencies:
-  flutter:
-    sdk: flutter
-  http: ^1.2.0
-  shared_preferences: ^2.2.2
-  provider: ^6.1.2
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
-''',
-      });
-
-      return parsedFiles;
-    } catch (e) {
-      throw Exception('Parsing Error: $e');
+      return cleaned;
+    } catch (_) {
+      return rawResponse; // फेल होने पर पूरा रॉ रिस्पॉन्स रिटर्न कर देगा ताकि क्रैश न हो
     }
   }
 
