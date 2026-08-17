@@ -13,7 +13,7 @@ class AutonomousEnterpriseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Autonomous Enterprise Studio',
+      title: 'Autonomous Enterprise Studio - VIP Models',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0B132B),
         primaryColor: const Color(0xFF00F5D4),
@@ -30,16 +30,14 @@ class AutonomousEnterpriseApp extends StatelessWidget {
 }
 
 class AgentConfig {
-  final String groqKey;
-  final String anthropicKey;
+  final String openRouterKey;
   final String githubToken;
   final String githubUser;
   final String githubRepo;
   final String selectedModel;
 
   AgentConfig({
-    required this.groqKey,
-    required this.anthropicKey,
+    required this.openRouterKey,
     required this.githubToken,
     required this.githubUser,
     required this.githubRepo,
@@ -61,12 +59,36 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   bool _isAutonomousRunning = false;
   bool _isWaitingForUserFileSelection = false;
   double _progressValue = 0.0;
-  String _currentPhase = 'Idle - Ready for Enterprise Task.';
+  String _currentPhase = 'Idle - Ready for Enterprise Task via OpenRouter.';
   String _fileSearchQuery = '';
 
   final List<String> _logs = [];
   List<Map<String, dynamic>> _selectableFiles = [];
   String _actionsUrl = '';
+
+  // दुनिया के टॉप 25+ VIP मॉडल्स की लिस्ट (OpenRouter IDs के साथ)
+  final List<Map<String, String>> _vipModels = [
+    {'name': 'Claude 3.5 Sonnet (Anthropic - Best for Code)', 'id': 'anthropic/claude-3.5-sonnet'},
+    {'name': 'Claude 3.5 Opus (Anthropic - Heavy Logic)', 'id': 'anthropic/claude-3-opus'},
+    {'name': 'DeepSeek R1 (Reasoning Master)', 'id': 'deepseek/deepseek-r1'},
+    {'name': 'DeepSeek V3 (Lightning Fast Coding)', 'id': 'deepseek/deepseek-chat'},
+    {'name': 'GPT-4o (OpenAI Flagship)', 'id': 'openai/gpt-4o'},
+    {'name': 'GPT-4o Mini (OpenAI Fast)', 'id': 'openai/gpt-4o-mini'},
+    {'name': 'Llama 3.3 70B Instruct (Meta)', 'id': 'meta-llama/llama-3.3-70b-instruct'},
+    {'name': 'Llama 3.1 405B (Meta Mega Model)', 'id': 'meta-llama/llama-3.1-405b-instruct'},
+    {'name': 'Gemini Pro 1.5 (Google)', 'id': 'google/gemini-pro-1.5'},
+    {'name': 'Gemini Flash 1.5 (Google)', 'id': 'google/gemini-flash-1.5'},
+    {'name': 'Qwen 2.5 72B Instruct (Alibaba)', 'id': 'qwen/qwen-2.5-72b-instruct'},
+    {'name': 'Qwen 2.5 Coder 32B (Specialized Code)', 'id': 'qwen/qwen-2.5-coder-32b-instruct'},
+    {'name': 'Mistral Large 2 (Mistral AI)', 'id': 'mistralai/mistral-large-2407'},
+    {'name': 'Codestral 22B (Mistral Coding)', 'id': 'mistralai/codestral-22b'},
+    {'name': 'Command R+ (Cohere)', 'id': 'cohere/command-r-plus'},
+    {'name': 'Gemma 2 27B (Google)', 'id': 'google/gemma-2-27b-it'},
+    {'name': 'Llama 3 8B (Fast & Light)', 'id': 'meta-llama/llama-3-8b-instruct'},
+    {'name': 'Perplexica / Sonar Small', 'id': 'perplexity/sonar-small'},
+    {'name': 'Phi-3.5 Mini (Microsoft)', 'id': 'microsoft/phi-3.5-mini-instruct'},
+    {'name': 'DeepSeek R1 Distill Llama 70B', 'id': 'deepseek/deepseek-r1-distill-llama-70b'},
+  ];
 
   @override
   void initState() {
@@ -76,10 +98,10 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
 
   Future<void> _loadSavedConfig() async {
     final config = await _getStoredConfig();
-    if (config.groqKey == 'YOUR_GROQ_API_KEY') {
+    if (config.openRouterKey == 'YOUR_OPENROUTER_API_KEY') {
       _addLog('⚠️ Default configuration detected. Please check settings.');
     } else {
-      _addLog('⚙️ Loaded stored configurations successfully (Hybrid Grok + Claude Engine Ready).');
+      _addLog('⚙️ Loaded OpenRouter VIP configuration successfully.');
     }
   }
 
@@ -95,175 +117,158 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   Future<AgentConfig> _getStoredConfig() async {
     final prefs = await SharedPreferences.getInstance();
     return AgentConfig(
-      groqKey: prefs.getString('groq_key') ?? 'YOUR_GROQ_API_KEY',
-      anthropicKey: prefs.getString('anthropic_key') ?? '',
+      openRouterKey: prefs.getString('openrouter_key') ?? 'YOUR_OPENROUTER_API_KEY',
       githubToken: prefs.getString('github_token') ?? 'YOUR_GITHUB_TOKEN',
       githubUser: prefs.getString('github_user') ?? 'tarun225601-star',
       githubRepo: prefs.getString('github_repo') ?? 'real_time',
-      selectedModel: prefs.getString('agent_model') ?? 'claude-3-5-sonnet-20241022',
+      selectedModel: prefs.getString('openrouter_model') ?? 'anthropic/claude-3.5-sonnet',
     );
   }
 
   Future<void> _saveConfig(AgentConfig config) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('groq_key', config.groqKey);
-    await prefs.setString('anthropic_key', config.anthropicKey);
+    await prefs.setString('openrouter_key', config.openRouterKey);
     await prefs.setString('github_token', config.githubToken);
     await prefs.setString('github_user', config.githubUser);
     await prefs.setString('github_repo', config.githubRepo);
-    await prefs.setString('agent_model', config.selectedModel);
+    await prefs.setString('openrouter_model', config.selectedModel);
   }
 
   void _showSettingsDialog() {
-    final groqKeyController = TextEditingController();
-    final anthropicKeyController = TextEditingController();
+    final openRouterKeyController = TextEditingController();
     final githubTokenController = TextEditingController();
     final githubUserController = TextEditingController();
     final githubRepoController = TextEditingController();
-    String selectedModel = 'claude-3-5-sonnet-20241022';
+    
+    String currentSelectedModel = 'anthropic/claude-3.5-sonnet';
 
     _getStoredConfig().then((config) {
-      groqKeyController.text = config.groqKey;
-      anthropicKeyController.text = config.anthropicKey;
+      openRouterKeyController.text = config.openRouterKey;
       githubTokenController.text = config.githubToken;
       githubUserController.text = config.githubUser;
       githubRepoController.text = config.githubRepo;
-      selectedModel = config.selectedModel;
+      currentSelectedModel = config.selectedModel;
     });
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Enterprise Studio Settings'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: groqKeyController,
-                decoration: const InputDecoration(labelText: 'Groq / Grok API Key (Scout)'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: anthropicKeyController,
-                decoration: const InputDecoration(labelText: 'Anthropic Claude API Key (Master Coder)'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: githubTokenController,
-                decoration: const InputDecoration(labelText: 'GitHub Personal Access Token'),
-                obscureText: true,
-              ),
-              TextField(
-                controller: githubUserController,
-                decoration: const InputDecoration(labelText: 'GitHub Username'),
-              ),
-              TextField(
-                controller: githubRepoController,
-                decoration: const InputDecoration(labelText: 'GitHub Repository Name'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedModel,
-                decoration: const InputDecoration(labelText: 'Primary Code Engine'),
-                items: const [
-                  DropdownMenuItem(value: 'claude-3-5-sonnet-20241022', child: Text('Claude 3.5 Sonnet (Master Coder)')),
-                  DropdownMenuItem(value: 'llama-3.3-70b-versatile', child: Text('Llama 3.3 70B (Groq)')),
-                ],
-                onChanged: (val) {
-                  if (val != null) selectedModel = val;
-                },
-              ),
-            ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('VIP OpenRouter Settings'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: openRouterKeyController,
+                  decoration: const InputDecoration(labelText: 'OpenRouter API Key'),
+                  obscureText: true,
+                ),
+                const SizedBox(height: 12),
+                const Text('Select VIP Model:', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00F5D4))),
+                const SizedBox(height: 4),
+                DropdownButtonFormField<String>(
+                  value: _vipModelExists(currentSelectedModel) ? currentSelectedModel : _vipModels[0]['id'],
+                  isExpanded: true,
+                  dropdownColor: const Color(0xFF1D3557),
+                  items: _vipModels.map((model) {
+                    return DropdownMenuItem<String>(
+                      value: model['id'],
+                      child: Text(
+                        model['name']!, 
+                        style: const TextStyle(fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setDialogState(() {
+                        currentSelectedModel = val;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: githubTokenController,
+                  decoration: const InputDecoration(labelText: 'GitHub Personal Access Token'),
+                  obscureText: true,
+                ),
+                TextField(
+                  controller: githubUserController,
+                  decoration: const InputDecoration(labelText: 'GitHub Username'),
+                ),
+                TextField(
+                  controller: githubRepoController,
+                  decoration: const InputDecoration(labelText: 'GitHub Repository Name'),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newConfig = AgentConfig(
+                  openRouterKey: openRouterKeyController.text.trim(),
+                  githubToken: githubTokenController.text.trim(),
+                  githubUser: githubUserController.text.trim(),
+                  githubRepo: githubRepoController.text.trim(),
+                  selectedModel: currentSelectedModel,
+                );
+                await _saveConfig(newConfig);
+                Navigator.pop(context);
+                setState(() {});
+                _addLog('💾 VIP Configuration updated. Model: $currentSelectedModel');
+              },
+              child: const Text('Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newConfig = AgentConfig(
-                groqKey: groqKeyController.text.trim(),
-                anthropicKey: anthropicKeyController.text.trim(),
-                githubToken: githubTokenController.text.trim(),
-                githubUser: githubUserController.text.trim(),
-                githubRepo: githubRepoController.text.trim(),
-                selectedModel: selectedModel,
-              );
-              await _saveConfig(newConfig);
-              Navigator.pop(context);
-              _addLog('💾 Hybrid Configuration updated successfully.');
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
   }
 
-  // AI Router: Grok (Scout) -> Claude (Master Coder)
-  Future<String> _callAiModel({required AgentConfig config, required String systemPrompt, required String userPrompt}) async {
-    // अगर यूजर ने Claude चुना है या क्लाउड की चाबी है, तो कोडिंग के लिए Claude 3.5 Sonnet का इस्तेमाल होगा
-    if (config.anthropicKey.isNotEmpty && config.selectedModel.contains('claude')) {
-      _addLog('🤖 Routing request to Claude 3.5 Sonnet (Master Coder)...');
-      final uri = Uri.parse('https://api.anthropic.com/v1/messages');
-      
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': config.anthropicKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: jsonEncode({
-          "model": "claude-3-5-sonnet-20241022",
-          "max_tokens": 4000,
-          "system": systemPrompt,
-          "messages": [
-            {"role": "user", "content": userPrompt}
-          ]
-        }),
-      );
+  bool _vipModelExists(String modelId) {
+    return _vipModels.any((m) => m['id'] == modelId);
+  }
 
-      if (response.statusCode != 200) {
-        throw Exception('Claude API Error: ${response.body}');
-      }
+  // OpenRouter Unified API Engine
+  Future<String> _callOpenRouter({required AgentConfig config, required String systemPrompt, required String userPrompt}) async {
+    _addLog('🚀 Routing request via OpenRouter to VIP Model [${config.selectedModel}]...');
+    
+    final uri = Uri.parse('https://openrouter.ai/api/v1/chat/completions');
+    
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${config.openRouterKey}',
+        'HTTP-Referer': 'https://github.com/${config.githubUser}/${config.githubRepo}',
+        'X-Title': 'Autonomous Enterprise Studio',
+      },
+      body: jsonEncode({
+        "model": config.selectedModel,
+        "messages": [
+          {"role": "system", "content": systemPrompt},
+          {"role": "user", "content": userPrompt}
+        ],
+        "temperature": 0.2,
+        "max_tokens": 8000,
+      }),
+    );
 
-      final decoded = jsonDecode(response.body);
-      return decoded['content'][0]['text'];
-    } else {
-      // फॉलबैक या Groq API (Llama 3.3 70B)
-      _addLog('⚡ Routing request to Groq / Llama Engine...');
-      final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-      
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${config.groqKey}',
-        },
-        body: jsonEncode({
-          "model": "llama-3.3-70b-versatile",
-          "messages": [
-            {"role": "system", "content": systemPrompt},
-            {"role": "user", "content": userPrompt}
-          ],
-          "temperature": 0.2,
-          "max_tokens": 4000,
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Groq API Error: ${response.body}');
-      }
-
-      final decoded = jsonDecode(response.body);
-      return decoded['choices'][0]['message']['content'];
+    if (response.statusCode != 200) {
+      throw Exception('OpenRouter API Error: ${response.body}');
     }
+
+    final decoded = jsonDecode(response.body);
+    return decoded['choices'][0]['message']['content'];
   }
 
   Future<void> _startAutonomousPipeline() async {
@@ -278,12 +283,12 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     setState(() {
       _isAutonomousRunning = true;
       _progressValue = 0.2;
-      _currentPhase = 'Analyzing prompt and mapping file paths via AI Router...';
+      _currentPhase = 'Analyzing prompt and mapping file paths via VIP Model...';
       _selectableFiles.clear();
       _actionsUrl = '';
     });
 
-    _addLog('🚀 Initializing Groq Scout + Claude Coder Pipeline...');
+    _addLog('📋 Initializing file structure generation...');
 
     try {
       final config = await _getStoredConfig();
@@ -307,7 +312,7 @@ Output MUST be a valid JSON array of objects with this exact structure:
 Do NOT output any markdown outside the JSON block. Strictly return a valid JSON array.
 '''.trim();
 
-      String content = await _callAiModel(
+      String content = await _callOpenRouter(
         config: config, 
         systemPrompt: systemPrompt, 
         userPrompt: userPrompt,
@@ -366,7 +371,7 @@ Do NOT output any markdown outside the JSON block. Strictly return a valid JSON 
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.7;
-      _currentPhase = 'Synthesizing clean code with Claude and pushing to GitHub...';
+      _currentPhase = 'Synthesizing clean code via VIP Model and pushing to GitHub...';
     });
 
     try {
@@ -384,7 +389,7 @@ Output MUST be a valid JSON array of objects with this exact structure:
 Do NOT output markdown outside the JSON. Strictly valid JSON array.
 ''';
 
-      String rawResponse = await _callAiModel(
+      String rawResponse = await _callOpenRouter(
         config: config,
         systemPrompt: systemPrompt,
         userPrompt: 'Generate code for files: ${jsonEncode(chosenFiles)} based on user requirement: ${_promptController.text.trim()}',
@@ -627,7 +632,7 @@ jobs:
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Autonomous Enterprise Studio'),
+        title: const Text('VIP OpenRouter Studio'),
         backgroundColor: const Color(0xFF1D3557),
         actions: [
           IconButton(
@@ -641,6 +646,24 @@ jobs:
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            FutureBuilder<AgentConfig>(
+              future: _getStoredConfig(),
+              builder: (context, snapshot) {
+                final modelName = snapshot.hasData ? snapshot.data!.selectedModel : 'Loading...';
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1D3557),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Active VIP Model: $modelName',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF00F5D4), fontWeight: FontWeight.bold),
+                  ),
+                );
+              },
+            ),
             TextField(
               controller: _promptController,
               maxLines: 3,
@@ -659,7 +682,7 @@ jobs:
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: const Text('🔍 Step 1: Generate Correct Paths & Files (Hybrid)', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('🔍 Step 1: Generate Paths & Files (VIP Model)', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
             LinearProgressIndicator(
