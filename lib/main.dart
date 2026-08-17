@@ -31,6 +31,7 @@ class AutonomousEnterpriseApp extends StatelessWidget {
 
 class AgentConfig {
   final String groqKey;
+  final String anthropicKey;
   final String githubToken;
   final String githubUser;
   final String githubRepo;
@@ -38,6 +39,7 @@ class AgentConfig {
 
   AgentConfig({
     required this.groqKey,
+    required this.anthropicKey,
     required this.githubToken,
     required this.githubUser,
     required this.githubRepo,
@@ -77,7 +79,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     if (config.groqKey == 'YOUR_GROQ_API_KEY') {
       _addLog('⚠️ Default configuration detected. Please check settings.');
     } else {
-      _addLog('⚙️ Loaded stored configurations successfully.');
+      _addLog('⚙️ Loaded stored configurations successfully (Hybrid Grok + Claude Engine Ready).');
     }
   }
 
@@ -94,31 +96,35 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     final prefs = await SharedPreferences.getInstance();
     return AgentConfig(
       groqKey: prefs.getString('groq_key') ?? 'YOUR_GROQ_API_KEY',
+      anthropicKey: prefs.getString('anthropic_key') ?? '',
       githubToken: prefs.getString('github_token') ?? 'YOUR_GITHUB_TOKEN',
       githubUser: prefs.getString('github_user') ?? 'tarun225601-star',
       githubRepo: prefs.getString('github_repo') ?? 'real_time',
-      selectedModel: prefs.getString('groq_model') ?? 'llama-3.3-70b-versatile',
+      selectedModel: prefs.getString('agent_model') ?? 'claude-3-5-sonnet-20241022',
     );
   }
 
   Future<void> _saveConfig(AgentConfig config) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('groq_key', config.groqKey);
+    await prefs.setString('anthropic_key', config.anthropicKey);
     await prefs.setString('github_token', config.githubToken);
     await prefs.setString('github_user', config.githubUser);
     await prefs.setString('github_repo', config.githubRepo);
-    await prefs.setString('groq_model', config.selectedModel);
+    await prefs.setString('agent_model', config.selectedModel);
   }
 
   void _showSettingsDialog() {
     final groqKeyController = TextEditingController();
+    final anthropicKeyController = TextEditingController();
     final githubTokenController = TextEditingController();
     final githubUserController = TextEditingController();
     final githubRepoController = TextEditingController();
-    String selectedModel = 'llama-3.3-70b-versatile';
+    String selectedModel = 'claude-3-5-sonnet-20241022';
 
     _getStoredConfig().then((config) {
       groqKeyController.text = config.groqKey;
+      anthropicKeyController.text = config.anthropicKey;
       githubTokenController.text = config.githubToken;
       githubUserController.text = config.githubUser;
       githubRepoController.text = config.githubRepo;
@@ -135,9 +141,16 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
             children: [
               TextField(
                 controller: groqKeyController,
-                decoration: const InputDecoration(labelText: 'Groq API Key'),
+                decoration: const InputDecoration(labelText: 'Groq / Grok API Key (Scout)'),
                 obscureText: true,
               ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: anthropicKeyController,
+                decoration: const InputDecoration(labelText: 'Anthropic Claude API Key (Master Coder)'),
+                obscureText: true,
+              ),
+              const SizedBox(height: 8),
               TextField(
                 controller: githubTokenController,
                 decoration: const InputDecoration(labelText: 'GitHub Personal Access Token'),
@@ -154,10 +167,10 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: selectedModel,
-                decoration: const InputDecoration(labelText: 'Groq Model'),
+                decoration: const InputDecoration(labelText: 'Primary Code Engine'),
                 items: const [
-                  DropdownMenuItem(value: 'llama-3.3-70b-versatile', child: Text('Llama 3.3 70B Versatile')),
-                  DropdownMenuItem(value: 'llama-3.1-8b-instant', child: Text('Llama 3.1 8B Instant')),
+                  DropdownMenuItem(value: 'claude-3-5-sonnet-20241022', child: Text('Claude 3.5 Sonnet (Master Coder)')),
+                  DropdownMenuItem(value: 'llama-3.3-70b-versatile', child: Text('Llama 3.3 70B (Groq)')),
                 ],
                 onChanged: (val) {
                   if (val != null) selectedModel = val;
@@ -175,6 +188,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
             onPressed: () async {
               final newConfig = AgentConfig(
                 groqKey: groqKeyController.text.trim(),
+                anthropicKey: anthropicKeyController.text.trim(),
                 githubToken: githubTokenController.text.trim(),
                 githubUser: githubUserController.text.trim(),
                 githubRepo: githubRepoController.text.trim(),
@@ -182,13 +196,74 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
               );
               await _saveConfig(newConfig);
               Navigator.pop(context);
-              _addLog('💾 Configuration updated successfully.');
+              _addLog('💾 Hybrid Configuration updated successfully.');
             },
             child: const Text('Save'),
           ),
         ],
       ),
     );
+  }
+
+  // AI Router: Grok (Scout) -> Claude (Master Coder)
+  Future<String> _callAiModel({required AgentConfig config, required String systemPrompt, required String userPrompt}) async {
+    // अगर यूजर ने Claude चुना है या क्लाउड की चाबी है, तो कोडिंग के लिए Claude 3.5 Sonnet का इस्तेमाल होगा
+    if (config.anthropicKey.isNotEmpty && config.selectedModel.contains('claude')) {
+      _addLog('🤖 Routing request to Claude 3.5 Sonnet (Master Coder)...');
+      final uri = Uri.parse('https://api.anthropic.com/v1/messages');
+      
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': config.anthropicKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: jsonEncode({
+          "model": "claude-3-5-sonnet-20241022",
+          "max_tokens": 4000,
+          "system": systemPrompt,
+          "messages": [
+            {"role": "user", "content": userPrompt}
+          ]
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Claude API Error: ${response.body}');
+      }
+
+      final decoded = jsonDecode(response.body);
+      return decoded['content'][0]['text'];
+    } else {
+      // फॉलबैक या Groq API (Llama 3.3 70B)
+      _addLog('⚡ Routing request to Groq / Llama Engine...');
+      final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+      
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${config.groqKey}',
+        },
+        body: jsonEncode({
+          "model": "llama-3.3-70b-versatile",
+          "messages": [
+            {"role": "system", "content": systemPrompt},
+            {"role": "user", "content": userPrompt}
+          ],
+          "temperature": 0.2,
+          "max_tokens": 4000,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Groq API Error: ${response.body}');
+      }
+
+      final decoded = jsonDecode(response.body);
+      return decoded['choices'][0]['message']['content'];
+    }
   }
 
   Future<void> _startAutonomousPipeline() async {
@@ -203,16 +278,15 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     setState(() {
       _isAutonomousRunning = true;
       _progressValue = 0.2;
-      _currentPhase = 'Analyzing prompt and generating correct file paths...';
+      _currentPhase = 'Analyzing prompt and mapping file paths via AI Router...';
       _selectableFiles.clear();
       _actionsUrl = '';
     });
 
-    _addLog('🚀 Generating strict project structure and files from prompt...');
+    _addLog('🚀 Initializing Groq Scout + Claude Coder Pipeline...');
 
     try {
       final config = await _getStoredConfig();
-      final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       
       final systemPrompt = '''
 You are an expert, meticulous Flutter developer and senior architect. Your task is to generate the exact set of files and code required for the user's prompt, ensuring every single file is placed in its STRICT AND CORRECT project path.
@@ -221,7 +295,7 @@ CRITICAL PATH RULES:
 1. Flutter main UI/Logic code MUST always be inside the "lib/" directory (e.g., "lib/main.dart", "lib/screens/home_screen.dart").
 2. Configuration files MUST follow Flutter standards (e.g., "pubspec.yaml", "android/app/build.gradle", "android/app/src/main/AndroidManifest.xml").
 3. DO NOT invent arbitrary or broken paths. Use standard Flutter workspace hierarchies.
-4. Generate ONLY the necessary number of files based on the prompt complexity—no bloated or redundant files.
+4. Generate ONLY the necessary number of files based on the prompt complexity.
 
 Output MUST be a valid JSON array of objects with this exact structure:
 [
@@ -233,29 +307,11 @@ Output MUST be a valid JSON array of objects with this exact structure:
 Do NOT output any markdown outside the JSON block. Strictly return a valid JSON array.
 '''.trim();
 
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${config.groqKey}',
-        },
-        body: jsonEncode({
-          "model": config.selectedModel,
-          "messages": [
-            {"role": "system", "content": systemPrompt},
-            {"role": "user", "content": userPrompt}
-          ],
-          "temperature": 0.2,
-          "max_tokens": 4000,
-        }),
+      String content = await _callAiModel(
+        config: config, 
+        systemPrompt: systemPrompt, 
+        userPrompt: userPrompt,
       );
-
-      if (response.statusCode != 200) {
-        throw Exception('API Error: ${response.body}');
-      }
-
-      final decoded = jsonDecode(response.body);
-      String content = decoded['choices'][0]['message']['content'].trim();
       
       content = content.replaceAll('```json', '').replaceAll('```', '').trim();
       int startIndex = content.indexOf('[');
@@ -272,7 +328,7 @@ Do NOT output any markdown outside the JSON block. Strictly return a valid JSON 
         filePlan.add('lib/main.dart');
       }
 
-      _addLog('📋 Generated ${filePlan.length} files with correct paths successfully.');
+      _addLog('📋 Generated ${filePlan.length} files successfully.');
 
       setState(() {
         _selectableFiles = filePlan.map((path) => {'path': path, 'selected': true}).toList();
@@ -310,15 +366,14 @@ Do NOT output any markdown outside the JSON block. Strictly return a valid JSON 
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.7;
-      _currentPhase = 'Synthesizing final code and pushing to GitHub...';
+      _currentPhase = 'Synthesizing clean code with Claude and pushing to GitHub...';
     });
 
     try {
       final config = await _getStoredConfig();
-      final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
 
       final systemPrompt = '''
-You are an expert Flutter developer. Generate the code for the requested files based on the user requirement. Ensure correct paths.
+You are an expert Flutter developer. Generate the full code for the requested files based on the user requirement. Ensure correct paths.
 Output MUST be a valid JSON array of objects with this exact structure:
 [
   {
@@ -329,29 +384,11 @@ Output MUST be a valid JSON array of objects with this exact structure:
 Do NOT output markdown outside the JSON. Strictly valid JSON array.
 ''';
 
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${config.groqKey}',
-        },
-        body: jsonEncode({
-          "model": config.selectedModel,
-          "messages": [
-            {"role": "system", "content": systemPrompt},
-            {"role": "user", "content": "Generate code for files: ${jsonEncode(chosenFiles)} based on user requirement: ${_promptController.text.trim()}"}
-          ],
-          "temperature": 0.2,
-          "max_tokens": 4000,
-        }),
+      String rawResponse = await _callAiModel(
+        config: config,
+        systemPrompt: systemPrompt,
+        userPrompt: 'Generate code for files: ${jsonEncode(chosenFiles)} based on user requirement: ${_promptController.text.trim()}',
       );
-
-      if (response.statusCode != 200) {
-        throw Exception('Synthesis Error: ${response.body}');
-      }
-
-      final decoded = jsonDecode(response.body);
-      String rawResponse = decoded['choices'][0]['message']['content'];
 
       _addLog('📦 Verifying Android folder structures and config files...');
       final files = _parsePlainFiles(rawResponse, config.githubRepo);
@@ -622,7 +659,7 @@ jobs:
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: const Text('🔍 Step 1: Generate Correct Paths & Files', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('🔍 Step 1: Generate Correct Paths & Files (Hybrid)', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
             LinearProgressIndicator(
