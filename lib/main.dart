@@ -13,7 +13,7 @@ class AutonomousEnterpriseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Autonomous Enterprise Studio - Self Healing',
+      title: 'Autonomous Enterprise Studio - Zero-Error Studio',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0B132B),
         primaryColor: const Color(0xFF00F5D4),
@@ -89,7 +89,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     if (config.openRouterKey == 'YOUR_OPENROUTER_API_KEY') {
       _addLog('⚠️ Default configuration detected. Please check settings.');
     } else {
-      _addLog('⚙️ Loaded Self-Healing Agent configuration successfully.');
+      _addLog('⚙️ Loaded Zero-Error Artifact Agent configuration successfully.');
     }
   }
 
@@ -142,7 +142,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Self-Healing Studio Settings'),
+          title: const Text('Zero-Error Studio Settings'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -226,7 +226,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     return _vipModels.any((m) => m['id'] == modelId);
   }
 
-  // OpenRouter Engine with Built-in Self-Healing Retry Loop
+  // OpenRouter Engine with Dynamic Retry Loop & Zero Error Enforcement
   Future<String> _callOpenRouterWithHealing({
     required AgentConfig config, 
     required String systemPrompt, 
@@ -240,7 +240,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       attempt++;
       try {
         if (attempt > 1) {
-          _addLog('🔄 Self-Healing Loop: Attempt $attempt of $maxRetries due to previous error...');
+          _addLog('🔄 Dynamic Self-Healing Loop: Attempt $attempt of $maxRetries (Fixing: $currentError)...');
         } else {
           _addLog('🚀 Routing request via OpenRouter to [${config.selectedModel}]...');
         }
@@ -258,10 +258,15 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
           body: jsonEncode({
             "model": config.selectedModel,
             "messages": [
-              {"role": "system", "content": attempt == 1 ? systemPrompt : "$systemPrompt\n\nPrevious attempt failed with error: $currentError. Fix this error in your output."},
+              {
+                "role": "system", 
+                "content": attempt == 1 
+                    ? systemPrompt 
+                    : "$systemPrompt\n\nCRITICAL FIX REQUIRED: Previous attempt threw error: '$currentError'. Ensure correct architecture, package name '${config.githubRepo}', absolute imports, and no missing path references."
+              },
               {"role": "user", "content": userPrompt}
             ],
-            "temperature": 0.2,
+            "temperature": 0.1,
             "max_tokens": 8000,
           }),
         );
@@ -273,7 +278,6 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
         final decoded = jsonDecode(response.body);
         final content = decoded['choices'][0]['message']['content'];
 
-        // Validate JSON integrity check internally before proceeding
         _validateJsonFormat(content);
         return content;
 
@@ -281,12 +285,12 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
         currentError = e.toString();
         _addLog('⚠️ Error Caught in Attempt $attempt: $currentError', type: 'error');
         if (attempt >= maxRetries) {
-          throw Exception('Self-Healing Failed after $maxRetries attempts. Last Error: $currentError');
+          throw Exception('Pipeline Failed after $maxRetries attempts. Last Error: $currentError');
         }
-        await Future.delayed(const Duration(seconds: 2)); // Short cool-down before retry
+        await Future.delayed(const Duration(seconds: 2));
       }
     }
-    throw Exception('Unknown error in self-healing pipeline.');
+    throw Exception('Unknown error in pipeline.');
   }
 
   void _validateJsonFormat(String content) {
@@ -296,7 +300,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
       cleaned = cleaned.substring(startIndex, endIndex + 1);
     }
-    jsonDecode(cleaned); // Will throw FormatException if invalid JSON
+    jsonDecode(cleaned);
   }
 
   Future<void> _startAutonomousPipeline() async {
@@ -311,29 +315,29 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     setState(() {
       _isAutonomousRunning = true;
       _progressValue = 0.2;
-      _currentPhase = 'Analyzing prompt & mapping file paths with Self-Healing active...';
+      _currentPhase = 'Analyzing prompt scale & mapping dynamic file paths...';
       _selectableFiles.clear();
       _actionsUrl = '';
     });
 
-    _addLog('📋 Initializing file structure generation with Auto-Error Correction...');
+    _addLog('📋 Analyzing app scale (Utility vs Massive Enterprise Architecture)...');
 
     try {
       final config = await _getStoredConfig();
       
       final systemPrompt = '''
-You are an expert, meticulous Flutter developer and senior architect. Your task is to generate the exact set of files and code required for the user's prompt, ensuring every single file is placed in its STRICT AND CORRECT project path.
+You are an expert Autonomous Software Architect and Flutter Master. Analyze the user prompt to determine if it's a simple utility app (like a Calculator, Todo) or a massive scale app (like Instagram, E-commerce).
 
-CRITICAL RULES:
-1. Flutter main UI/Logic code MUST always be inside the "lib/" directory.
-2. Output MUST be a valid JSON array of objects with this exact structure:
+Strictly follow these path architecture rules:
+1. FOR SIMPLE APPS: Provide lightweight paths like 'lib/main.dart', 'lib/models/', 'lib/views/', 'lib/controllers/'.
+2. FOR COMPLEX/MASSIVE APPS: Provide production enterprise paths like 'lib/main.dart', 'lib/app/routes.dart', 'lib/features/feed/', 'lib/features/auth/', 'lib/services/', 'lib/widgets/'.
+3. Output MUST be a strictly valid JSON array of objects with this exact format, with NO markdown outside:
 [
   {
     "fileName": "lib/main.dart",
-    "fileCode": "actual clean code string here..."
+    "fileCode": "// code"
   }
 ]
-Do NOT output any markdown outside the JSON block. Strictly return a valid JSON array.
 '''.trim();
 
       String content = await _callOpenRouterWithHealing(
@@ -356,7 +360,7 @@ Do NOT output any markdown outside the JSON block. Strictly return a valid JSON 
         filePlan.add('lib/main.dart');
       }
 
-      _addLog('📋 Generated ${filePlan.length} files successfully with zero errors.');
+      _addLog('📋 Successfully planned ${filePlan.length} file paths according to app scale.');
 
       setState(() {
         _selectableFiles = filePlan.map((path) => {'path': path, 'selected': true}).toList();
@@ -372,7 +376,7 @@ Do NOT output any markdown outside the JSON block. Strictly return a valid JSON 
       _addLog('❌ Pipeline Halted: $e', type: 'error');
       setState(() {
         _isAutonomousRunning = false;
-        _currentPhase = 'Failed due to unresolvable errors.';
+        _currentPhase = 'Failed due to path parsing errors.';
       });
     }
   }
@@ -394,58 +398,124 @@ Do NOT output any markdown outside the JSON block. Strictly return a valid JSON 
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.7;
-      _currentPhase = 'Synthesizing code with Auto-Correction & pushing to GitHub...';
+      _currentPhase = 'Synthesizing bug-free code & injecting artifact workflow...';
     });
 
     try {
       final config = await _getStoredConfig();
 
       final systemPrompt = '''
-You are an expert Flutter developer. Generate the full code for the requested files based on the user requirement. Ensure correct paths.
-Output MUST be a valid JSON array of objects with this exact structure:
+You are an expert Flutter developer. Generate full, 100% bug-free code for the requested files.
+CRITICAL RULES:
+1. Every file must use absolute package imports: `import 'package:${config.githubRepo}/...';`.
+2. Ensure complete class definitions and public constructors to prevent undefined class errors.
+3. Output MUST be a valid JSON array matching this exact format:
 [
   {
     "fileName": "lib/main.dart",
-    "fileCode": "actual clean code string here..."
+    "fileCode": "..."
   }
 ]
-Do NOT output markdown outside the JSON. Strictly valid JSON array.
 ''';
 
       String rawResponse = await _callOpenRouterWithHealing(
         config: config,
         systemPrompt: systemPrompt,
-        userPrompt: 'Generate code for files: ${jsonEncode(chosenFiles)} based on user requirement: ${_promptController.text.trim()}',
+        userPrompt: 'Generate code for files: ${jsonEncode(chosenFiles)} for user requirement: ${_promptController.text.trim()}',
       );
 
-      _addLog('📦 Verifying Android folder structures and config files...');
+      _addLog('📦 Packaging code and mapping configurations...');
       final files = _parsePlainFiles(rawResponse, config.githubRepo);
 
-      _addLog('☁️ Pushing files to correct GitHub repository paths...');
+      _addLog('☁️ Pushing code files to GitHub repository...');
       for (int i = 0; i < files.length; i++) {
         final fileEntry = files[i];
         final String fileName = fileEntry['fileName'];
         final String fileCode = fileEntry['fileCode'];
 
-        _addLog('📤 Uploading to path -> $fileName');
+        _addLog('📤 Uploading -> $fileName');
         await _pushFileToGitHub(config, fileName, fileCode);
       }
+
+      // Injecting Bulletproof Workflow with Artifact Generation (v4)
+      _addLog('⚙️ Injecting automated GitHub Actions Workflow with APK Artifact Support...');
+      await _pushFileToGitHub(config, '.github/workflows/flutter.yml', _getArtifactWorkflowYaml());
 
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
-        _currentPhase = 'Successfully committed all files via Self-Healing Engine!';
+        _currentPhase = 'Successfully committed all files & artifact pipeline!';
         _actionsUrl = 'https://github.com/${config.githubUser}/${config.githubRepo}/actions';
       });
-      _addLog('🎉 All files successfully committed and verified!');
+      _addLog('🎉 Deployment complete! Check GitHub Actions for your downloadable APK Artifact.');
 
     } catch (e) {
-      _addLog('❌ Push & Healing Error: $e', type: 'error');
+      _addLog('❌ Push Error: $e', type: 'error');
       setState(() {
         _isAutonomousRunning = false;
-        _currentPhase = 'Failed to push files after healing attempts.';
+        _currentPhase = 'Failed during GitHub commit.';
       });
     }
+  }
+
+  // Enterprise Workflow with guaranteed Artifact Generation (v4)
+  String _getArtifactWorkflowYaml() {
+    return '''name: Flutter Build & Generate APK Artifact
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.x'
+          channel: 'stable'
+
+      - name: Auto-Heal & Generate Fresh Android Structure
+        run: |
+          PROJECT_NAME=\$(grep '^name:' pubspec.yaml | head -n 1 | awk '{print \$2}' | tr -d '\\r' | tr -d '"' | tr -d "'")
+          echo "Building project: \$PROJECT_NAME"
+          rm -rf android ios .dart_tool build
+          flutter create . --project-name "\$PROJECT_NAME" --platforms=android
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK Release
+        run: flutter build apk --release
+
+      - name: Verify APK Output Path
+        run: |
+          if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
+            echo "SUCCESS: APK file verified at release path!"
+          else
+            echo "ERROR: APK file not found!"
+            ls -R build/app/outputs/
+            exit 1
+          fi
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
+''';
   }
 
   List<Map<String, dynamic>> _parsePlainFiles(String rawResponse, String packageName) {
@@ -466,12 +536,12 @@ Do NOT output markdown outside the JSON. Strictly valid JSON array.
         });
       }
 
-      // Default configs injection
+      // Inject robust pubspec.yaml with correct package name
       parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
       parsedFiles.add({
         'fileName': 'pubspec.yaml',
         'fileCode': '''name: $packageName
-description: A new Flutter application.
+description: An autonomous enterprise Flutter application.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -518,7 +588,7 @@ dev_dependencies:
 
     final encodedContent = base64Encode(utf8.encode(fileCode));
     final Map<String, dynamic> bodyData = {
-      "message": "Self-Healing Engine: Update $fileName",
+      "message": "Artifact Engine: Update $fileName",
       "content": encodedContent,
       "branch": "main",
     };
@@ -550,7 +620,7 @@ dev_dependencies:
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Self-Healing OpenRouter Studio'),
+        title: const Text('Dynamic Path & Artifact Studio'),
         backgroundColor: const Color(0xFF1D3557),
         actions: [
           IconButton(
@@ -576,7 +646,7 @@ dev_dependencies:
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    'Active Healing Model: $modelName',
+                    'Active Artifact Model: $modelName',
                     style: const TextStyle(fontSize: 12, color: Color(0xFF00F5D4), fontWeight: FontWeight.bold),
                   ),
                 );
@@ -586,7 +656,7 @@ dev_dependencies:
               controller: _promptController,
               maxLines: 3,
               decoration: const InputDecoration(
-                labelText: 'Enter App Requirement / Prompt',
+                labelText: 'Enter App Requirement (e.g. Calculator or Instagram)',
                 border: OutlineInputBorder(),
                 filled: true,
                 fillColor: Colors.black26,
@@ -600,7 +670,7 @@ dev_dependencies:
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: const Text('🔍 Step 1: Generate with Auto-Healing Loop', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('🔍 Step 1: Dynamic Path & Scale Analysis', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
             LinearProgressIndicator(
@@ -625,7 +695,7 @@ dev_dependencies:
                 ),
               ),
               const SizedBox(height: 8),
-              const Text('Review Paths & Select Files to Push:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Review Scaled Paths & Select Files to Push:', style: TextStyle(fontWeight: FontWeight.bold)),
               Expanded(
                 child: ListView.builder(
                   itemCount: filteredFiles.length,
@@ -653,7 +723,7 @@ dev_dependencies:
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('🚀 Step 2: Push Files via Self-Healing Engine', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('🚀 Step 2: Push & Generate APK Artifact', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ] else ...[
               Expanded(
