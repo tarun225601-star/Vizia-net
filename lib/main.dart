@@ -13,7 +13,7 @@ class AutonomousEnterpriseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Autonomous Enterprise Studio - Zero-Error Studio',
+      title: 'Autonomous Enterprise Studio - Final Smart Scale',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0B132B),
         primaryColor: const Color(0xFF00F5D4),
@@ -59,7 +59,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   bool _isAutonomousRunning = false;
   bool _isWaitingForUserFileSelection = false;
   double _progressValue = 0.0;
-  String _currentPhase = 'Idle - Ready for Enterprise Task via OpenRouter.';
+  String _currentPhase = 'Idle - Ready for Smart-Scale App Build.';
   String _fileSearchQuery = '';
 
   final List<String> _logs = [];
@@ -87,9 +87,9 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   Future<void> _loadSavedConfig() async {
     final config = await _getStoredConfig();
     if (config.openRouterKey == 'YOUR_OPENROUTER_API_KEY') {
-      _addLog('⚠️ Default configuration detected. Please check settings.');
+      _addLog('⚠️ Default configuration detected. Please configure via Gear Icon.');
     } else {
-      _addLog('⚙️ Loaded Zero-Error Artifact Agent configuration successfully.');
+      _addLog('⚙️ Loaded Agent configuration successfully.');
     }
   }
 
@@ -142,7 +142,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Zero-Error Studio Settings'),
+          title: const Text('Studio Settings & API Keys'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -212,9 +212,9 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
                 await _saveConfig(newConfig);
                 Navigator.pop(context);
                 setState(() {});
-                _addLog('💾 Configuration updated with Model: $currentSelectedModel');
+                _addLog('💾 Configuration & API Keys saved successfully!');
               },
-              child: const Text('Save'),
+              child: const Text('Save Keys'),
             ),
           ],
         ),
@@ -226,88 +226,46 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     return _vipModels.any((m) => m['id'] == modelId);
   }
 
-  // OpenRouter Engine with Dynamic Retry Loop & Zero Error Enforcement
-  Future<String> _callOpenRouterWithHealing({
+  Future<String> _callOpenRouter({
     required AgentConfig config, 
     required String systemPrompt, 
     required String userPrompt,
-    int maxRetries = 3,
   }) async {
-    int attempt = 0;
-    String currentError = '';
+    _addLog('🚀 Routing request via OpenRouter to [${config.selectedModel}]...');
+    final uri = Uri.parse('https://openrouter.ai/api/v1/chat/completions');
+    
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${config.openRouterKey}',
+        'HTTP-Referer': 'https://github.com/${config.githubUser}/${config.githubRepo}',
+        'X-Title': 'Final Smart Scale Studio',
+      },
+      body: jsonEncode({
+        "model": config.selectedModel,
+        "messages": [
+          {"role": "system", "content": systemPrompt},
+          {"role": "user", "content": userPrompt}
+        ],
+        "temperature": 0.1,
+        "max_tokens": 8000,
+      }),
+    );
 
-    while (attempt < maxRetries) {
-      attempt++;
-      try {
-        if (attempt > 1) {
-          _addLog('🔄 Dynamic Self-Healing Loop: Attempt $attempt of $maxRetries (Fixing: $currentError)...');
-        } else {
-          _addLog('🚀 Routing request via OpenRouter to [${config.selectedModel}]...');
-        }
-
-        final uri = Uri.parse('https://openrouter.ai/api/v1/chat/completions');
-        
-        final response = await http.post(
-          uri,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ${config.openRouterKey}',
-            'HTTP-Referer': 'https://github.com/${config.githubUser}/${config.githubRepo}',
-            'X-Title': 'Autonomous Enterprise Studio',
-          },
-          body: jsonEncode({
-            "model": config.selectedModel,
-            "messages": [
-              {
-                "role": "system", 
-                "content": attempt == 1 
-                    ? systemPrompt 
-                    : "$systemPrompt\n\nCRITICAL FIX REQUIRED: Previous attempt threw error: '$currentError'. Ensure correct architecture, package name '${config.githubRepo}', absolute imports, and no missing path references."
-              },
-              {"role": "user", "content": userPrompt}
-            ],
-            "temperature": 0.1,
-            "max_tokens": 8000,
-          }),
-        );
-
-        if (response.statusCode != 200) {
-          throw Exception('API StatusCode ${response.statusCode}: ${response.body}');
-        }
-
-        final decoded = jsonDecode(response.body);
-        final content = decoded['choices'][0]['message']['content'];
-
-        _validateJsonFormat(content);
-        return content;
-
-      } catch (e) {
-        currentError = e.toString();
-        _addLog('⚠️ Error Caught in Attempt $attempt: $currentError', type: 'error');
-        if (attempt >= maxRetries) {
-          throw Exception('Pipeline Failed after $maxRetries attempts. Last Error: $currentError');
-        }
-        await Future.delayed(const Duration(seconds: 2));
-      }
+    if (response.statusCode != 200) {
+      throw Exception('API StatusCode ${response.statusCode}: ${response.body}');
     }
-    throw Exception('Unknown error in pipeline.');
+
+    final decoded = jsonDecode(response.body);
+    return decoded['choices'][0]['message']['content'];
   }
 
-  void _validateJsonFormat(String content) {
-    String cleaned = content.replaceAll('```json', '').replaceAll('```', '').trim();
-    int startIndex = cleaned.indexOf('[');
-    int endIndex = cleaned.lastIndexOf(']');
-    if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
-      cleaned = cleaned.substring(startIndex, endIndex + 1);
-    }
-    jsonDecode(cleaned);
-  }
-
-  Future<void> _startAutonomousPipeline() async {
+  Future<void> _startScaleAnalysis() async {
     final userPrompt = _promptController.text.trim();
     if (userPrompt.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Please enter a prompt or app requirement!')),
+        const SnackBar(content: Text('⚠️ Please enter an app requirement!')),
       );
       return;
     }
@@ -315,32 +273,28 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     setState(() {
       _isAutonomousRunning = true;
       _progressValue = 0.2;
-      _currentPhase = 'Analyzing prompt scale & mapping dynamic file paths...';
+      _currentPhase = 'Analyzing app scale (Utility vs Massive Marketplace)...';
       _selectableFiles.clear();
       _actionsUrl = '';
     });
 
-    _addLog('📋 Analyzing app scale (Utility vs Massive Enterprise Architecture)...');
-
     try {
       final config = await _getStoredConfig();
       
-      final systemPrompt = '''
-You are an expert Autonomous Software Architect and Flutter Master. Analyze the user prompt to determine if it's a simple utility app (like a Calculator, Todo) or a massive scale app (like Instagram, E-commerce).
-
-Strictly follow these path architecture rules:
-1. FOR SIMPLE APPS: Provide lightweight paths like 'lib/main.dart', 'lib/models/', 'lib/views/', 'lib/controllers/'.
-2. FOR COMPLEX/MASSIVE APPS: Provide production enterprise paths like 'lib/main.dart', 'lib/app/routes.dart', 'lib/features/feed/', 'lib/features/auth/', 'lib/services/', 'lib/widgets/'.
-3. Output MUST be a strictly valid JSON array of objects with this exact format, with NO markdown outside:
+      const systemPrompt = '''
+You are an expert Flutter Architect. Analyze the user prompt:
+1. FOR SIMPLE APPS (Calculator, Notes): Return only ['lib/main.dart'].
+2. FOR MASSIVE/COMPLEX APPS (Marketplace, E-commerce, Instagram): Return structured paths like ['lib/main.dart', 'lib/screens/home_screen.dart', 'lib/models/item.dart', 'lib/services/api_service.dart'].
+3. Output MUST be a strictly valid JSON array of objects with this format, NO markdown outside:
 [
   {
     "fileName": "lib/main.dart",
-    "fileCode": "// code"
+    "fileCode": "// code placeholder"
   }
 ]
-'''.trim();
+''';
 
-      String content = await _callOpenRouterWithHealing(
+      String content = await _callOpenRouter(
         config: config, 
         systemPrompt: systemPrompt, 
         userPrompt: userPrompt,
@@ -360,28 +314,28 @@ Strictly follow these path architecture rules:
         filePlan.add('lib/main.dart');
       }
 
-      _addLog('📋 Successfully planned ${filePlan.length} file paths according to app scale.');
+      _addLog('📋 Scaled successfully into ${filePlan.length} file(s). Review & Confirm.');
 
       setState(() {
         _selectableFiles = filePlan.map((path) => {'path': path, 'selected': true}).toList();
         _isAutonomousRunning = false;
         _isWaitingForUserFileSelection = true;
         _progressValue = 0.5;
-        _currentPhase = 'Review paths & files, then push to GitHub.';
+        _currentPhase = 'Review files and push to GitHub.';
         _fileSearchQuery = '';
         _searchFileController.clear();
       });
 
     } catch (e) {
-      _addLog('❌ Pipeline Halted: $e', type: 'error');
+      _addLog('❌ Scale Analysis Error: $e', type: 'error');
       setState(() {
         _isAutonomousRunning = false;
-        _currentPhase = 'Failed due to path parsing errors.';
+        _currentPhase = 'Failed during scale analysis.';
       });
     }
   }
 
-  Future<void> _confirmAndExecuteBuild() async {
+  Future<void> _confirmAndPushBuild() async {
     final chosenFiles = _selectableFiles
         .where((f) => f['selected'] == true)
         .map((f) => f['path'].toString())
@@ -398,17 +352,17 @@ Strictly follow these path architecture rules:
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.7;
-      _currentPhase = 'Synthesizing bug-free code & injecting artifact workflow...';
+      _currentPhase = 'Generating code with Settings Gear Icon & Token Manager...';
     });
 
     try {
       final config = await _getStoredConfig();
 
       final systemPrompt = '''
-You are an expert Flutter developer. Generate full, 100% bug-free code for the requested files.
-CRITICAL RULES:
-1. Every file must use absolute package imports: `import 'package:${config.githubRepo}/...';`.
-2. Ensure complete class definitions and public constructors to prevent undefined class errors.
+You are an expert Flutter Developer. Generate 100% bug-free code for the requested files.
+CRITICAL MANDATORY RULES:
+1. If multi-file, ensure absolute package imports: `import 'package:${config.githubRepo}/...';`.
+2. EVERY generated app MUST include a Settings Gear Icon in its top app bar. Clicking this icon must open a Dialog/Screen allowing users to input and save custom API Keys, Firebase/Grok tokens, or backend URLs locally using `SharedPreferences`.
 3. Output MUST be a valid JSON array matching this exact format:
 [
   {
@@ -418,36 +372,31 @@ CRITICAL RULES:
 ]
 ''';
 
-      String rawResponse = await _callOpenRouterWithHealing(
+      String rawResponse = await _callOpenRouter(
         config: config,
         systemPrompt: systemPrompt,
-        userPrompt: 'Generate code for files: ${jsonEncode(chosenFiles)} for user requirement: ${_promptController.text.trim()}',
+        userPrompt: 'Generate code for files: ${jsonEncode(chosenFiles)} for requirement: ${_promptController.text.trim()}',
       );
 
-      _addLog('📦 Packaging code and mapping configurations...');
-      final files = _parsePlainFiles(rawResponse, config.githubRepo);
+      _addLog('📦 Parsing code files...');
+      final files = _parseFiles(rawResponse, config.githubRepo);
 
-      _addLog('☁️ Pushing code files to GitHub repository...');
-      for (int i = 0; i < files.length; i++) {
-        final fileEntry = files[i];
-        final String fileName = fileEntry['fileName'];
-        final String fileCode = fileEntry['fileCode'];
-
-        _addLog('📤 Uploading -> $fileName');
-        await _pushFileToGitHub(config, fileName, fileCode);
+      _addLog('☁️ Pushing files to GitHub repository...');
+      for (var fileEntry in files) {
+        await _pushFileToGitHub(config, fileEntry['fileName'], fileEntry['fileCode']);
+        _addLog('📤 Uploaded -> ${fileEntry['fileName']}');
       }
 
-      // Injecting Bulletproof Workflow with Artifact Generation (v4)
-      _addLog('⚙️ Injecting automated GitHub Actions Workflow with APK Artifact Support...');
+      _addLog('⚙️ Injecting GitHub Actions Workflow with APK Artifact support...');
       await _pushFileToGitHub(config, '.github/workflows/flutter.yml', _getArtifactWorkflowYaml());
 
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
-        _currentPhase = 'Successfully committed all files & artifact pipeline!';
+        _currentPhase = 'Successfully committed all files & workflow!';
         _actionsUrl = 'https://github.com/${config.githubUser}/${config.githubRepo}/actions';
       });
-      _addLog('🎉 Deployment complete! Check GitHub Actions for your downloadable APK Artifact.');
+      _addLog('🎉 Deployment complete! Check GitHub Actions for your downloadable APK.');
 
     } catch (e) {
       _addLog('❌ Push Error: $e', type: 'error');
@@ -458,7 +407,55 @@ CRITICAL RULES:
     }
   }
 
-  // Enterprise Workflow with guaranteed Artifact Generation (v4)
+  List<Map<String, dynamic>> _parseFiles(String rawResponse, String packageName) {
+    try {
+      String cleaned = rawResponse.replaceAll('```json', '').replaceAll('```', '').trim();
+      int startIndex = cleaned.indexOf('[');
+      int endIndex = cleaned.lastIndexOf(']');
+      if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
+        cleaned = cleaned.substring(startIndex, endIndex + 1);
+      }
+
+      List<dynamic> list = jsonDecode(cleaned);
+      List<Map<String, dynamic>> parsedFiles = [];
+      for (var item in list) {
+        parsedFiles.add({
+          'fileName': item['fileName'] ?? '',
+          'fileCode': item['fileCode'] ?? '',
+        });
+      }
+
+      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
+      parsedFiles.add({
+        'fileName': 'pubspec.yaml',
+        'fileCode': '''name: $packageName
+description: A smart-scale Flutter marketplace application with API key settings.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '^3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  shared_preferences: ^2.2.2
+  provider: ^6.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+''',
+      });
+
+      return parsedFiles;
+    } catch (e) {
+      throw Exception('Parsing Error: $e');
+    }
+  }
+
   String _getArtifactWorkflowYaml() {
     return '''name: Flutter Build & Generate APK Artifact
 
@@ -486,10 +483,9 @@ jobs:
           flutter-version: '3.19.x'
           channel: 'stable'
 
-      - name: Auto-Heal & Generate Fresh Android Structure
+      - name: Auto-Heal & Create Android Structure
         run: |
           PROJECT_NAME=\$(grep '^name:' pubspec.yaml | head -n 1 | awk '{print \$2}' | tr -d '\\r' | tr -d '"' | tr -d "'")
-          echo "Building project: \$PROJECT_NAME"
           rm -rf android ios .dart_tool build
           flutter create . --project-name "\$PROJECT_NAME" --platforms=android
 
@@ -499,16 +495,6 @@ jobs:
       - name: Build APK Release
         run: flutter build apk --release
 
-      - name: Verify APK Output Path
-        run: |
-          if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
-            echo "SUCCESS: APK file verified at release path!"
-          else
-            echo "ERROR: APK file not found!"
-            ls -R build/app/outputs/
-            exit 1
-          fi
-
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -516,56 +502,6 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
 ''';
-  }
-
-  List<Map<String, dynamic>> _parsePlainFiles(String rawResponse, String packageName) {
-    try {
-      String cleaned = rawResponse.replaceAll('```json', '').replaceAll('```', '').trim();
-      int startIndex = cleaned.indexOf('[');
-      int endIndex = cleaned.lastIndexOf(']');
-      if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
-        cleaned = cleaned.substring(startIndex, endIndex + 1);
-      }
-
-      List<dynamic> list = jsonDecode(cleaned);
-      List<Map<String, dynamic>> parsedFiles = [];
-      for (var item in list) {
-        parsedFiles.add({
-          'fileName': item['fileName'] ?? '',
-          'fileCode': item['fileCode'] ?? '',
-        });
-      }
-
-      // Inject robust pubspec.yaml with correct package name
-      parsedFiles.removeWhere((file) => file['fileName'].toString() == 'pubspec.yaml');
-      parsedFiles.add({
-        'fileName': 'pubspec.yaml',
-        'fileCode': '''name: $packageName
-description: An autonomous enterprise Flutter application.
-publish_to: 'none'
-version: 1.0.0+1
-
-environment:
-  sdk: '^3.3.0'
-
-dependencies:
-  flutter:
-    sdk: flutter
-  http: ^1.2.0
-  shared_preferences: ^2.2.2
-  provider: ^6.1.2
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
-''',
-      });
-
-      return parsedFiles;
-    } catch (e) {
-      throw Exception('Parsing Error in Code Synthesis: $e');
-    }
   }
 
   Future<void> _pushFileToGitHub(AgentConfig config, String fileName, String fileCode) async {
@@ -588,7 +524,7 @@ dev_dependencies:
 
     final encodedContent = base64Encode(utf8.encode(fileCode));
     final Map<String, dynamic> bodyData = {
-      "message": "Artifact Engine: Update $fileName",
+      "message": "Final Smart-Scale Engine: Update $fileName",
       "content": encodedContent,
       "branch": "main",
     };
@@ -620,7 +556,7 @@ dev_dependencies:
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dynamic Path & Artifact Studio'),
+        title: const Text('Final Smart-Scale Studio'),
         backgroundColor: const Color(0xFF1D3557),
         actions: [
           IconButton(
@@ -646,7 +582,7 @@ dev_dependencies:
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    'Active Artifact Model: $modelName',
+                    'Active Model: $modelName',
                     style: const TextStyle(fontSize: 12, color: Color(0xFF00F5D4), fontWeight: FontWeight.bold),
                   ),
                 );
@@ -656,7 +592,7 @@ dev_dependencies:
               controller: _promptController,
               maxLines: 3,
               decoration: const InputDecoration(
-                labelText: 'Enter App Requirement (e.g. Calculator or Instagram)',
+                labelText: 'Enter App Requirement (e.g. Marketplace App with Firebase)',
                 border: OutlineInputBorder(),
                 filled: true,
                 fillColor: Colors.black26,
@@ -664,13 +600,13 @@ dev_dependencies:
             ),
             const SizedBox(height: 12),
             ElevatedButton(
-              onPressed: _isAutonomousRunning || _isWaitingForUserFileSelection ? null : _startAutonomousPipeline,
+              onPressed: _isAutonomousRunning || _isWaitingForUserFileSelection ? null : _startScaleAnalysis,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00F5D4), 
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: const Text('🔍 Step 1: Dynamic Path & Scale Analysis', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('🔍 Step 1: Analyze Scale & Map Structure', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
             LinearProgressIndicator(
@@ -695,7 +631,7 @@ dev_dependencies:
                 ),
               ),
               const SizedBox(height: 8),
-              const Text('Review Scaled Paths & Select Files to Push:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Review Paths & Select Files to Push:', style: TextStyle(fontWeight: FontWeight.bold)),
               Expanded(
                 child: ListView.builder(
                   itemCount: filteredFiles.length,
@@ -717,13 +653,13 @@ dev_dependencies:
               ),
               const SizedBox(height: 8),
               ElevatedButton(
-                onPressed: _confirmAndExecuteBuild,
+                onPressed: _confirmAndPushBuild,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00F5D4), 
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('🚀 Step 2: Push & Generate APK Artifact', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('🚀 Step 2: Push Code & Generate APK', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ] else ...[
               Expanded(
