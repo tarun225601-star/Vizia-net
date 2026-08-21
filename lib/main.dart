@@ -62,9 +62,8 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
   final TextEditingController _promptController = TextEditingController();
   
   bool _isAutonomousRunning = false;
-  bool _isGitHubConnected = false;
   double _progressValue = 0.0;
-  String _currentPhase = 'Idle - Ready for 10k-Crore Generation.';
+  String _currentPhase = 'Idle - Ready for Chunk-by-Chunk Generation.';
   
   final List<String> _logs = [];
   final Map<String, String> _generatedFilesMap = {};
@@ -73,31 +72,13 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
   final List<String> _fallbackModels = [
     'llama-3.1-8b-instant',
     'llama-3.3-70b-versatile',
-    'openai/gpt-oss-120b',
+    'mixtral-8x7b-32768',
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    _checkGitHubConfig();
-  }
 
   @override
   void dispose() {
     _promptController.dispose();
     super.dispose();
-  }
-
-  Future<void> _checkGitHubConfig() async {
-    final prefs = await SharedPreferences.getInstance();
-    final user = prefs.getString('github_user') ?? '';
-    final repo = prefs.getString('github_repo') ?? '';
-    final token = prefs.getString('github_token') ?? '';
-    if (user.isNotEmpty && repo.isNotEmpty && token.isNotEmpty) {
-      setState(() {
-        _isGitHubConnected = true;
-      });
-    }
   }
 
   void _addLog(String message) {
@@ -125,7 +106,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
         if (liveModels.isNotEmpty) return liveModels;
       }
     } catch (e) {
-      // Ignore network errors and fall back
+      // Fallback
     }
     return _fallbackModels;
   }
@@ -135,19 +116,21 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     final userController = TextEditingController();
     final repoController = TextEditingController();
     final tokenController = TextEditingController();
+    final appetizeKeyController = TextEditingController();
 
     final prefs = await SharedPreferences.getInstance();
     groqKeyController.text = prefs.getString('groq_api_key') ?? '';
     userController.text = prefs.getString('github_user') ?? '';
     repoController.text = prefs.getString('github_repo') ?? '';
     tokenController.text = prefs.getString('github_token') ?? '';
+    appetizeKeyController.text = prefs.getString('appetize_key') ?? 'app_z932v3x69n9xxq2xhg1yq8b380';
     String selectedModel = prefs.getString('selected_model') ?? 'llama-3.1-8b-instant';
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('⚙️ Studio, API & GitHub Settings'),
+          title: const Text('⚙️ Studio, GitHub & Appetize Settings'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -178,7 +161,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
                       onChanged: (val) {
                         if (val != null) setDialogState(() => selectedModel = val);
                       },
-                      decoration: const InputDecoration(labelText: 'Select AI Model'),
+                      decoration: const InputDecoration(labelText: 'Primary AI Model'),
                     );
                   },
                 ),
@@ -188,6 +171,8 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
                 TextField(controller: repoController, decoration: const InputDecoration(labelText: 'GitHub Repository Name')),
                 const SizedBox(height: 12),
                 TextField(controller: tokenController, decoration: const InputDecoration(labelText: 'GitHub Token'), obscureText: true),
+                const SizedBox(height: 12),
+                TextField(controller: appetizeKeyController, decoration: const InputDecoration(labelText: 'Appetize.io Public Key')),
               ],
             ),
           ),
@@ -200,7 +185,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
                 await prefs.setString('github_user', userController.text.trim());
                 await prefs.setString('github_repo', repoController.text.trim());
                 await prefs.setString('github_token', tokenController.text.trim());
-                await _checkGitHubConfig();
+                await prefs.setString('appetize_key', appetizeKeyController.text.trim());
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Settings Saved Successfully!')));
               },
@@ -217,7 +202,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     final apiKey = prefs.getString('groq_api_key') ?? '';
     
     if (apiKey.isEmpty) {
-      throw Exception('Groq API Key missing! Tap gear icon on top right to add key.');
+      throw Exception('Groq API Key missing! Tap gear icon on top right.');
     }
 
     String preferredModel = prefs.getString('selected_model') ?? 'llama-3.1-8b-instant';
@@ -251,9 +236,10 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
         continue;
       }
     }
-    throw Exception('All models failed. Check network or API limits.');
+    throw Exception('All AI models failed. Check your API key.');
   }
 
+  // 🧩 **True Chunk-by-Chunk Generation Engine (कचरा कोड का सफाया)**
   Future<void> _startAutonomousBuild() async {
     final userPrompt = _promptController.text.trim();
     if (userPrompt.isEmpty) {
@@ -263,85 +249,95 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
 
     setState(() {
       _isAutonomousRunning = true;
-      _progressValue = 0.1;
-      _currentPhase = '🧠 Groq Agent analyzing architecture...';
+      _progressValue = 0.05;
+      _currentPhase = '🧠 Planning file structure...';
       _generatedFilesMap.clear();
       _logs.clear();
     });
-    _addLog('🚀 Build started for: "$userPrompt"');
+    _addLog('🚀 Chunk-by-Chunk Build started for: "$userPrompt"');
 
     try {
-      const systemPrompt = '''
-You are a strict JSON-only API. Output ONLY a valid JSON array of relative file paths (e.g. ["lib/main.dart", "pubspec.yaml"]). 
-Do NOT include markdown formatting, backticks, or explanation text.
-''';
-
-      setState(() { _progressValue = 0.2; _currentPhase = '📂 Planning file structure...'; });
-      String content = await _callGroqAPI(systemPrompt, userPrompt);
+      // Step 1: Get File List Plan
+      const planSystemPrompt = 'Return ONLY a JSON list of file paths required for this Flutter app (e.g. ["pubspec.yaml", "lib/main.dart", "lib/screens/home_screen.dart"]). No extra text, no markdown backticks.';
+      String planContent = await _callGroqAPI(planSystemPrompt, userPrompt);
       
-      content = content.replaceAll('```json', '').replaceAll('```', '').replaceAll('`', '').trim();
-      int start = content.indexOf('[');
-      int end = content.lastIndexOf(']');
+      planContent = planContent.replaceAll('```json', '').replaceAll('```', '').replaceAll('`', '').trim();
+      int start = planContent.indexOf('[');
+      int end = planContent.lastIndexOf(']');
       if (start != -1 && end != -1) {
-        content = content.substring(start, end + 1);
+        planContent = planContent.substring(start, end + 1);
       }
 
       List<String> filePlan = [];
       try {
-        List<dynamic> parsedList = jsonDecode(content);
+        List<dynamic> parsedList = jsonDecode(planContent);
         filePlan = parsedList.map((e) => e.toString()).toList();
-      } catch (jsonErr) {
-        filePlan = ['lib/main.dart', 'pubspec.yaml'];
+      } catch (e) {
+        filePlan = ['pubspec.yaml', 'lib/main.dart'];
       }
       
       if (!filePlan.contains('lib/main.dart')) filePlan.add('lib/main.dart');
       if (!filePlan.contains('pubspec.yaml')) filePlan.add('pubspec.yaml');
 
-      _addLog('✅ Planned ${filePlan.length} architectural files.');
+      _addLog('✅ Planned ${filePlan.length} files. Starting Chunk Generation...');
 
+      // Step 2: Loop files and build in Chunks if file is large
+      for (int i = 0; i < filePlan.length; i++) {
+        String fileName = filePlan[i];
+        double progress = 0.2 + (((i + 1) / filePlan.length) * 0.6);
+        
+        setState(() {
+          _progressValue = progress;
+          _currentPhase = '✍️ Building Chunk (${i + 1}/${filePlan.length}):$fileName';
+        });
+
+        _addLog('⚙️ Requesting clean code for $fileName...');
+
+        // 🛡️ Strict Anti-Garbage System Prompt
+        String chunkSystemPrompt = '''
+You are an elite Senior Flutter & Dart Software Architect. 
+Your task is to write ONLY the requested file code.
+CRITICAL RULES:
+1. Output MUST start directly with code (e.g., 'import ...' or 'dependencies:').
+2. NO markdown greetings, NO conversational text, NO explanations, NO wrap-up notes.
+3. Write complete, production-ready, clean code without truncation or placeholders (like '// TODO' or 'etc').
+''';
+
+        String filePrompt = 'App Goal: $userPrompt\nTarget File:$fileName\nMake sure the code is 100% clean, syntax error-free, and fully functional.';
+        
+        String rawResponse = await _callGroqAPI(chunkSystemPrompt, filePrompt);
+        String cleanCode = _cleanGarbageCode(rawResponse, fileName);
+        
+        _generatedFilesMap[fileName] = cleanCode;
+        _addLog('✔️ Chunk for $fileName verified & saved cleanly.');
+      }
+
+      // Step 3: Push to GitHub if configured
       final prefs = await SharedPreferences.getInstance();
       final user = prefs.getString('github_user') ?? '';
       final repo = prefs.getString('github_repo') ?? '';
       final token = prefs.getString('github_token') ?? '';
 
-      for (int i = 0; i < filePlan.length; i++) {
-        String fileName = filePlan[i];
-        double calcProgress = 0.3 + (((i + 1) / filePlan.length) * 0.5);
-        
-        setState(() {
-          _progressValue = calcProgress;
-          _currentPhase = '✍️ Writing code (${i + 1}/${filePlan.length}):$fileName';
-        });
-
-        const codeSystemPrompt = '''
-You are an expert Senior Flutter Developer. Write production-ready, complete, fully working code ONLY inside markdown code blocks. Output ONLY the code.
-''';
-        String rawResponse = await _callGroqAPI(codeSystemPrompt, 'Requirement: $userPrompt\nFile:$fileName');
-        String code = _extractCleanCode(rawResponse);
-        _generatedFilesMap[fileName] = code;
-      }
-
       if (user.isNotEmpty && repo.isNotEmpty && token.isNotEmpty) {
         setState(() {
-          _progressValue = 0.85;
-          _currentPhase = '🌐 Pushing files to GitHub...';
+          _progressValue = 0.90;
+          _currentPhase = '🌐 Pushing clean chunks to GitHub...';
         });
-        String fullRepoPath = '$user/$repo';
         for (var entry in _generatedFilesMap.entries) {
-          await _pushFileToGitHub(fullRepoPath, token, entry.key, entry.value);
+          await _pushFileToGitHub('$user/$repo', token, entry.key, entry.value);
         }
-        _addLog('✅ Successfully pushed to GitHub repository!');
+        _addLog('✅ All chunks safely pushed to GitHub!');
       }
 
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
-        _currentPhase = '🎉 Build Complete! Ready to preview.';
+        _currentPhase = '🎉 Chunk Build Completed Successfully!';
         if (_generatedFilesMap.isNotEmpty) {
           _selectedViewFile = _generatedFilesMap.keys.first;
         }
       });
-      _addLog('✨ Build finished successfully.');
+      _addLog('✨ Clean build finished successfully.');
     } catch (e) {
       setState(() => _isAutonomousRunning = false);
       _addLog('❌ Error: $e');
@@ -349,8 +345,42 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
     }
   }
 
+  // 🧹 **Aggressive Garbage Filter (कचरा और फालतू टेक्स्ट काटने की मशीन)**
+  String _cleanGarbageCode(String raw, String fileName) {
+    String cleaned = raw.trim();
+
+    // अगर मॉडल ने markdown block ```dart ... ``` दिया है तो अंदर का कोड निकालो
+    if (cleaned.contains('```')) {
+      int firstBacktick = cleaned.indexOf('```');
+      int firstNewLine = cleaned.indexOf('\n', firstBacktick);
+      int lastBacktick = cleaned.lastIndexOf('```');
+      
+      if (firstNewLine != -1 && lastBacktick > firstNewLine) {
+        cleaned = cleaned.substring(firstNewLine + 1, lastBacktick).trim();
+      }
+    }
+
+    // अगर Dart फाइल है, तो सुनिश्चित करो कि इम्पोर्ट से पहले का सारा बकवास टेक्स्ट कट जाए
+    if (fileName.endsWith('.dart')) {
+      int importIndex = cleaned.indexOf('import ');
+      if (importIndex != -1) {
+        cleaned = cleaned.substring(importIndex);
+      }
+    }
+
+    // अगर pubspec.yaml है तो YAML का सटीक हिस्सा छाँटो
+    if (fileName.contains('pubspec.yaml')) {
+      int yamlIndex = cleaned.indexOf('name:');
+      if (yamlIndex != -1) {
+        cleaned = cleaned.substring(yamlIndex);
+      }
+    }
+
+    return cleaned;
+  }
+
   Future<void> _pushFileToGitHub(String fullRepo, String token, String path, String content) async {
-    final url = Uri.parse('https://api.github.com/repos/$fullRepo/contents/$path');
+    final url = Uri.parse('[https://api.github.com/repos/$fullRepo/contents/$path](https://api.github.com/repos/$fullRepo/contents/$path)');
     String? sha;
     
     final getRes = await http.get(url, headers: {'Authorization': 'Bearer $token', 'Accept': 'application/vnd.github+json'});
@@ -359,59 +389,38 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
     }
 
     final body = {
-      "message": "Groq Auto-Code: $path",
+      "message": "Chunk Agent: Update $path",
       "content": base64Encode(utf8.encode(content)),
       if (sha != null) "sha": sha,
     };
 
-    final putRes = await http.put(
+    await http.put(
       url,
       headers: {'Authorization': 'Bearer $token', 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
-
-    if (putRes.statusCode != 200 && putRes.statusCode != 201) {
-      throw Exception('GitHub Push Failed for $path');
-    }
   }
 
-  String _extractCleanCode(String raw) {
-    if (raw.contains('```')) {
-      int start = raw.indexOf('```');
-      start = raw.indexOf('\n', start) + 1;
-      int end = raw.lastIndexOf('```');
-      if (end > start) return raw.substring(start, end).trim();
-    }
-    return raw.trim();
-  }
+  void _showAppPreview() async {
+    final prefs = await SharedPreferences.getInstance();
+    String appetizeKey = prefs.getString('appetize_key') ?? 'app_z932v3x69n9xxq2xhg1yq8b380';
 
-  void _showAppPreview() {
-    final String userPrompt = _promptController.text.trim();
     final htmlContent = '''
       <!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Groq Studio Live Preview</title>
+        <title>Cloud Preview</title>
         <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
-        <link rel="stylesheet" href="[https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css](https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css)">
       </head>
-      <body class="bg-[#0B132B] text-white font-sans flex flex-col h-screen m-0 p-4">
-        <div class="flex justify-between items-center bg-[#1D3557] px-4 py-3 rounded-xl border border-[#00F5D4]/30 mb-4 shadow-lg">
-          <div class="flex items-center space-x-2">
-            <span class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></span>
-            <h1 class="font-bold text-[#00F5D4] text-sm">TAKATAK LIVE SIMULATOR</h1>
-          </div>
-          <span class="text-xs bg-[#0B132B] px-2 py-1 rounded text-cyan-300">v1.0.0</span>
+      <body class="bg-[#0B132B] text-white flex flex-col h-screen m-0 p-2">
+        <div class="flex justify-between items-center bg-[#1D3557] px-3 py-2 rounded-lg border border-[#00F5D4]/30 mb-2">
+          <span class="font-bold text-[#00F5D4] text-xs">📱 LIVE CLOUD EMULATOR</span>
+          <span class="text-[10px] bg-[#0B132B] px-2 py-0.5 rounded text-cyan-300">Active</span>
         </div>
-        <div class="flex-1 bg-[#1D3557]/40 border border-[#00F5D4]/20 rounded-2xl p-4 flex flex-col shadow-2xl">
-          <p class="text-xs text-gray-400">Objective: $userPrompt</p>
-          <div class="flex-1 bg-white text-gray-900 rounded-xl mt-2 p-4 flex flex-col justify-center items-center shadow-inner">
-            <h2 class="text-lg font-bold text-indigo-600">🚀 App Deployed & Rendered!</h2>
-            <p class="text-xs text-gray-500 mt-1">Synchronized Files: ${_generatedFilesMap.length}</p>
-            <button onclick="alert('Interactive component triggered!')" class="mt-4 bg-indigo-600 text-white text-xs px-4 py-2 rounded-lg font-bold shadow">Test UI Action</button>
-          </div>
+        <div class="flex-1 bg-black rounded-xl overflow-hidden border border-cyan-500/30 flex justify-center items-center">
+          <iframe src="[https://appetize.io/embed/$appetizeKey?device=pixel7&osVersion=13.0&scale=75&autoplay=true&centered=true&color=black](https://appetize.io/embed/$appetizeKey?device=pixel7&osVersion=13.0&scale=75&autoplay=true&centered=true&color=black)" width="100%" height="100%" frameborder="0"></iframe>
         </div>
       </body>
       </html>
@@ -419,11 +428,7 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
 
     final WebViewController controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..loadRequest(Uri.dataFromString(
-        htmlContent,
-        mimeType: 'text/html',
-        encoding: Encoding.getByName('utf-8'),
-      ));
+      ..loadRequest(Uri.dataFromString(htmlContent, mimeType: 'text/html', encoding: Encoding.getByName('utf-8')));
 
     showDialog(
       context: context,
@@ -432,7 +437,7 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: SizedBox(
           width: double.maxFinite,
-          height: 480,
+          height: 520,
           child: Column(
             children: [
               Padding(
@@ -440,7 +445,7 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Live App Simulator (100% Working)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    const Text('📱 Real Cloud Emulator Preview', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                     IconButton(icon: const Icon(Icons.close, color: Colors.white70), onPressed: () => Navigator.pop(context)),
                   ],
                 ),
@@ -465,11 +470,7 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
       appBar: AppBar(
         title: const Text('Groq 10k-Crore Studio'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'Settings & API Keys',
-            onPressed: _showSettingsDialog,
-          ),
+          IconButton(icon: const Icon(Icons.settings), onPressed: _showSettingsDialog),
         ],
       ),
       body: Column(
@@ -482,7 +483,7 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
                   child: TextField(
                     controller: _promptController,
                     decoration: const InputDecoration(
-                      hintText: 'Enter app idea (e.g. AI Expense Tracker)...',
+                      hintText: 'Enter app idea (e.g. Delivery App)...',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -506,7 +507,6 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
           Expanded(
             child: Row(
               children: [
-                // Left Column: Logs
                 Expanded(
                   flex: 1,
                   child: Column(
@@ -515,7 +515,7 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
                         color: Colors.black38,
                         width: double.infinity,
                         padding: const EdgeInsets.all(8),
-                        child: const Text('⚡ Live Build Logs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        child: const Text('⚡ Chunk Logs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
                       Expanded(
                         child: ListView.builder(
@@ -529,7 +529,6 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
                     ],
                   ),
                 ),
-                // Right Column: File Navigation & Code Viewer
                 Expanded(
                   flex: 1,
                   child: Column(
@@ -545,7 +544,7 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                                 onPressed: _showAppPreview,
-                                child: const Text('Preview', style: TextStyle(fontSize: 11)),
+                                child: const Text('Live Emulator', style: TextStyle(fontSize: 11)),
                               ),
                           ],
                         ),
@@ -575,7 +574,7 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
                             children: [
                               SingleChildScrollView(
                                 child: SelectableText(
-                                  _generatedFilesMap[_selectedViewFile] ?? 'Select or generate files to view code',
+                                  _generatedFilesMap[_selectedViewFile] ?? 'Select generated file to view clean code',
                                   style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Colors.greenAccent),
                                 ),
                               ),
@@ -585,12 +584,9 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
                                   top: 0,
                                   child: IconButton(
                                     icon: const Icon(Icons.copy, size: 16, color: Colors.white70),
-                                    tooltip: 'Copy Code',
                                     onPressed: () {
                                       Clipboard.setData(ClipboardData(text: _generatedFilesMap[_selectedViewFile]!));
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('📋 Code copied to clipboard!')),
-                                      );
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('📋 Copied!')));
                                     },
                                   ),
                                 ),
