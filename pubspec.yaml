@@ -11,6 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
     
+  webview_flutter: ^4.4.4
+  
   # जरूरी पैकेजेस
   shared_preferences: ^2.2.3
   http: ^1.2.0
