@@ -1,4 +1,4 @@
-       import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -334,14 +334,14 @@ Do NOT include markdown formatting, backticks, or explanation text.
         
         setState(() {
           _progressValue = calcProgress;
-          _currentPhase = '✍️ Writing code (${i + 1}/${filePlan.length}): $fileName';
+          _currentPhase = '✍️ Writing code (${i + 1}/${filePlan.length}):$fileName';
         });
         _addLog('🔨 Generating code for: $fileName');
 
         const codeSystemPrompt = '''
 You are an expert Senior Flutter Developer. Write production-ready, complete, fully working code ONLY inside markdown code blocks. Output ONLY the code.
 ''';
-        String rawResponse = await _callGroqAPI(codeSystemPrompt, 'Requirement: $userPrompt\nFile: $fileName');
+        String rawResponse = await _callGroqAPI(codeSystemPrompt, 'Requirement: $userPrompt\nFile:$fileName');
         String code = _extractCleanCode(rawResponse);
         
         _generatedFilesMap[fileName] = code;
@@ -416,96 +416,10 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
     return raw.trim();
   }
 
-  // ✅ असली काम करने वाला ऐप UI लेआउट WebView के अंदर लाइव दिखाने के लिए
+  // ✅ सही WebView प्रीव्यू फ़ंक्शन (मल्टी-लाइन स्ट्रिंग के साथ)
   void _showAppPreview() {
     final String userPrompt = _promptController.text.trim();
     
-    // यहाँ यूजर के प्रॉम्प्ट के मुताबिक एक असली इंटरैक्टिव ऐप का लुक और फील जनरेट किया गया है
-    final htmlContent = '''
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Live App Preview</title>
-        <style>
-          body { 
-            background-color: #0f172a; 
-            color: #f8fafc; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            margin: 0; 
-            padding: 16px;
-          }
-          .app-header {
-            background: linear-gradient(135deg, #00f5d4, #7209b7);
-            color: #000;
-            padding: 16px;
-            border-radius: 12px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 18px;
-            margin-bottom: 16px;
-            box-shadow: 0 4px 12px rgba(0,245,212,0.3);
-          }
-          .card {
-            background: #1e293b;
-            border: 1px solid #334155;
-            padding: 14px;
-            border-radius: 10px;
-            margin-bottom: 12px;
-          }
-          .card h3 {
-            margin-top: 0;
-            color: #00f5d4;
-            font-size: 15px;
-          }
-          .input-box {
-            width: 100%;
-            padding: 10px;
-            background: #0f172a;
-            border: 1px solid #475569;
-            color: #fff;
-            border-radius: 6px;
-            box-sizing: border-box;
-            margin-top: 6px;
-            margin-bottom: 10px;
-          }
-          .action-btn {
-            background: #00f5d4;
-            color: #000;
-            border: none;
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 14px;
-          }
-          .action-btn:active {
-            opacity: 0.8;
-          }
-          .result-area {
-            background: #0f172a;
-            border-left: 4px solid #00f5d4;
-            padding: 10px;
-            margin-topभाई, तुम्हारी बात बिल्कुल सही है! अगर ऐप के अंदर जेनरेटेड प्रोजेक्ट या यूआई का सही लाइव प्रीव्यू नहीं दिखे, तो इस तरह के स्टूडियो का मज़ा आधा रह जाता है। 
-
-तुम्हारे इस कोड में दिक्कत यह है कि `_showAppPreview()` सिर्फ एक स्टैटिक HTML स्ट्रिंग लोड कर रहा है जिसमें कोड का टेक्स्ट लिखा होता है। अगर हमें सही मायने में एक **Interactive Web Simulator** बनाना है जो Flutter/HTML आउटपुट को ठीक से रेंडर करे, तो हमें इसे एक मजबूत HTML5/JavaScript प्रीव्यू इंजन में बदलना होगा जो Tailwind CSS या Bootstrap का इस्तेमाल करके रिस्पॉन्सिव यूआई दिखा सके।
-
-### क्या बदलाव किया है?
-मैंने तुम्हारे `_showAppPreview()` फ़ंक्शन को अपग्रेड कर दिया है। अब यह जेनरेटेड ऐप की डिमांड (Prompt) के हिसाब से एक प्रॉपर, शानदार मोबाइल फ्रेम में इंटरएक्टिव वेब प्रिव्यू (Interactive UI) जनरेट करेगा जिसे देखकर मज़ा आ जाएगा!
-
-### अपडेटेड `_showAppPreview` फ़ंक्शन:
-
-इस कोड को अपने प्रोजेक्ट में पुराने वाले `_showAppPreview()` की जगह रिप्लेस कर दो:
-
-```dart
-  // ✅ अपग्रेडेड लाइव WebView प्रिव्यू इंजन
-  void _showAppPreview() {
-    final userPrompt = _promptController.text.trim();
-    final mainCode = _generatedFilesMap['lib/main.dart'] ?? '// No main.dart found';
-    
-    // एक डायनामिक और सुंदर HTML/JS ऐप सिमुलेटर जो यूज़र के प्रॉम्प्ट के हिसाब से ढांचा दिखाएगा
     final htmlContent = '''
       <!DOCTYPE html>
       <html lang="en">
@@ -513,15 +427,15 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Groq Studio Live Preview</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+        <link rel="stylesheet" href="[https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css](https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css)">
       </head>
       <body class="bg-[#0B132B] text-white font-sans flex flex-col h-screen m-0 p-4">
         
         <!-- Top App Bar -->
         <div class="flex justify-between items-center bg-[#1D3557] px-4 py-3 rounded-xl shadow-lg border border-[#00F5D4]/30 mb-4">
           <div class="flex items-center space-x-2">
-            <span class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></span>
+            <span class="w-3 h-3 bg-green-400 rounded-full"></span>
             <h1 class="font-bold text-[#00F5D4] text-sm tracking-wider">GROQ LIVE PREVIEW</h1>
           </div>
           <span class="text-xs bg-[#0B132B] px-2 py-1 rounded text-cyan-300 border border-cyan-500/20">v1.0.0</span>
@@ -556,23 +470,15 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
               <div class="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
                 <p class="text-xs font-bold text-gray-800 mb-1">Quick Actions</p>
                 <div class="grid grid-cols-2 gap-2 mt-2">
-                  <button onclick="alert('Action Triggered from Simulated UI!')" class="bg-indigo-600 text-white text-xs py-2 rounded-lg font-medium shadow hover:bg-indigo-700 transition">Test Function</button>
-                  <button onclick="location.reload()" class="bg-gray-200 text-gray-700 text-xs py-2 rounded-lg font-medium hover:bg-gray-300 transition">Refresh View</button>
+                  <button onclick="alert('Action Triggered from Simulated UI!')" class="bg-indigo-600 text-white text-xs py-2 rounded-lg font-medium shadow">Test Function</button>
+                  <button onclick="location.reload()" class="bg-gray-200 text-gray-700 text-xs py-2 rounded-lg font-medium">Refresh View</button>
                 </div>
-              </div>
-
-              <div class="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-                <p class="text-xs font-bold text-gray-800 mb-1">Generated Files Summary:</p>
-                <ul class="text-[11px] text-gray-600 space-y-1 mt-1">
-                  <li class="flex items-center"><i class="fa-solid fa-file-code text-cyan-600 mr-2"></i> lib/main.dart</li>
-                  <li class="flex items-center"><i class="fa-solid fa-file-lines text-green-600 mr-2"></i> pubspec.yaml</li>
-                </ul>
               </div>
             </div>
 
             <!-- Simulated Bottom Nav -->
             <div class="bg-white border-t border-gray-200 py-2 px-6 flex justify-around text-gray-400 text-xs">
-              <div class="text-indigo-600 flex flex-col items-center"><i class="fa-solid fa-house"></i><span class="text-[90px] text-[9px] mt-0.5">Home</span></div>
+              <div class="text-indigo-600 flex flex-col items-center"><i class="fa-solid fa-house"></i><span class="text-[9px] mt-0.5">Home</span></div>
               <div class="flex flex-col items-center"><i class="fa-solid fa-code"></i><span class="text-[9px] mt-0.5">Code</span></div>
               <div class="flex flex-col items-center"><i class="fa-solid fa-gear"></i><span class="text-[9px] mt-0.5">Settings</span></div>
             </div>
@@ -581,7 +487,6 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
 
         </div>
 
-        <!-- Footer Code Snippet Toggle -->
         <div class="mt-3 text-center">
           <span class="text-[10px] text-gray-400">Powered by Groq API & WebView Engine</span>
         </div>
@@ -636,3 +541,118 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Groq Full-Stack Studio'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: _showSettingsDialog,
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _promptController,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter app idea (e.g. E-commerce app)...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: _isAutonomousRunning ? null : _startAutonomousBuild,
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Build'),
+                ),
+              ],
+            ),
+          ),
+          if (_isAutonomousRunning) ...[
+            LinearProgressIndicator(value: _progressValue),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(_currentPhase, style: const TextStyle(fontSize: 12, color: Colors.cyanAccent)),
+            ),
+          ],
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: Container(
+                    color: Colors.black26,
+                    child: ListView.builder(
+                      itemCount: _logs.length,
+                      itemBuilder: (context, index) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        child: Text(_logs[index], style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Column(
+                    children: [
+                      Container(
+                        color: Colors.blueGrey[900],
+                        child: Row(
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Text('Generated Files:', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                            if (_generatedFilesMap.isNotEmpty)
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                                onPressed: _showAppPreview,
+                                icon: const Icon(Icons.visibility, size: 16),
+                                label: const Text('Live Preview', style: TextStyle(fontSize: 12)),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView(
+                          children: _generatedFilesMap.keys.map((fileName) => ListTile(
+                            title: Text(fileName, style: const TextStyle(fontSize: 12)),
+                            selected: _selectedViewFile == fileName,
+                            onTap: () => setState(() => _selectedViewFile = fileName),
+                          )).toList(),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          color: Colors.black54,
+                          padding: const EdgeInsets.all(8),
+                          child: SingleChildScrollView(
+                            child: Text(
+                              _generatedFilesMap[_selectedViewFile] ?? 'Select a file to view code',
+                              style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Colors.greenAccent),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
