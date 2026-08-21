@@ -5,13 +5,14 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.4.0 <4.0.0' # एरर में जो SDK वर्जन मांगा था, वो यहाँ अपडेट कर दिया है
 
 dependencies:
   flutter:
     sdk: flutter
+  # वर्जन्स को स्टेबल किया ताकि कोई कॉन्फ्लिक्ट न हो
   firebase_core: ^3.6.0
-  firebase_auth: ^5.3.1
+  firebase_auth: ^5.3.1 
   supabase_flutter: ^2.5.4
   shared_preferences: ^2.2.3
   http: ^1.2.0
