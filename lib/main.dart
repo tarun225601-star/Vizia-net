@@ -71,6 +71,13 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
 
   late AnimationController _brainAnimController;
 
+  // हमेशा काम करने वाले बैकअप मॉडल्स की लिस्ट
+  final List<String> _fallbackModels = [
+    'llama-3.1-8b-instant',
+    'llama-3.3-70b-versatile',
+    'openai/gpt-oss-120b',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -109,72 +116,128 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     });
   }
 
-  void _showSettingsDialog() {
+  // Groq से लाइव मॉडल्स फेच करने का फंक्शन
+  Future<List<String>> _fetchLiveModels() async {
+    final prefs = await SharedPreferences.getInstance();
+    final apiKey = prefs.getString('groq_api_key') ?? '';
+    if (apiKey.isEmpty) return _fallbackModels;
+
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.groq.com/openai/v1/models'),
+        headers: {'Authorization': 'Bearer $apiKey'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        List<String> liveModels = List<String>.from(data['data'].map((m) => m['id'].toString()));
+        if (liveModels.isNotEmpty) {
+          return liveModels;
+        }
+      }
+    } catch (e) {
+      // अगर नेटवर्क इश्यू हो तो फॉलबैक लिस्ट दे देगा
+    }
+    return _fallbackModels;
+  }
+
+  void _showSettingsDialog() async {
     final groqKeyController = TextEditingController();
     final userController = TextEditingController();
     final repoController = TextEditingController();
     final tokenController = TextEditingController();
 
-    SharedPreferences.getInstance().then((prefs) {
-      groqKeyController.text = prefs.getString('groq_api_key') ?? '';
-      userController.text = prefs.getString('github_user') ?? '';
-      repoController.text = prefs.getString('github_repo') ?? '';
-      tokenController.text = prefs.getString('github_token') ?? '';
-    });
+    final prefs = await SharedPreferences.getInstance();
+    groqKeyController.text = prefs.getString('groq_api_key') ?? '';
+    userController.text = prefs.getString('github_user') ?? '';
+    repoController.text = prefs.getString('github_repo') ?? '';
+    tokenController.text = prefs.getString('github_token') ?? '';
+    String selectedModel = prefs.getString('selected_model') ?? 'llama-3.1-8b-instant';
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('⚙️ Studio & GitHub Settings'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: groqKeyController,
-                decoration: const InputDecoration(labelText: 'Groq API Key (gsk_...)'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: userController,
-                decoration: const InputDecoration(labelText: 'GitHub Username (e.g. tarun)'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: repoController,
-                decoration: const InputDecoration(labelText: 'GitHub Repository Name (e.g. my-app)'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: tokenController,
-                decoration: const InputDecoration(labelText: 'GitHub Personal Access Token'),
-                obscureText: true,
-              ),
-            ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('⚙️ Studio & Model Settings'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: groqKeyController,
+                  decoration: const InputDecoration(labelText: 'Groq API Key (gsk_...)'),
+                  obscureText: true,
+                ),
+                const SizedBox(height: 12),
+                
+                // लाइव मॉडल सिलेक्टर ड्रॉपडाउन
+                FutureBuilder<List<String>>(
+                  future: _fetchLiveModels(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const LinearProgressIndicator();
+                    }
+                    List<String> models = snapshot.data ?? _fallbackModels;
+                    if (!models.contains(selectedModel)) {
+                      models.insert(0, selectedModel);
+                    }
+                    return DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: selectedModel,
+                      items: models.map((m) => DropdownMenuItem(
+                        value: m, 
+                        child: Text(m, style: const TextStyle(fontSize: 12))
+                      )).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() => selectedModel = val);
+                        }
+                      },
+                      decoration: const InputDecoration(labelText: 'Select AI Model (Live List)'),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: userController,
+                  decoration: const InputDecoration(labelText: 'GitHub Username (e.g. tarun)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: repoController,
+                  decoration: const InputDecoration(labelText: 'GitHub Repository Name (e.g. my-app)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: tokenController,
+                  decoration: const InputDecoration(labelText: 'GitHub Personal Access Token'),
+                  obscureText: true,
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                await prefs.setString('groq_api_key', groqKeyController.text.trim());
+                await prefs.setString('selected_model', selectedModel);
+                await prefs.setString('github_user', userController.text.trim());
+                await prefs.setString('github_repo', repoController.text.trim());
+                await prefs.setString('github_token', tokenController.text.trim());
+                
+                await _checkGitHubConfig();
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ Settings Saved! Model: $selectedModel')));
+              },
+              child: const Text('Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('groq_api_key', groqKeyController.text.trim());
-              await prefs.setString('github_user', userController.text.trim());
-              await prefs.setString('github_repo', repoController.text.trim());
-              await prefs.setString('github_token', tokenController.text.trim());
-              
-              await _checkGitHubConfig();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Settings Saved Successfully!')));
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
   }
 
+  // ऑटो-फॉलबैक के साथ Groq API कॉल करने का मजबूत फंक्शन
   Future<String> _callGroqAPI(String systemPrompt, String userPrompt) async {
     final prefs = await SharedPreferences.getInstance();
     final apiKey = prefs.getString('groq_api_key') ?? '';
@@ -183,30 +246,39 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
       throw Exception('Groq API Key missing! Tap gear icon (top right) to set it.');
     }
 
-    final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $apiKey',
-      },
-      body: jsonEncode({
-        "model": "llama-3.3-70b-versatile",
-        "messages": [
-          {"role": "system", "content": systemPrompt},
-          {"role": "user", "content": userPrompt}
-        ],
-        "temperature": 0.1,
-        "max_tokens": 4000,
-      }),
-    );
+    String preferredModel = prefs.getString('selected_model') ?? 'llama-3.1-8b-instant';
+    List<String> modelsToTry = [preferredModel, ..._fallbackModels].toSet().toList();
 
-    if (response.statusCode != 200) {
-      throw Exception('Groq API Error: ${response.body}');
+    for (String model in modelsToTry) {
+      try {
+        final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+        final response = await http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $apiKey',
+          },
+          body: jsonEncode({
+            "model": model,
+            "messages": [
+              {"role": "system", "content": systemPrompt},
+              {"role": "user", "content": userPrompt}
+            ],
+            "temperature": 0.1,
+            "max_tokens": 4000,
+          }),
+        );
+
+        if (response.statusCode == 200) {
+          final decoded = jsonDecode(response.body);
+          return decoded['choices'][0]['message']['content'];
+        }
+      } catch (e) {
+        continue; // अगर एक मॉडल फेल हुआ, तो अगले बैकअप मॉडल पर ट्राई करेगा
+      }
     }
 
-    final decoded = jsonDecode(response.body);
-    return decoded['choices'][0]['message']['content'];
+    throw Exception('All models failed. Please check your API key or active models.');
   }
 
   Future<void> _startAutonomousBuild() async {
