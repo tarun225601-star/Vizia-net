@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -71,7 +72,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
 
   late AnimationController _brainAnimController;
 
-  // हमेशा काम करने वाले बैकअप मॉडल्स की लिस्ट
   final List<String> _fallbackModels = [
     'llama-3.1-8b-instant',
     'llama-3.3-70b-versatile',
@@ -116,7 +116,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     });
   }
 
-  // Groq से लाइव मॉडल्स फेच करने का फंक्शन
   Future<List<String>> _fetchLiveModels() async {
     final prefs = await SharedPreferences.getInstance();
     final apiKey = prefs.getString('groq_api_key') ?? '';
@@ -135,7 +134,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
         }
       }
     } catch (e) {
-      // अगर नेटवर्क इश्यू हो तो फॉलबैक लिस्ट दे देगा
+      // Ignore
     }
     return _fallbackModels;
   }
@@ -168,8 +167,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
                   obscureText: true,
                 ),
                 const SizedBox(height: 12),
-                
-                // लाइव मॉडल सिलेक्टर ड्रॉपडाउन
                 FutureBuilder<List<String>>(
                   future: _fetchLiveModels(),
                   builder: (context, snapshot) {
@@ -199,12 +196,12 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
                 const SizedBox(height: 12),
                 TextField(
                   controller: userController,
-                  decoration: const InputDecoration(labelText: 'GitHub Username (e.g. tarun)'),
+                  decoration: const InputDecoration(labelText: 'GitHub Username'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: repoController,
-                  decoration: const InputDecoration(labelText: 'GitHub Repository Name (e.g. my-app)'),
+                  decoration: const InputDecoration(labelText: 'GitHub Repository Name'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -227,7 +224,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
                 
                 await _checkGitHubConfig();
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ Settings Saved! Model: $selectedModel')));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Settings Saved!')));
               },
               child: const Text('Save'),
             ),
@@ -237,13 +234,12 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     );
   }
 
-  // ऑटो-फॉलबैक के साथ Groq API कॉल करने का मजबूत फंक्शन
   Future<String> _callGroqAPI(String systemPrompt, String userPrompt) async {
     final prefs = await SharedPreferences.getInstance();
     final apiKey = prefs.getString('groq_api_key') ?? '';
     
     if (apiKey.isEmpty) {
-      throw Exception('Groq API Key missing! Tap gear icon (top right) to set it.');
+      throw Exception('Groq API Key missing! Tap gear icon to set it.');
     }
 
     String preferredModel = prefs.getString('selected_model') ?? 'llama-3.1-8b-instant';
@@ -274,11 +270,10 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
           return decoded['choices'][0]['message']['content'];
         }
       } catch (e) {
-        continue; // अगर एक मॉडल फेल हुआ, तो अगले बैकअप मॉडल पर ट्राई करेगा
+        continue;
       }
     }
-
-    throw Exception('All models failed. Please check your API key or active models.');
+    throw Exception('All models failed. Please check your API key.');
   }
 
   Future<void> _startAutonomousBuild() async {
@@ -299,20 +294,29 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
 
     try {
       const systemPrompt = '''
-You are an expert Autonomous Flutter Architect. Design a clean file structure for the user requirement.
-Return a strict JSON array of relative file paths (e.g. ["lib/main.dart", "pubspec.yaml"]). Output ONLY valid JSON array and nothing else.
+You are a strict JSON-only API. Output ONLY a valid JSON array of relative file paths (e.g. ["lib/main.dart", "pubspec.yaml"]). 
+Do NOT include markdown formatting, backticks, or explanation text.
 ''';
 
       setState(() { _progressValue = 0.2; _currentPhase = '📂 Planning project file structure...'; });
       String content = await _callGroqAPI(systemPrompt, userPrompt);
-      content = content.replaceAll('```json', '').replaceAll('```', '').trim();
+      
+      content = content.replaceAll('```json', '').replaceAll('```', '').replaceAll('`', '').trim();
       
       int start = content.indexOf('[');
       int end = content.lastIndexOf(']');
-      if (start != -1 && end != -1) content = content.substring(start, end + 1);
+      if (start != -1 && end != -1) {
+        content = content.substring(start, end + 1);
+      }
 
-      List<dynamic> parsedList = jsonDecode(content);
-      List<String> filePlan = parsedList.map((e) => e.toString()).toList();
+      List<String> filePlan = [];
+      try {
+        List<dynamic> parsedList = jsonDecode(content);
+        filePlan = parsedList.map((e) => e.toString()).toList();
+      } catch (jsonErr) {
+        _addLog('⚠️ JSON Parse warning: using default architecture layout.');
+        filePlan = ['lib/main.dart', 'pubspec.yaml'];
+      }
       
       if (!filePlan.contains('lib/main.dart')) filePlan.add('lib/main.dart');
       if (!filePlan.contains('pubspec.yaml')) filePlan.add('pubspec.yaml');
@@ -335,7 +339,7 @@ Return a strict JSON array of relative file paths (e.g. ["lib/main.dart", "pubsp
         _addLog('🔨 Generating code for: $fileName');
 
         const codeSystemPrompt = '''
-You are an expert Senior Flutter Developer. Write production-ready, complete, fully working code ONLY for the specified file path inside markdown code blocks. Output ONLY the code inside the code block.
+You are an expert Senior Flutter Developer. Write production-ready, complete, fully working code ONLY inside markdown code blocks. Output ONLY the code.
 ''';
         String rawResponse = await _callGroqAPI(codeSystemPrompt, 'Requirement: $userPrompt\nFile:$fileName');
         String code = _extractCleanCode(rawResponse);
@@ -356,7 +360,7 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
         }
         _addLog('✅ All files successfully pushed to GitHub!');
       } else {
-        _addLog('ℹ️ GitHub credentials incomplete; files saved locally in studio.');
+        _addLog('ℹ️ GitHub credentials incomplete; files saved locally.');
       }
 
       setState(() {
@@ -397,7 +401,7 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
     );
 
     if (putRes.statusCode != 200 && putRes.statusCode != 201) {
-      throw Exception('GitHub Push Failed for $path:${putRes.body}');
+      throw Exception('GitHub Push Failed for $path');
     }
     _addLog('📂 Pushed to GitHub -> $path');
   }
@@ -412,59 +416,81 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
     return raw.trim();
   }
 
+  // असली WebView के साथ Live App Preview
   void _showAppPreview() {
+    // एक सुंदर HTML पेज बनाओ जिसमें जेनरेटेड कोड और ऐप की डिटेल दिखे
+    final mainCode = _generatedFilesMap['lib/main.dart'] ?? '// No main.dart found';
+    final htmlContent = '''
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>App Live Preview</title>
+        <style>
+          body { background-color: #0b132b; color: #00f5d4; font-family: monospace; padding: 16px; margin: 0; }
+          h2 { color: #ffffff; border-bottom: 2px solid #00f5d4; padding-bottom: 8px; }
+          .card { background: #1d3557; padding: 12px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #00f5d4; }
+          pre { background: #000; color: #00ffcc; padding: 10px; border-radius: 6px; overflow-x: auto; font-size: 11px; }
+        </style>
+      </head>
+      <body>
+        <h2>🚀 Live App Web Simulator</h2>
+        <div class="card">
+          <strong>Requirement:</strong> ${_promptController.text}
+        </div>
+        <div class="card">
+          <strong>Generated Files:</strong> ${_generatedFilesMap.length} files built successfully.
+        </div>
+        <h3>📄 main.dart Code:</h3>
+        <pre>${mainCode.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</pre>
+      </body>
+      </html>
+    ''';
+
+    final WebViewController controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..loadHtmlString(htmlContent);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => Dialog(
         backgroundColor: const Color(0xFF1D3557),
-        title: const Row(
-          children: [
-            Icon(Icons.remove_red_eye, color: Color(0xFF00F5D4)),
-            SizedBox(width: 8),
-            Text('Live App Preview', style: TextStyle(color: Colors.white)),
-          ],
-        ),
-        content: SizedBox(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: SizedBox(
           width: double.maxFinite,
+          height: 450,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                height: 250,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF00F5D4)),
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.public, color: Color(0xFF00F5D4)),
+                        SizedBox(width: 8),
+                        Text('Live WebView Preview', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white70),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.phone_android, size: 50, color: Color(0xFF00F5D4)),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Project Built Successfully!',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Generated Files: ${_generatedFilesMap.length}',
-                        style: const TextStyle(color: Colors.cyanAccent, fontSize: 12),
-                      ),
-                    ],
-                  ),
+              ),
+              const Divider(color: Colors.white24, height: 1),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                  child: WebViewWidget(controller: controller),
                 ),
               ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: Colors.white70)),
-          ),
-        ],
       ),
     );
   }
@@ -526,7 +552,7 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
               controller: _promptController,
               maxLines: 2,
               decoration: const InputDecoration(
-                labelText: 'Enter App Requirement (e.g. "make a weather app")', 
+                labelText: 'Enter App Requirement (e.g. "make full marketplace app")', 
                 border: OutlineInputBorder(), 
                 filled: true, 
                 fillColor: Colors.black26,
