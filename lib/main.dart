@@ -64,7 +64,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
   bool _isAutonomousRunning = false;
   bool _isGitHubConnected = false;
   double _progressValue = 0.0;
-  String _currentPhase = 'Idle - Ready for Takaatak Generation.';
+  String _currentPhase = 'Idle - Ready for 10k-Crore Generation.';
   
   final List<String> _logs = [];
   final Map<String, String> _generatedFilesMap = {};
@@ -125,7 +125,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
         if (liveModels.isNotEmpty) return liveModels;
       }
     } catch (e) {
-      // Ignore
+      // Ignore network errors and fall back
     }
     return _fallbackModels;
   }
@@ -147,7 +147,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('⚙️ Studio & Model Settings'),
+          title: const Text('⚙️ Studio, API & GitHub Settings'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -204,7 +204,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Settings Saved Successfully!')));
               },
-              child: const Text('Save'),
+              child: const Text('Save Settings'),
             ),
           ],
         ),
@@ -217,7 +217,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     final apiKey = prefs.getString('groq_api_key') ?? '';
     
     if (apiKey.isEmpty) {
-      throw Exception('Groq API Key missing! Tap gear icon to add key.');
+      throw Exception('Groq API Key missing! Tap gear icon on top right to add key.');
     }
 
     String preferredModel = prefs.getString('selected_model') ?? 'llama-3.1-8b-instant';
@@ -417,7 +417,6 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
       </html>
     ''';
 
-    // 100% Reliable WebView Controller Initialization using Data URI
     final WebViewController controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..loadRequest(Uri.dataFromString(
@@ -466,7 +465,11 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
       appBar: AppBar(
         title: const Text('Groq 10k-Crore Studio'),
         actions: [
-          IconButton(icon: const Icon(Icons.settings), onPressed: _showSettingsDialog),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings & API Keys',
+            onPressed: _showSettingsDialog,
+          ),
         ],
       ),
       body: Column(
@@ -539,11 +542,10 @@ You are an expert Senior Flutter Developer. Write production-ready, complete, fu
                           children: [
                             const Text('Files:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                             if (_generatedFilesMap.isNotEmpty)
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, isDense: true),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                                 onPressed: _showAppPreview,
-                                icon: const Icon(Icons.visibility, size: 14),
-                                label: const Text('Preview', style: TextStyle(fontSize: 11)),
+                                child: const Text('Preview', style: TextStyle(fontSize: 11)),
                               ),
                           ],
                         ),
