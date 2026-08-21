@@ -10,7 +10,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # स्टेबल वर्जन्स का कॉम्बिनेशन
   firebase_core: ^2.24.2
   firebase_auth: ^4.16.0
   supabase_flutter: ^2.5.4
