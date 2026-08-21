@@ -8,7 +8,44 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+
+  // 🔴 कस्टम एरर विजेट: अब ब्लैक स्क्रीन की जगह एरर सीधे स्क्रीन पर दिखेगा
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return MaterialApp(
+      home: Scaffold(
+        backgroundColor: Colors.black87,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.bug_report, color: Colors.red, size: 80),
+                const SizedBox(height: 20),
+                const Text(
+                  "⚠️ App Error Detected",
+                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  details.exception.toString(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  };
+
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint("Firebase Init Error: $e");
+  }
+
   runApp(const AutonomousEnterpriseApp());
 }
 
@@ -75,12 +112,16 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   }
 
   void _checkExistingGitHubUser() {
-    User? currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null) {
-      setState(() {
-        _isGitHubConnected = true;
-      });
-      _addLog('🔗 Existing GitHub session found: ${currentUser.displayName ?? currentUser.email}');
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        setState(() {
+          _isGitHubConnected = true;
+        });
+        _addLog('🔗 Existing GitHub session found: ${currentUser.displayName ?? currentUser.email}');
+      }
+    } catch (e) {
+      _addLog('❌ Auth check error: $e');
     }
   }
 
@@ -291,7 +332,6 @@ Return a strict JSON array of relative file paths. Output ONLY valid JSON array 
     }
   }
 
-  // यहाँ हमने सेल्फ-हीलिंग और एरर फिक्सिंग वाला स्मार्ट प्रॉम्प्ट जोड़ दिया है
   Future<void> _confirmAndBuildProject() async {
     final chosenFiles = _selectableFiles.where((f) => f['selected'] == true).map((f) => f['path'].toString()).toList();
     if (chosenFiles.isEmpty) return;
@@ -315,7 +355,6 @@ Return a strict JSON array of relative file paths. Output ONLY valid JSON array 
           _currentPhase = 'Writing ($i/${chosenFiles.length}):$fileName';
         });
 
-        // ⚡ धांसू एरर-फ्री सिस्टम प्रॉम्प्ट (Self-Healing & Clean Code Protocol)
         const systemPrompt = '''
 You are an expert Senior Flutter & Full-Stack Developer. Write production-ready, complete code or configuration content ONLY for the specified file path.
 CRITICAL RULES FOR ERROR-FREE CODE:
