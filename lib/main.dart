@@ -69,10 +69,28 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
   final Map<String, String> _generatedFilesMap = {};
   String _selectedViewFile = '';
 
+  // 🚀 अपडेटेड 20+ पावरफुल मॉडल्स की लिस्ट
   final List<String> _fallbackModels = [
-    'llama-3.1-8b-instant',
     'llama-3.3-70b-versatile',
+    'llama-3.1-70b-versatile',
+    'llama-3.1-8b-instant',
+    'gemma2-9b-it',
+    'llama-3.3-70b-specdec',
+    'llama-3.1-70b-specdec',
+    'llama-3.2-90b-vision-preview',
+    'llama-3.2-11b-vision-preview',
+    'llama-3.2-3b-preview',
+    'llama-3.2-1b-preview',
+    'llama-3.1-405b-reasoning',
+    'llama-guard-3-8b',
     'mixtral-8x7b-32768',
+    'gemma-7b-it',
+    'llama3-70b-8192',
+    'llama3-8b-8192',
+    'llama2-70b-4096',
+    'mixtral-8x22b-instruct-preview',
+    'llama-3.1-70b-turbo',
+    'llama-3.2-90b-text-preview'
   ];
 
   @override
@@ -85,7 +103,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     setState(() {
       _logs.insert(
         0, 
-        '[${DateTime.now().toLocal().toString().split(' ')[1].substring(0, 8)}] $message'
+        '[${DateTime.now().toLocal().toString().split(' ')[1].substring(0, 8)}]$message'
       );
     });
   }
@@ -124,7 +142,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     repoController.text = prefs.getString('github_repo') ?? '';
     tokenController.text = prefs.getString('github_token') ?? '';
     appetizeKeyController.text = prefs.getString('appetize_key') ?? 'app_z932v3x69n9xxq2xhg1yq8b380';
-    String selectedModel = prefs.getString('selected_model') ?? 'llama-3.1-8b-instant';
+    String selectedModel = prefs.getString('selected_model') ?? 'llama-3.3-70b-versatile';
 
     showDialog(
       context: context,
@@ -197,6 +215,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     );
   }
 
+  // 🚀 अपडेटेड API कॉल फंक्शन
   Future<String> _callGroqAPI(String systemPrompt, String userPrompt) async {
     final prefs = await SharedPreferences.getInstance();
     final apiKey = prefs.getString('groq_api_key') ?? '';
@@ -205,7 +224,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
       throw Exception('Groq API Key missing! Tap gear icon on top right.');
     }
 
-    String preferredModel = prefs.getString('selected_model') ?? 'llama-3.1-8b-instant';
+    String preferredModel = prefs.getString('selected_model') ?? 'llama-3.3-70b-versatile';
     List<String> modelsToTry = [preferredModel, ..._fallbackModels].toSet().toList();
 
     for (String model in modelsToTry) {
@@ -223,23 +242,24 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
               {"role": "system", "content": systemPrompt},
               {"role": "user", "content": userPrompt}
             ],
-            "temperature": 0.1,
-            "max_tokens": 4000,
+            "temperature": 0.2,
+            "max_tokens": 4096,
           }),
         );
 
         if (response.statusCode == 200) {
           final decoded = jsonDecode(response.body);
-          return decoded['choices'][0]['message']['content'];
+          if (decoded['choices'] != null && decoded['choices'].isNotEmpty) {
+            return decoded['choices'][0]['message']['content'];
+          }
         }
       } catch (e) {
         continue;
       }
     }
-    throw Exception('All AI models failed. Check your API key.');
+    throw Exception('All 20+ models failed. Check your API key.');
   }
 
-  // 🧩 **True Chunk-by-Chunk Generation Engine (कचरा कोड का सफाया)**
   Future<void> _startAutonomousBuild() async {
     final userPrompt = _promptController.text.trim();
     if (userPrompt.isEmpty) {
@@ -257,7 +277,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     _addLog('🚀 Chunk-by-Chunk Build started for: "$userPrompt"');
 
     try {
-      // Step 1: Get File List Plan
       const planSystemPrompt = 'Return ONLY a JSON list of file paths required for this Flutter app (e.g. ["pubspec.yaml", "lib/main.dart", "lib/screens/home_screen.dart"]). No extra text, no markdown backticks.';
       String planContent = await _callGroqAPI(planSystemPrompt, userPrompt);
       
@@ -281,7 +300,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
 
       _addLog('✅ Planned ${filePlan.length} files. Starting Chunk Generation...');
 
-      // Step 2: Loop files and build in Chunks if file is large
       for (int i = 0; i < filePlan.length; i++) {
         String fileName = filePlan[i];
         double progress = 0.2 + (((i + 1) / filePlan.length) * 0.6);
@@ -293,7 +311,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
 
         _addLog('⚙️ Requesting clean code for $fileName...');
 
-        // 🛡️ Strict Anti-Garbage System Prompt
         String chunkSystemPrompt = '''
 You are an elite Senior Flutter & Dart Software Architect. 
 Your task is to write ONLY the requested file code.
@@ -312,7 +329,6 @@ CRITICAL RULES:
         _addLog('✔️ Chunk for $fileName verified & saved cleanly.');
       }
 
-      // Step 3: Push to GitHub if configured
       final prefs = await SharedPreferences.getInstance();
       final user = prefs.getString('github_user') ?? '';
       final repo = prefs.getString('github_repo') ?? '';
@@ -345,66 +361,49 @@ CRITICAL RULES:
     }
   }
 
-  // 🧹 **Aggressive Garbage Filter (कचरा और फालतू टेक्स्ट काटने की मशीन)**
   String _cleanGarbageCode(String raw, String fileName) {
     String cleaned = raw.trim();
-
-    // अगर मॉडल ने markdown block ```dart ... ``` दिया है तो अंदर का कोड निकालो
     if (cleaned.contains('```')) {
       int firstBacktick = cleaned.indexOf('```');
       int firstNewLine = cleaned.indexOf('\n', firstBacktick);
       int lastBacktick = cleaned.lastIndexOf('```');
-      
       if (firstNewLine != -1 && lastBacktick > firstNewLine) {
         cleaned = cleaned.substring(firstNewLine + 1, lastBacktick).trim();
       }
     }
-
-    // अगर Dart फाइल है, तो सुनिश्चित करो कि इम्पोर्ट से पहले का सारा बकवास टेक्स्ट कट जाए
     if (fileName.endsWith('.dart')) {
       int importIndex = cleaned.indexOf('import ');
       if (importIndex != -1) {
         cleaned = cleaned.substring(importIndex);
       }
     }
-
-    // अगर pubspec.yaml है तो YAML का सटीक हिस्सा छाँटो
     if (fileName.contains('pubspec.yaml')) {
       int yamlIndex = cleaned.indexOf('name:');
       if (yamlIndex != -1) {
         cleaned = cleaned.substring(yamlIndex);
       }
     }
-
     return cleaned;
   }
 
   Future<void> _pushFileToGitHub(String fullRepo, String token, String path, String content) async {
     final url = Uri.parse('[https://api.github.com/repos/$fullRepo/contents/$path](https://api.github.com/repos/$fullRepo/contents/$path)');
     String? sha;
-    
     final getRes = await http.get(url, headers: {'Authorization': 'Bearer $token', 'Accept': 'application/vnd.github+json'});
     if (getRes.statusCode == 200) {
       sha = jsonDecode(getRes.body)['sha'];
     }
-
     final body = {
       "message": "Chunk Agent: Update $path",
       "content": base64Encode(utf8.encode(content)),
       if (sha != null) "sha": sha,
     };
-
-    await http.put(
-      url,
-      headers: {'Authorization': 'Bearer $token', 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
+    await http.put(url, headers: {'Authorization': 'Bearer $token', 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'}, body: jsonEncode(body));
   }
 
   void _showAppPreview() async {
     final prefs = await SharedPreferences.getInstance();
     String appetizeKey = prefs.getString('appetize_key') ?? 'app_z932v3x69n9xxq2xhg1yq8b380';
-
     final htmlContent = '''
       <!DOCTYPE html>
       <html lang="en">
@@ -425,11 +424,9 @@ CRITICAL RULES:
       </body>
       </html>
     ''';
-
     final WebViewController controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..loadRequest(Uri.dataFromString(htmlContent, mimeType: 'text/html', encoding: Encoding.getByName('utf-8')));
-
     showDialog(
       context: context,
       builder: (context) => Dialog(
