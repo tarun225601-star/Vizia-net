@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Firebase को इनिशियलाइज करना जरूरी है
+  await Firebase.initializeApp();
   runApp(const AutonomousEnterpriseApp());
 }
 
@@ -67,6 +72,18 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   void initState() {
     super.initState();
     _loadSavedConfig();
+    _checkExistingGitHubUser();
+  }
+
+  // चेक करें कि क्या यूजर पहले से ही GitHub से लॉग इन है
+  void _checkExistingGitHubUser() {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      setState(() {
+        _isGitHubConnected = true;
+      });
+      _addLog('🔗 Existing GitHub session found: ${currentUser.displayName ?? currentUser.email}');
+    }
   }
 
   Future<void> _loadSavedConfig() async {
@@ -176,10 +193,36 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     return decoded['choices'][0]['message']['content'];
   }
 
-  void _connectGitHub() {
-    setState(() { _isGitHubConnected = true; });
-    _addLog('🔗 Connected to GitHub account.');
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ GitHub Connected!')));
+  // Firebase के जरिए असली GitHub OAuth लॉगिन फंक्शन
+  Future<void> _connectGitHub() async {
+    try {
+      _addLog('🔄 Opening GitHub login window...');
+      
+      // GitHub Provider का इंस्टेंस बनाएँ
+      GithubAuthProvider githubProvider = GithubAuthProvider();
+      
+      // यदि रिपॉजिटरी या अन्य स्कोप्स की जरूरत हो
+      githubProvider.addScope('repo');
+
+      // Firebase के साथ ऑथेंटिकेशन फ्लो शुरू करें
+      UserCredential userCredential = await FirebaseAuth.instance.signInWithProvider(githubProvider);
+      
+      User? user = userCredential.user;
+
+      setState(() { 
+        _isGitHubConnected = true; 
+      });
+      
+      _addLog('🔗 Successfully connected to GitHub: ${user?.displayName ?? user?.email ?? "User"}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ GitHub Connected Successfully!')),
+      );
+    } catch (e) {
+      _addLog('❌ GitHub Login Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('⚠️ GitHub Login Failed: $e')),
+      );
+    }
   }
 
   void _syncAndroidStudio() {
@@ -205,7 +248,6 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
 
     try {
       final config = await _getStoredConfig();
-      // Replit style system prompt for absolute full-stack structure generation
       const systemPrompt = '''
 You are an expert Principal App Architect and Senior Flutter/Android Developer. 
 Design a complete, production-ready, full-stack Flutter application structure based on the user prompt.
