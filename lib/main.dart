@@ -97,11 +97,11 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   }
 
   void _showSettingsDialog() {
-    final grokKeyController = TextEditingController();
+    final groqKeyController = TextEditingController();
     final projectNameController = TextEditingController();
 
     _getStoredConfig().then((config) {
-      grokKeyController.text = config.grokApiKey;
+      groqKeyController.text = config.groqApiKey;
       projectNameController.text = config.projectName;
     });
 
@@ -123,7 +123,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
               ),
               const SizedBox(height: 12),
               TextField(
-                controller: grokKeyController,
+                controller: groqKeyController,
                 decoration: const InputDecoration(labelText: 'Groq API Key (gsk_...)'),
                 obscureText: true,
               ),
@@ -135,7 +135,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
           ElevatedButton(
             onPressed: () async {
               await _saveConfig(AgentConfig(
-                groqApiKey: grokKeyController.text.trim(),
+                groqApiKey: groqKeyController.text.trim(),
                 projectName: projectNameController.text.trim().isEmpty ? 'Project_1' : projectNameController.text.trim(),
               ));
               Navigator.pop(context);
@@ -205,7 +205,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
 
     try {
       final config = await _getStoredConfig();
-      // System prompt updated to include config, gradle, manifest, pubspec, kotlin files along with dart files
+      // Replit style system prompt for absolute full-stack structure generation
       const systemPrompt = '''
 You are an expert Principal App Architect and Senior Flutter/Android Developer. 
 Design a complete, production-ready, full-stack Flutter application structure based on the user prompt.
@@ -230,7 +230,6 @@ Return a strict JSON array of relative file paths. Output ONLY valid JSON array 
       List<dynamic> parsedList = jsonDecode(content);
       List<String> filePlan = parsedList.map((e) => e.toString()).toList();
       
-      // Ensure absolute essentials exist
       if (!filePlan.contains('lib/main.dart')) filePlan.add('lib/main.dart');
       if (!filePlan.contains('pubspec.yaml')) filePlan.add('pubspec.yaml');
       if (!filePlan.contains('android/app/build.gradle')) filePlan.add('android/app/build.gradle');
