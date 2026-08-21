@@ -8,7 +8,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Firebase को इनिशियलाइज करना जरूरी है
   await Firebase.initializeApp();
   runApp(const AutonomousEnterpriseApp());
 }
@@ -75,7 +74,6 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     _checkExistingGitHubUser();
   }
 
-  // चेक करें कि क्या यूजर पहले से ही GitHub से लॉग इन है
   void _checkExistingGitHubUser() {
     User? currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
@@ -87,7 +85,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
   }
 
   Future<void> _loadSavedConfig() async {
-    _addLog('⚙️ Groq Full-Stack Studio Agent initialized.');
+    _addLog('⚙️ Groq Full-Stack Studio Agent initialized with Self-Healing feature.');
   }
 
   void _addLog(String message) {
@@ -193,20 +191,13 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     return decoded['choices'][0]['message']['content'];
   }
 
-  // Firebase के जरिए असली GitHub OAuth लॉगिन फंक्शन
   Future<void> _connectGitHub() async {
     try {
       _addLog('🔄 Opening GitHub login window...');
-      
-      // GitHub Provider का इंस्टेंस बनाएँ
       GithubAuthProvider githubProvider = GithubAuthProvider();
-      
-      // यदि रिपॉजिटरी या अन्य स्कोप्स की जरूरत हो
       githubProvider.addScope('repo');
 
-      // Firebase के साथ ऑथेंटिकेशन फ्लो शुरू करें
       UserCredential userCredential = await FirebaseAuth.instance.signInWithProvider(githubProvider);
-      
       User? user = userCredential.user;
 
       setState(() { 
@@ -241,7 +232,7 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     setState(() {
       _isAutonomousRunning = true;
       _progressValue = 0.2;
-      _currentPhase = 'Analyzing full-stack architecture (Gradle, Pubspec, Kotlin, Dart)...';
+      _currentPhase = 'Analyzing full-stack architecture & error-free planning...';
       _selectableFiles.clear();
       _generatedFilesMap.clear();
     });
@@ -250,15 +241,15 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
       final config = await _getStoredConfig();
       const systemPrompt = '''
 You are an expert Principal App Architect and Senior Flutter/Android Developer. 
-Design a complete, production-ready, full-stack Flutter application structure based on the user prompt.
+Design a complete, production-ready, error-free full-stack Flutter application structure based on the user prompt.
 You MUST include all necessary configuration and native setup files along with source code files.
 Specifically, always include:
 1. pubspec.yaml
 2. android/app/build.gradle
 3. android/app/src/main/AndroidManifest.xml
-4. android/app/src/main/kotlin/com/example/app/MainActivity.kt (or appropriate package path)
+4. android/app/src/main/kotlin/com/example/app/MainActivity.kt
 5. lib/main.dart
-And any additional required modular files (screens, widgets, models, services, etc.).
+And any additional required modular files.
 Return a strict JSON array of relative file paths. Output ONLY valid JSON array and nothing else.
 ''';
 
@@ -281,7 +272,7 @@ Return a strict JSON array of relative file paths. Output ONLY valid JSON array 
         _isAutonomousRunning = false;
         _isWaitingForUserFileSelection = true;
         _progressValue = 0.5;
-        _currentPhase = 'Mapped ${filePlan.length} files (Including Gradle, Pubspec, Kotlin, Dart). Review & build.';
+        _currentPhase = 'Mapped ${filePlan.length} files. Review & build.';
       });
       _addLog('📋 Successfully planned full-stack file structure.');
     } catch (e) {
@@ -300,6 +291,7 @@ Return a strict JSON array of relative file paths. Output ONLY valid JSON array 
     }
   }
 
+  // यहाँ हमने सेल्फ-हीलिंग और एरर फिक्सिंग वाला स्मार्ट प्रॉम्प्ट जोड़ दिया है
   Future<void> _confirmAndBuildProject() async {
     final chosenFiles = _selectableFiles.where((f) => f['selected'] == true).map((f) => f['path'].toString()).toList();
     if (chosenFiles.isEmpty) return;
@@ -308,12 +300,13 @@ Return a strict JSON array of relative file paths. Output ONLY valid JSON array 
       _isWaitingForUserFileSelection = false;
       _isAutonomousRunning = true;
       _progressValue = 0.6;
-      _currentPhase = 'Generating code & configs for all selected files...';
+      _currentPhase = 'Generating error-free code & configs...';
       _generatedFilesMap.clear();
     });
 
     try {
       final config = await _getStoredConfig();
+      final userFullInput = _promptController.text.trim();
 
       for (int i = 0; i < chosenFiles.length; i++) {
         String fileName = chosenFiles[i];
@@ -322,12 +315,21 @@ Return a strict JSON array of relative file paths. Output ONLY valid JSON array 
           _currentPhase = 'Writing ($i/${chosenFiles.length}):$fileName';
         });
 
+        // ⚡ धांसू एरर-फ्री सिस्टम प्रॉम्प्ट (Self-Healing & Clean Code Protocol)
         const systemPrompt = '''
-You are an expert developer. Write production-ready, complete code or configuration content ONLY for the specified file path (whether it is pubspec.yaml, build.gradle, AndroidManifest.xml, a .kt kotlin file, or a .dart file). 
-For code files, enclose inside appropriate markdown code blocks (```dart, ```yaml, ```groovy, ```xml, ```kotlin).
-Output ONLY the clean content inside the code block.
+You are an expert Senior Flutter & Full-Stack Developer. Write production-ready, complete code or configuration content ONLY for the specified file path.
+CRITICAL RULES FOR ERROR-FREE CODE:
+1. Ensure all required imports (e.g., 'package:flutter/material.dart') are explicitly included.
+2. Fix any potential syntax errors, unclosed brackets, or type mismatches beforehand.
+3. If the user provides an error message or debugging prompt, analyze the error, locate the buggy lines, and output a fully corrected version of the code.
+4. Enclose code inside appropriate markdown code blocks (```dart, ```yaml, ```groovy, ```xml, ```kotlin).
+Output ONLY the clean content inside the code block and nothing else.
 ''';
-        String rawResponse = await _callGroqAPI(config: config, systemPrompt: systemPrompt, userPrompt: 'Project Requirement: ${_promptController.text}\nTarget File Path: $fileName');
+        String rawResponse = await _callGroqAPI(
+          config: config, 
+          systemPrompt: systemPrompt, 
+          userPrompt: 'Project Requirement / Bug Fix Request: $userFullInput\nTarget File Path: $fileName'
+        );
         
         String code = _extractCleanCode(rawResponse, fileName);
         _generatedFilesMap[fileName] = code;
@@ -336,12 +338,12 @@ Output ONLY the clean content inside the code block.
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
-        _currentPhase = 'Successfully generated full-stack project for [${config.projectName}]!';
+        _currentPhase = 'Successfully generated/fixed full-stack project for [${config.projectName}]!';
         if (_generatedFilesMap.isNotEmpty) {
           _selectedViewFile = _generatedFilesMap.keys.first;
         }
       });
-      _addLog('🎉 All ${_generatedFilesMap.length} full-stack files successfully generated!');
+      _addLog('🎉 Files successfully generated with Self-Healing protection!');
     } catch (e) {
       _addLog('❌ Build Error: $e');
       setState(() => _isAutonomousRunning = false);
@@ -435,13 +437,18 @@ Output ONLY the clean content inside the code block.
             TextField(
               controller: _promptController,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Enter App Requirement (Full-Stack + Gradle + Pubspec)', border: OutlineInputBorder(), filled: true, fillColor: Colors.black26),
+              decoration: const InputDecoration(
+                labelText: 'Enter Requirement OR Paste Error (e.g. "Error: Widget not found in main.dart")', 
+                border: OutlineInputBorder(), 
+                filled: true, 
+                fillColor: Colors.black26,
+              ),
             ),
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: _isAutonomousRunning || _isWaitingForUserFileSelection ? null : _startScaleAnalysis,
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00F5D4), foregroundColor: Colors.black),
-              child: const Text('🔍 Step 1: Map Full-Stack Structure via Groq', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('🔍 Step 1: Map / Analyze via Groq AI', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 8),
             LinearProgressIndicator(value: _progressValue, valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00F5D4))),
@@ -450,7 +457,7 @@ Output ONLY the clean content inside the code block.
             const SizedBox(height: 8),
 
             if (_isWaitingForUserFileSelection) ...[
-              const Text('📂 Select Files to Generate (Dart, Gradle, Pubspec, Kotlin):', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('📂 Select Files to Generate / Fix:', style: TextStyle(fontWeight: FontWeight.bold)),
               Expanded(
                 child: ListView.builder(
                   itemCount: _selectableFiles.length,
@@ -469,7 +476,7 @@ Output ONLY the clean content inside the code block.
               ElevatedButton(
                 onPressed: _confirmAndBuildProject,
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00F5D4), foregroundColor: Colors.black),
-                child: const Text('🚀 Step 2: Generate Full Project Files', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('🚀 Step 2: Generate / Fix Code Files', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ] else ...[
               Row(
@@ -525,7 +532,7 @@ Output ONLY the clean content inside the code block.
                     child: Text(
                       _generatedFilesMap.isNotEmpty && _selectedViewFile.isNotEmpty
                           ? _generatedFilesMap[_selectedViewFile]!
-                          : '// Generated project files, pubspec, gradle and code will appear here after build...',
+                          : '// Generated project files, fixes and code will appear here...',
                       style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.cyanAccent),
                     ),
                   ),
