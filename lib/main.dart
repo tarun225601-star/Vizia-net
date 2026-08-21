@@ -3,13 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🔴 कस्टम एरर विजेट: अब ब्लैक स्क्रीन की जगह एरर सीधे स्क्रीन पर दिखेगा
   ErrorWidget.builder = (FlutterErrorDetails details) {
     return MaterialApp(
       home: Scaffold(
@@ -17,22 +14,10 @@ void main() async {
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.bug_report, color: Colors.red, size: 80),
-                const SizedBox(height: 20),
-                const Text(
-                  "⚠️ App Error Detected",
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  details.exception.toString(),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
-                ),
-              ],
+            child: Text(
+              "⚠️ Error: ${details.exception}",
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 14),
             ),
           ),
         ),
@@ -40,22 +25,16 @@ void main() async {
     );
   };
 
-  try {
-    await Firebase.initializeApp();
-  } catch (e) {
-    debugPrint("Firebase Init Error: $e");
-  }
-
-  runApp(const AutonomousEnterpriseApp());
+  runApp(const GroqStudioApp());
 }
 
-class AutonomousEnterpriseApp extends StatelessWidget {
-  const AutonomousEnterpriseApp({super.key});
+class GroqStudioApp extends StatelessWidget {
+  const GroqStudioApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Groq Full-Stack Project Studio',
+      title: 'Groq Full-Stack Studio',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0B132B),
         primaryColor: const Color(0xFF00F5D4),
@@ -65,68 +44,60 @@ class AutonomousEnterpriseApp extends StatelessWidget {
           surface: Color(0xFF1D3557),
         ),
       ),
-      home: const EnterpriseStudioScreen(),
+      home: const StudioHomeScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
 }
 
-class AgentConfig {
-  final String groqApiKey;
-  final String projectName;
-
-  AgentConfig({
-    required this.groqApiKey,
-    required this.projectName,
-  });
-}
-
-class EnterpriseStudioScreen extends StatefulWidget {
-  const EnterpriseStudioScreen({super.key});
+class StudioHomeScreen extends StatefulWidget {
+  const StudioHomeScreen({super.key});
 
   @override
-  State<EnterpriseStudioScreen> createState() => _EnterpriseStudioScreenState();
+  State<StudioHomeScreen> createState() => _StudioHomeScreenState();
 }
 
-class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
+class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerProviderStateMixin {
   final TextEditingController _promptController = TextEditingController();
   
   bool _isAutonomousRunning = false;
-  bool _isWaitingForUserFileSelection = false;
   bool _isGitHubConnected = false;
-  bool _isAndroidStudioSynced = false;
   double _progressValue = 0.0;
-  String _currentPhase = 'Idle - Ready for Full-Stack Flutter Generation.';
+  String _currentPhase = 'Idle - Ready for Autonomous Full-Stack Generation.';
   
   final List<String> _logs = [];
-  List<Map<String, dynamic>> _selectableFiles = [];
-  
   final Map<String, String> _generatedFilesMap = {};
   String _selectedViewFile = '';
+
+  late AnimationController _brainAnimController;
 
   @override
   void initState() {
     super.initState();
-    _loadSavedConfig();
-    _checkExistingGitHubUser();
+    _checkGitHubConfig();
+    _brainAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
   }
 
-  void _checkExistingGitHubUser() {
-    try {
-      User? currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null) {
-        setState(() {
-          _isGitHubConnected = true;
-        });
-        _addLog('🔗 Existing GitHub session found: ${currentUser.displayName ?? currentUser.email}');
-      }
-    } catch (e) {
-      _addLog('❌ Auth check error: $e');
+  @override
+  void dispose() {
+    _brainAnimController.dispose();
+    _promptController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkGitHubConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    final user = prefs.getString('github_user') ?? '';
+    final repo = prefs.getString('github_repo') ?? '';
+    final token = prefs.getString('github_token') ?? '';
+    if (user.isNotEmpty && repo.isNotEmpty && token.isNotEmpty) {
+      setState(() {
+        _isGitHubConnected = true;
+      });
     }
-  }
-
-  Future<void> _loadSavedConfig() async {
-    _addLog('⚙️ Groq Full-Stack Studio Agent initialized with Self-Healing feature.');
   }
 
   void _addLog(String message) {
@@ -138,49 +109,46 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     });
   }
 
-  Future<AgentConfig> _getStoredConfig() async {
-    final prefs = await SharedPreferences.getInstance();
-    return AgentConfig(
-      groqApiKey: prefs.getString('groq_api_key') ?? '',
-      projectName: prefs.getString('project_name') ?? 'Project_1',
-    );
-  }
-
-  Future<void> _saveConfig(AgentConfig config) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('groq_api_key', config.groqApiKey);
-    await prefs.setString('project_name', config.projectName);
-  }
-
   void _showSettingsDialog() {
     final groqKeyController = TextEditingController();
-    final projectNameController = TextEditingController();
+    final userController = TextEditingController();
+    final repoController = TextEditingController();
+    final tokenController = TextEditingController();
 
-    _getStoredConfig().then((config) {
-      groqKeyController.text = config.groqApiKey;
-      projectNameController.text = config.projectName;
+    SharedPreferences.getInstance().then((prefs) {
+      groqKeyController.text = prefs.getString('groq_api_key') ?? '';
+      userController.text = prefs.getString('github_user') ?? '';
+      repoController.text = prefs.getString('github_repo') ?? '';
+      tokenController.text = prefs.getString('github_token') ?? '';
     });
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Project & Groq API Settings'),
+        title: const Text('⚙️ Studio & GitHub Settings'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
-                controller: projectNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Project Name (e.g. Project_1, ShopApp)',
-                  hintText: 'Enter unique project folder name',
-                ),
-              ),
-              const SizedBox(height: 12),
               TextField(
                 controller: groqKeyController,
                 decoration: const InputDecoration(labelText: 'Groq API Key (gsk_...)'),
+                obscureText: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: userController,
+                decoration: const InputDecoration(labelText: 'GitHub Username (e.g. tarun)'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: repoController,
+                decoration: const InputDecoration(labelText: 'GitHub Repository Name (e.g. my-app)'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: tokenController,
+                decoration: const InputDecoration(labelText: 'GitHub Personal Access Token'),
                 obscureText: true,
               ),
             ],
@@ -190,13 +158,15 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
-              await _saveConfig(AgentConfig(
-                groqApiKey: groqKeyController.text.trim(),
-                projectName: projectNameController.text.trim().isEmpty ? 'Project_1' : projectNameController.text.trim(),
-              ));
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('groq_api_key', groqKeyController.text.trim());
+              await prefs.setString('github_user', userController.text.trim());
+              await prefs.setString('github_repo', repoController.text.trim());
+              await prefs.setString('github_token', tokenController.text.trim());
+              
+              await _checkGitHubConfig();
               Navigator.pop(context);
-              setState(() {});
-              _addLog('💾 Project & Groq settings saved!');
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Settings Saved Successfully!')));
             },
             child: const Text('Save'),
           ),
@@ -205,13 +175,20 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     );
   }
 
-  Future<String> _callGroqAPI({required AgentConfig config, required String systemPrompt, required String userPrompt}) async {
+  Future<String> _callGroqAPI(String systemPrompt, String userPrompt) async {
+    final prefs = await SharedPreferences.getInstance();
+    final apiKey = prefs.getString('groq_api_key') ?? '';
+    
+    if (apiKey.isEmpty) {
+      throw Exception('Groq API Key missing! Tap gear icon (top right) to set it.');
+    }
+
     final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
     final response = await http.post(
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${config.groqApiKey}',
+        'Authorization': 'Bearer $apiKey',
       },
       body: jsonEncode({
         "model": "llama-3.3-70b-versatile",
@@ -232,69 +209,30 @@ class _EnterpriseStudioScreenState extends State<EnterpriseStudioScreen> {
     return decoded['choices'][0]['message']['content'];
   }
 
-  Future<void> _connectGitHub() async {
-    try {
-      _addLog('🔄 Opening GitHub login window...');
-      GithubAuthProvider githubProvider = GithubAuthProvider();
-      githubProvider.addScope('repo');
-
-      UserCredential userCredential = await FirebaseAuth.instance.signInWithProvider(githubProvider);
-      User? user = userCredential.user;
-
-      setState(() { 
-        _isGitHubConnected = true; 
-      });
-      
-      _addLog('🔗 Successfully connected to GitHub: ${user?.displayName ?? user?.email ?? "User"}');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ GitHub Connected Successfully!')),
-      );
-    } catch (e) {
-      _addLog('❌ GitHub Login Error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('⚠️ GitHub Login Failed: $e')),
-      );
-    }
-  }
-
-  void _syncAndroidStudio() {
-    setState(() { _isAndroidStudioSynced = true; });
-    _addLog('💻 Android Studio workspace linked.');
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Android Studio Synced!')));
-  }
-
-  Future<void> _startScaleAnalysis() async {
+  Future<void> _startAutonomousBuild() async {
     final userPrompt = _promptController.text.trim();
     if (userPrompt.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Enter requirements!')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Please enter requirements!')));
       return;
     }
 
     setState(() {
       _isAutonomousRunning = true;
-      _progressValue = 0.2;
-      _currentPhase = 'Analyzing full-stack architecture & error-free planning...';
-      _selectableFiles.clear();
+      _progressValue = 0.1;
+      _currentPhase = '🧠 Groq Agent analyzing architecture...';
       _generatedFilesMap.clear();
+      _logs.clear();
     });
+    _addLog('🚀 Autonomous build started for: "$userPrompt"');
 
     try {
-      final config = await _getStoredConfig();
       const systemPrompt = '''
-You are an expert Principal App Architect and Senior Flutter/Android Developer. 
-Design a complete, production-ready, error-free full-stack Flutter application structure based on the user prompt.
-You MUST include all necessary configuration and native setup files along with source code files.
-Specifically, always include:
-1. pubspec.yaml
-2. android/app/build.gradle
-3. android/app/src/main/AndroidManifest.xml
-4. android/app/src/main/kotlin/com/example/app/MainActivity.kt
-5. lib/main.dart
-And any additional required modular files.
-Return a strict JSON array of relative file paths. Output ONLY valid JSON array and nothing else.
+You are an expert Autonomous Flutter Architect. Design a clean file structure for the user requirement.
+Return a strict JSON array of relative file paths (e.g. ["lib/main.dart", "pubspec.yaml"]). Output ONLY valid JSON array and nothing else.
 ''';
 
-      String content = await _callGroqAPI(config: config, systemPrompt: systemPrompt, userPrompt: userPrompt);
+      setState(() { _progressValue = 0.2; _currentPhase = '📂 Planning project file structure...'; });
+      String content = await _callGroqAPI(systemPrompt, userPrompt);
       content = content.replaceAll('```json', '').replaceAll('```', '').trim();
       
       int start = content.indexOf('[');
@@ -306,278 +244,306 @@ Return a strict JSON array of relative file paths. Output ONLY valid JSON array 
       
       if (!filePlan.contains('lib/main.dart')) filePlan.add('lib/main.dart');
       if (!filePlan.contains('pubspec.yaml')) filePlan.add('pubspec.yaml');
-      if (!filePlan.contains('android/app/build.gradle')) filePlan.add('android/app/build.gradle');
 
-      setState(() {
-        _selectableFiles = filePlan.map((path) => {'path': path, 'selected': true}).toList();
-        _isAutonomousRunning = false;
-        _isWaitingForUserFileSelection = true;
-        _progressValue = 0.5;
-        _currentPhase = 'Mapped ${filePlan.length} files. Review & build.';
-      });
-      _addLog('📋 Successfully planned full-stack file structure.');
-    } catch (e) {
-      setState(() {
-        _selectableFiles = [
-          {'path': 'pubspec.yaml', 'selected': true},
-          {'path': 'android/app/build.gradle', 'selected': true},
-          {'path': 'lib/main.dart', 'selected': true},
-        ];
-        _isAutonomousRunning = false;
-        _isWaitingForUserFileSelection = true;
-        _progressValue = 0.5;
-        _currentPhase = 'Fallback full-stack structure loaded.';
-      });
-      _addLog('⚠️ Analysis error: $e');
-    }
-  }
+      _addLog('✅ Planned ${filePlan.length} files successfully.');
 
-  Future<void> _confirmAndBuildProject() async {
-    final chosenFiles = _selectableFiles.where((f) => f['selected'] == true).map((f) => f['path'].toString()).toList();
-    if (chosenFiles.isEmpty) return;
+      final prefs = await SharedPreferences.getInstance();
+      final user = prefs.getString('github_user') ?? '';
+      final repo = prefs.getString('github_repo') ?? '';
+      final token = prefs.getString('github_token') ?? '';
 
-    setState(() {
-      _isWaitingForUserFileSelection = false;
-      _isAutonomousRunning = true;
-      _progressValue = 0.6;
-      _currentPhase = 'Generating error-free code & configs...';
-      _generatedFilesMap.clear();
-    });
-
-    try {
-      final config = await _getStoredConfig();
-      final userFullInput = _promptController.text.trim();
-
-      for (int i = 0; i < chosenFiles.length; i++) {
-        String fileName = chosenFiles[i];
-        setState(() {
-          _progressValue = 0.6 + ((i + 1) / chosenFiles.length) * 0.3;
-          _currentPhase = 'Writing ($i/${chosenFiles.length}):$fileName';
-        });
-
-        const systemPrompt = '''
-You are an expert Senior Flutter & Full-Stack Developer. Write production-ready, complete code or configuration content ONLY for the specified file path.
-CRITICAL RULES FOR ERROR-FREE CODE:
-1. Ensure all required imports (e.g., 'package:flutter/material.dart') are explicitly included.
-2. Fix any potential syntax errors, unclosed brackets, or type mismatches beforehand.
-3. If the user provides an error message or debugging prompt, analyze the error, locate the buggy lines, and output a fully corrected version of the code.
-4. Enclose code inside appropriate markdown code blocks (```dart, ```yaml, ```groovy, ```xml, ```kotlin).
-Output ONLY the clean content inside the code block and nothing else.
-''';
-        String rawResponse = await _callGroqAPI(
-          config: config, 
-          systemPrompt: systemPrompt, 
-          userPrompt: 'Project Requirement / Bug Fix Request: $userFullInput\nTarget File Path: $fileName'
-        );
+      for (int i = 0; i < filePlan.length; i++) {
+        String fileName = filePlan[i];
+        double calcProgress = 0.3 + (((i + 1) / filePlan.length) * 0.5);
         
-        String code = _extractCleanCode(rawResponse, fileName);
+        setState(() {
+          _progressValue = calcProgress;
+          _currentPhase = '✍️ Writing code (${i + 1}/${filePlan.length}):$fileName';
+        });
+        _addLog('🔨 Generating code for: $fileName');
+
+        const codeSystemPrompt = '''
+You are an expert Senior Flutter Developer. Write production-ready, complete, fully working code ONLY for the specified file path inside markdown code blocks. Output ONLY the code inside the code block.
+''';
+        String rawResponse = await _callGroqAPI(codeSystemPrompt, 'Requirement: $userPrompt\nFile:$fileName');
+        String code = _extractCleanCode(rawResponse);
+        
         _generatedFilesMap[fileName] = code;
+      }
+
+      if (user.isNotEmpty && repo.isNotEmpty && token.isNotEmpty) {
+        setState(() {
+          _progressValue = 0.85;
+          _currentPhase = '🌐 Pushing generated files to GitHub...';
+        });
+        String fullRepoPath = '$user/$repo';
+        _addLog('🔄 Connecting to GitHub repository: $fullRepoPath');
+
+        for (var entry in _generatedFilesMap.entries) {
+          await _pushFileToGitHub(fullRepoPath, token, entry.key, entry.value);
+        }
+        _addLog('✅ All files successfully pushed to GitHub!');
+      } else {
+        _addLog('ℹ️ GitHub credentials incomplete; files saved locally in studio.');
       }
 
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
-        _currentPhase = 'Successfully generated/fixed full-stack project for [${config.projectName}]!';
+        _currentPhase = '🎉 Build Complete! 100% Success.';
         if (_generatedFilesMap.isNotEmpty) {
           _selectedViewFile = _generatedFilesMap.keys.first;
         }
       });
-      _addLog('🎉 Files successfully generated with Self-Healing protection!');
+      _addLog('✨ Autonomous Build & GitHub Sync finished successfully.');
     } catch (e) {
-      _addLog('❌ Build Error: $e');
       setState(() => _isAutonomousRunning = false);
+      _addLog('❌ Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Error: $e')));
     }
   }
 
-  String _extractCleanCode(String raw, String fileName) {
-    String tag = 'dart';
-    if (fileName.endsWith('.yaml')) tag = 'yaml';
-    else if (fileName.endsWith('.gradle') || fileName.endsWith('.kts')) tag = 'groovy';
-    else if (fileName.endsWith('.xml')) tag = 'xml';
-    else if (fileName.endsWith('.kt')) tag = 'kotlin';
+  Future<void> _pushFileToGitHub(String fullRepo, String token, String path, String content) async {
+    final url = Uri.parse('https://api.github.com/repos/$fullRepo/contents/$path');
+    String? sha;
+    
+    final getRes = await http.get(url, headers: {'Authorization': 'Bearer $token', 'Accept': 'application/vnd.github+json'});
+    if (getRes.statusCode == 200) {
+      sha = jsonDecode(getRes.body)['sha'];
+    }
 
-    if (raw.contains('```$tag')) {
-      int start = raw.indexOf('```$tag') + tag.length + 3;
-      int end = raw.lastIndexOf('```');
-      if (end > start) return raw.substring(start, end).trim();
-    } else if (raw.contains('```')) {
-      int start = raw.indexOf('```') + 3;
+    final body = {
+      "message": "Groq Agent Auto-Code: $path",
+      "content": base64Encode(utf8.encode(content)),
+      if (sha != null) "sha": sha,
+    };
+
+    final putRes = await http.put(
+      url,
+      headers: {'Authorization': 'Bearer $token', 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+
+    if (putRes.statusCode != 200 && putRes.statusCode != 201) {
+      throw Exception('GitHub Push Failed for $path:${putRes.body}');
+    }
+    _addLog('📂 Pushed to GitHub -> $path');
+  }
+
+  String _extractCleanCode(String raw) {
+    if (raw.contains('```')) {
+      int start = raw.indexOf('```');
+      start = raw.indexOf('\n', start) + 1;
       int end = raw.lastIndexOf('```');
       if (end > start) return raw.substring(start, end).trim();
     }
     return raw.trim();
   }
 
+  void _showAppPreview() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1D3557),
+        title: const Row(
+          children: [
+            Icon(Icons.remove_red_eye, color: Color(0xFF00F5D4)),
+            SizedBox(width: 8),
+            Text('Live App Preview', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                height: 250,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF00F5D4)),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.phone_android, size: 50, color: Color(0xFF00F5D4)),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Project Built Successfully!',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Generated Files: ${_generatedFilesMap.length}',
+                        style: const TextStyle(color: Colors.cyanAccent, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close', style: TextStyle(color: Colors.white70)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Groq Full-Stack Studio'),
+        title: Row(
+          children: [
+            RotationTransition(
+              turns: _isAutonomousRunning ? _brainAnimController : const AlwaysStoppedAnimation(0),
+              child: const Icon(Icons.psychology, color: Color(0xFF00F5D4)),
+            ),
+            const SizedBox(width: 8),
+            const Text('Groq Full-Stack Studio'),
+          ],
+        ),
         backgroundColor: const Color(0xFF1D3557),
-        actions: [IconButton(icon: const Icon(Icons.settings), onPressed: _showSettingsDialog)],
+        actions: [
+          if (_generatedFilesMap.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.remove_red_eye, color: Color(0xFF00F5D4)),
+              tooltip: 'Preview App',
+              onPressed: _showAppPreview,
+            ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+            onPressed: _showSettingsDialog,
+          ),
+        ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            FutureBuilder<AgentConfig>(
-              future: _getStoredConfig(),
-              builder: (context, snapshot) {
-                final projName = snapshot.hasData ? snapshot.data!.projectName : 'Project_1';
-                return Container(
-                  padding: const EdgeInsets.all(10),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(8)),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Container(
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(8)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('🤖 Agent: Autonomous Mode', style: TextStyle(color: Color(0xFF00F5D4), fontSize: 12, fontWeight: FontWeight.bold)),
+                  Row(
                     children: [
-                      Text('📁 Project: $projName', style: const TextStyle(color: Color(0xFF00F5D4), fontWeight: FontWeight.bold)),
-                      Row(
-                        children: [
-                          Icon(Icons.circle, size: 10, color: _isGitHubConnected ? Colors.green : Colors.red),
-                          const SizedBox(width: 4),
-                          const Text('GitHub', style: TextStyle(fontSize: 12)),
-                          const SizedBox(width: 8),
-                          Icon(Icons.circle, size: 10, color: _isAndroidStudioSynced ? Colors.green : Colors.red),
-                          const SizedBox(width: 4),
-                          const Text('Studio', style: TextStyle(fontSize: 12)),
-                        ],
-                      ),
+                      Icon(Icons.circle, size: 10, color: _isGitHubConnected ? Colors.green : Colors.red),
+                      const SizedBox(width: 4),
+                      Text(_isGitHubConnected ? 'GitHub Synced' : 'GitHub Not Connected', style: const TextStyle(fontSize: 11)),
                     ],
                   ),
-                );
-              },
+                ],
+              ),
             ),
-
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _connectGitHub,
-                    icon: const Icon(Icons.hub, size: 18),
-                    label: Text(_isGitHubConnected ? 'GitHub Connected' : 'Connect GitHub'),
-                    style: ElevatedButton.styleFrom(backgroundColor: _isGitHubConnected ? Colors.green.shade800 : const Color(0xFF1D3557), foregroundColor: Colors.white),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _syncAndroidStudio,
-                    icon: const Icon(Icons.code, size: 18),
-                    label: Text(_isAndroidStudioSynced ? 'Studio Synced' : 'Sync Studio'),
-                    style: ElevatedButton.styleFrom(backgroundColor: _isAndroidStudioSynced ? Colors.green.shade800 : const Color(0xFF1D3557), foregroundColor: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
 
             TextField(
               controller: _promptController,
               maxLines: 2,
               decoration: const InputDecoration(
-                labelText: 'Enter Requirement OR Paste Error (e.g. "Error: Widget not found in main.dart")', 
+                labelText: 'Enter App Requirement (e.g. "make a weather app")', 
                 border: OutlineInputBorder(), 
                 filled: true, 
                 fillColor: Colors.black26,
+                labelStyle: TextStyle(fontSize: 13),
               ),
             ),
             const SizedBox(height: 8),
+            
             ElevatedButton(
-              onPressed: _isAutonomousRunning || _isWaitingForUserFileSelection ? null : _startScaleAnalysis,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00F5D4), foregroundColor: Colors.black),
-              child: const Text('🔍 Step 1: Map / Analyze via Groq AI', style: TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: _isAutonomousRunning ? null : _startAutonomousBuild,
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00F5D4), foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 12)),
+              child: const Text('🚀 Start Autonomous Build & GitHub Push', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             ),
             const SizedBox(height: 8),
-            LinearProgressIndicator(value: _progressValue, valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00F5D4))),
+
+            LinearProgressIndicator(
+              value: _progressValue, 
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00F5D4)),
+              backgroundColor: Colors.white10,
+            ),
             const SizedBox(height: 4),
-            Text(_currentPhase, style: const TextStyle(color: Color(0xFF00F5D4), fontSize: 12)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: Text(_currentPhase, style: const TextStyle(color: Color(0xFF00F5D4), fontSize: 11))),
+                Text('${(_progressValue * 100).toInt()}%', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+              ],
+            ),
             const SizedBox(height: 8),
 
-            if (_isWaitingForUserFileSelection) ...[
-              const Text('📂 Select Files to Generate / Fix:', style: TextStyle(fontWeight: FontWeight.bold)),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _selectableFiles.length,
-                  itemBuilder: (context, index) {
-                    final f = _selectableFiles[index];
-                    return CheckboxListTile(
-                      title: Text(f['path']),
-                      value: f['selected'],
-                      activeColor: const Color(0xFF00F5D4),
-                      checkColor: Colors.black,
-                      onChanged: (val) => setState(() => f['selected'] = val ?? true),
-                    );
-                  },
-                ),
-              ),
-              ElevatedButton(
-                onPressed: _confirmAndBuildProject,
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00F5D4), foregroundColor: Colors.black),
-                child: const Text('🚀 Step 2: Generate / Fix Code Files', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ] else ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('📂 Generated Files Explorer:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  if (_generatedFilesMap.isNotEmpty)
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        final codeToCopy = _generatedFilesMap[_selectedViewFile] ?? '';
-                        Clipboard.setData(ClipboardData(text: codeToCopy));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('📋 Copied contents of $_selectedViewFile!')),
-                        );
-                      },
-                      icon: const Icon(Icons.copy, size: 14),
-                      label: const Text('Copy File Content', style: TextStyle(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7209B7), foregroundColor: Colors.white, minimumSize: const Size(100, 30)),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              
-              if (_generatedFilesMap.isNotEmpty)
-                SizedBox(
-                  height: 38,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: _generatedFilesMap.keys.map((fileName) {
-                      bool isSelected = _selectedViewFile == fileName;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ChoiceChip(
-                          label: Text(fileName, style: TextStyle(fontSize: 11, color: isSelected ? Colors.black : Colors.white)),
-                          selected: isSelected,
-                          selectedColor: const Color(0xFF00F5D4),
-                          backgroundColor: const Color(0xFF1D3557),
-                          onSelected: (selected) {
-                            setState(() { _selectedViewFile = fileName; });
-                          },
-                        ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('💻 Live Agent Console & Files:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                if (_generatedFilesMap.isNotEmpty)
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      final codeToCopy = _generatedFilesMap[_selectedViewFile] ?? '';
+                      Clipboard.setData(ClipboardData(text: codeToCopy));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('📋 Copied $_selectedViewFile!')),
                       );
-                    }).toList(),
+                    },
+                    icon: const Icon(Icons.copy, size: 12),
+                    label: const Text('Copy File', style: TextStyle(fontSize: 11)),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7209B7), foregroundColor: Colors.white, minimumSize: const Size(80, 28)),
                   ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            
+            if (_generatedFilesMap.isNotEmpty)
+              SizedBox(
+                height: 34,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: _generatedFilesMap.keys.map((fileName) {
+                    bool isSelected = _selectedViewFile == fileName;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: ChoiceChip(
+                        label: Text(fileName, style: TextStyle(fontSize: 10, color: isSelected ? Colors.black : Colors.white)),
+                        selected: isSelected,
+                        selectedColor: const Color(0xFF00F5D4),
+                        backgroundColor: const Color(0xFF1D3557),
+                        onSelected: (selected) {
+                          setState(() { _selectedViewFile = fileName; });
+                        },
+                      ),
+                    );
+                  }).toList(),
                 ),
-              const SizedBox(height: 4),
+              ),
+            const SizedBox(height: 4),
 
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF00F5D4))),
-                  child: SingleChildScrollView(
-                    child: Text(
-                      _generatedFilesMap.isNotEmpty && _selectedViewFile.isNotEmpty
-                          ? _generatedFilesMap[_selectedViewFile]!
-                          : '// Generated project files, fixes and code will appear here...',
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.cyanAccent),
-                    ),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF00F5D4))),
+                child: SingleChildScrollView(
+                  child: Text(
+                    _generatedFilesMap.isNotEmpty && _selectedViewFile.isNotEmpty
+                        ? _generatedFilesMap[_selectedViewFile]!
+                        : _logs.join('\n'),
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 10, color: Colors.cyanAccent),
                   ),
                 ),
               ),
-            ],
+            ),
           ],
         ),
       ),
