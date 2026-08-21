@@ -10,11 +10,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.16.0
-  supabase_flutter: ^2.5.4
+    
+  # जरूरी पैकेजेस
   shared_preferences: ^2.2.3
   http: ^1.2.0
+  
+  # अगर तुझे इनकी भी जरूरत नहीं है, तो इन्हें भी हटा सकता है
+  supabase_flutter: ^2.5.4
   image_picker: ^1.0.7
   webview_flutter: ^4.4.4
 
