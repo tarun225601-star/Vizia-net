@@ -70,7 +70,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
   String _generatedWebsiteCode = '';
   String _liveDeploymentUrl = '';
 
-  // सुरुवाती डिफ़ॉल्ट लिस्ट, जो API फेच होने के बाद लाइव मॉडल्स से बदल जाएगी
   List<String> _modelsList = [
     'llama-3.3-70b-versatile',
     'llama-3.1-8b-instant'
@@ -80,7 +79,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _fetchActiveModelsFromGroq(); // ऐप खुलते ही लाइव मॉडल चेक करने की कोशिश करेगा
+    _fetchActiveModelsFromGroq();
   }
 
   @override
@@ -98,10 +97,10 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     });
   }
 
-  // 🔍 तेरी API Key से लाइव चलने वाले मॉडल्स को ऑटो-फेच करने वाला फंक्शन
+  // 🔍 सिर्फ असली चैट मॉडल फेच करने वाला और गार्ड मॉडल छांटने वाला फंक्शन
   Future<void> _fetchActiveModelsFromGroq() async {
     setState(() => _isFetchingModels = true);
-    _addLog('🔄 Fetching active models from Groq for your API Key...');
+    _addLog('🔄 Fetching clean active chat models from Groq...');
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -129,8 +128,13 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
         List<String> fetchedModels = [];
         for (var model in modelsData) {
           String modelId = model['id'];
-          // हम चैट वाले काम के मॉडल्स को प्रायोरिटी देंगे (जैसे llama या gpt या mixtral)
-          if (modelId.contains('llama') || modelId.contains('mixtral') || modelId.contains('gemma') || modelId.contains('gpt')) {
+          // गार्ड, सेफगार्ड, एम्बेडिंग और मॉडरेटर वाले सारे बकवास मॉडल पूरी तरह बाहर कर दिए हैं
+          if ((modelId.contains('llama') || modelId.contains('mixtral') || modelId.contains('gemma') || modelId.contains('gpt')) &&
+              !modelId.contains('guard') && 
+              !modelId.contains('safeguard') &&
+              !modelId.contains('embed') && 
+              !modelId.contains('whisper') &&
+              !modelId.contains('moderation')) {
             fetchedModels.add(modelId);
           }
         }
@@ -142,12 +146,12 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
               _selectedModel = _modelsList.first;
             }
           });
-          _addLog('✅ Success! Loaded ${_modelsList.length} active models.');
+          _addLog('✅ Success! Loaded ${_modelsList.length} pure chat models.');
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('🔥 Loaded ${_modelsList.length} active models successfully!')),
+            SnackBar(content: Text('🔥 Loaded ${_modelsList.length} active chat models!')),
           );
         } else {
-          _addLog('❌ No chat models found in response.');
+          _addLog('❌ No valid chat models found.');
         }
       } else {
         _addLog('❌ Failed to fetch models: ${response.body}');
@@ -159,7 +163,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     }
   }
 
-  // ⚙️ सेटिंग्स डायलॉग
   void _showSettingsDialog() async {
     final userController = TextEditingController();
     final repoController = TextEditingController();
@@ -205,7 +208,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
               await prefs.setString('groq_api_key', groqKeyController.text.trim());
               Navigator.pop(context);
               
-              // सेटिंग सेव होते ही तुरंत नए मॉडल्स फेच कर लो
               _fetchActiveModelsFromGroq();
               
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Credentials Saved & Models Refreshing!')));
@@ -217,7 +219,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     );
   }
 
-  // 🚀 Groq API के जरिए कोड जनरेट करना
   Future<String> _generateCodeViaGroq(String userPrompt) async {
     final prefs = await SharedPreferences.getInstance();
     final groqKey = prefs.getString('groq_api_key') ?? '';
@@ -282,7 +283,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
       setState(() {
         _generatedWebsiteCode = cleanHtml;
         _progressValue = 0.6;
-        _currentPhase = '🚀 Deploying fresh PWA project to Vercel...';
+        _currentPhase = '🚀 Deploying fresh independent PWA project to Vercel...';
       });
       _addLog('✔️ Code generated successfully from Groq.');
 
@@ -293,9 +294,10 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
         throw Exception('Vercel Token missing in settings!');
       }
 
-      String sanitizedPrompt = userPrompt.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
-      if (sanitizedPrompt.length > 12) sanitizedPrompt = sanitizedPrompt.substring(0, 12);
-      String uniqueProjectName = 'pwa-$sanitizedPrompt-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+      // 🌟 हर बार बिल्कुल नया और यूनिक प्रोजेक्ट नेम जनरेट होगा ताकि कोई ओवरराइट न हो
+      String sanitizedPrompt = userPrompt.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      if (sanitizedPrompt.length > 8) sanitizedPrompt = sanitizedPrompt.substring(0, 8);
+      String uniqueProjectName = 'pwa-$sanitizedPrompt-${DateTime.now().millisecondsSinceEpoch}';
 
       String liveUrl = await _deployDirectlyToVercel(uniqueProjectName, cleanHtml, vercelToken);
 
@@ -314,11 +316,13 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     }
   }
 
+  // 🚀 हर बार अलग प्रोजेक्ट और पब्लिक डिप्लॉयमेंट ताकि लॉगिन का नाटक न हो
   Future<String> _deployDirectlyToVercel(String uniqueProjectName, String htmlContent, String vercelToken) async {
     final url = Uri.parse('https://api.vercel.com/v13/deployments');
     
     final body = {
       "name": uniqueProjectName,
+      "public": true,
       "files": [
         {
           "file": "index.html",
