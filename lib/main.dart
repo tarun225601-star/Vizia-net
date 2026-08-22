@@ -138,7 +138,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
       final prefs = await SharedPreferences.getInstance();
       final user = prefs.getString('github_user') ?? 'tarun225601-star';
       
-      // तेरी बनाई हुई pwa-templates रिपॉजिटरी का raw लिंक
       final url = Uri.parse('https://raw.githubusercontent.com/$user/pwa-templates/main/templates.json');
       final response = await http.get(url);
       
@@ -151,7 +150,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
               ? userPrompt[0].toUpperCase() + userPrompt.substring(1) 
               : "My Business App";
           
-          // प्रॉम्प्ट के हिसाब से ऐप का नाम अपने आप सेट हो जाएगा
           return rawCode.replaceAll('APP_TITLE', formattedTitle);
         }
       }
@@ -159,7 +157,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
       print("GitHub Fetch Error: $e");
     }
     
-    // अगर कोई दिक्कत आई, तो डिफ़ॉल्ट फॉलबैक कोड मिल जाएगा ताकि ऐप क्रैश न हो
     return "<!DOCTYPE html><html><body style='background:#0b132b;color:white;text-align:center;padding-top:50px;'><h1>$userPrompt</h1><p>PWA Built Successfully via Cloud Engine!</p></body></html>";
   }
 
@@ -180,7 +177,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     _addLog('🚀 Starting Cloud PWA Generation for: "$userPrompt"');
 
     try {
-      // 1. गिटहब से कोड खींचो (अब कोई API एरर नहीं आएगा!)
       String cleanHtml = await _fetchTemplateFromGitHub(userPrompt);
 
       setState(() {
@@ -259,12 +255,16 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
 
   Future<String> _deployToVercel(String repoName, String vercelToken) async {
     final url = Uri.parse('https://api.vercel.com/v13/deployments');
+    final prefs = await SharedPreferences.getInstance();
+    final user = prefs.getString('github_user') ?? '';
+
     final body = {
       "name": repoName.toLowerCase(),
       "gitSource": {
         "type": "github",
         "repo": repoName,
-        "org": (await SharedPreferences.getInstance()).getString('github_user') ?? ''
+        "org": user,
+        "ref": "main" // 🛠️ यह यहाँ जोड़ दिया है ताकि Vercel एरर न दे!
       }
     };
 
