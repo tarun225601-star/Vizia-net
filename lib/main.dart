@@ -69,7 +69,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
   String _generatedWebsiteCode = '';
   String _liveDeploymentUrl = '';
 
-  // सिर्फ एक्टिव और चालू Groq मॉडल्स की सूची
   final List<String> _activeModels = [
     'llama-3.3-70b-versatile',
     'llama-3.1-8b-instant',
@@ -353,7 +352,7 @@ CRITICAL RULES:
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.between,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween, // 🛠️ यहाँ ठीक कर दिया है
                   children: [
                     const Text('👀 Live Website Preview', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                     IconButton(icon: const Icon(Icons.close, color: Colors.white70), onPressed: () => Navigator.pop(context)),
@@ -424,7 +423,7 @@ CRITICAL RULES:
                 border: Border.all(color: Colors.tealAccent),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.between,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween, // 🛠️ यहाँ भी ठीक कर दिया है
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
