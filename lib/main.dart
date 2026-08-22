@@ -35,7 +35,7 @@ class GroqStudioApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Groq 10k-Crore PWA Studio',
+      title: 'Groq 10k-Crore PWA Studio Pro',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0B132B),
         primaryColor: const Color(0xFF00F5D4),
@@ -63,11 +63,21 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
   
   bool _isAutonomousRunning = false;
   double _progressValue = 0.0;
-  String _currentPhase = 'Idle - Ready to build PWA Website.';
+  String _currentPhase = 'Idle - Ready to build PWA Website via Groq & Cloud.';
   
   final List<String> _logs = [];
   String _generatedWebsiteCode = '';
   String _liveDeploymentUrl = '';
+
+  // 🚀 बेहतरीन Llama और अन्य मॉडल्स की लिस्ट
+  final List<String> _modelsList = [
+    'llama-3.3-70b-versatile',
+    'llama-3.1-70b-versatile',
+    'llama-3.1-8b-instant',
+    'gemma2-9b-it',
+    'mixtral-8x7b-32768'
+  ];
+  String _selectedModel = 'llama-3.3-70b-versatile';
 
   @override
   void dispose() {
@@ -79,27 +89,30 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     setState(() {
       _logs.insert(
         0, 
-        '[${DateTime.now().toLocal().toString().split(' ')[1].substring(0, 8)}]$message'
+        '[${DateTime.now().toLocal().toString().split(' ')[1].substring(0, 8)}] $message'
       );
     });
   }
 
+  // ⚙️ सेटिंग्स डायलॉग जिसमें GitHub और Vercel की सारी फील्ड्स मौजूद हैं
   void _showSettingsDialog() async {
     final userController = TextEditingController();
     final repoController = TextEditingController();
     final tokenController = TextEditingController();
     final vercelTokenController = TextEditingController();
+    final groqKeyController = TextEditingController();
 
     final prefs = await SharedPreferences.getInstance();
     userController.text = prefs.getString('github_user') ?? '';
     repoController.text = prefs.getString('github_repo') ?? '';
     tokenController.text = prefs.getString('github_token') ?? '';
     vercelTokenController.text = prefs.getString('vercel_token') ?? '';
+    groqKeyController.text = prefs.getString('groq_api_key') ?? '';
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('⚙️ GitHub & Vercel Settings'),
+        title: const Text('⚙️ Studio Configuration Center'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -108,9 +121,11 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
               const SizedBox(height: 12),
               TextField(controller: repoController, decoration: const InputDecoration(labelText: 'GitHub Repository Name')),
               const SizedBox(height: 12),
-              TextField(controller: tokenController, decoration: const InputDecoration(labelText: 'GitHub Token'), obscureText: true),
+              TextField(controller: tokenController, decoration: const InputDecoration(labelText: 'GitHub Personal Token'), obscureText: true),
               const SizedBox(height: 12),
-              TextField(controller: vercelTokenController, decoration: const InputDecoration(labelText: 'Vercel Token'), obscureText: true),
+              TextField(controller: vercelTokenController, decoration: const InputDecoration(labelText: 'Vercel Deployment Token'), obscureText: true),
+              const SizedBox(height: 12),
+              TextField(controller: groqKeyController, decoration: const InputDecoration(labelText: 'Groq API Key'), obscureText: true),
             ],
           ),
         ),
@@ -122,8 +137,9 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
               await prefs.setString('github_repo', repoController.text.trim());
               await prefs.setString('github_token', tokenController.text.trim());
               await prefs.setString('vercel_token', vercelTokenController.text.trim());
+              await prefs.setString('groq_api_key', groqKeyController.text.trim());
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Settings Saved Successfully!')));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ All Credentials Saved Successfully!')));
             },
             child: const Text('Save Settings'),
           ),
@@ -132,32 +148,49 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     );
   }
 
-  // 🚀 गिटहब से टेम्पलेट खींचने वाला फंक्शन
-  Future<String> _fetchTemplateFromGitHub(String userPrompt) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final user = prefs.getString('github_user') ?? 'tarun225601-star';
-      
-      final url = Uri.parse('https://raw.githubusercontent.com/$user/pwa-templates/main/templates.json');
-      final response = await http.get(url);
-      
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        
-        if (data.containsKey('dynamic_master')) {
-          String rawCode = data['dynamic_master']['code'];
-          String formattedTitle = userPrompt.isNotEmpty 
-              ? userPrompt[0].toUpperCase() + userPrompt.substring(1) 
-              : "My Business App";
-          
-          return rawCode.replaceAll('APP_TITLE', formattedTitle);
-        }
-      }
-    } catch (e) {
-      print("GitHub Fetch Error: $e");
+  // 🚀 Groq API के जरिए कोड जनरेट करने वाला फंक्शन
+  Future<String> _generateCodeViaGroq(String userPrompt) async {
+    final prefs = await SharedPreferences.getInstance();
+    final groqKey = prefs.getString('groq_api_key') ?? '';
+
+    if (groqKey.isEmpty) {
+      throw Exception('Groq API Key is missing! Please configure it in settings.');
     }
+
+    final url = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
     
-    return "<!DOCTYPE html><html><body style='background:#0b132b;color:white;text-align:center;padding-top:50px;'><h1>$userPrompt</h1><p>PWA Built Successfully via Cloud Engine!</p></body></html>";
+    final response = await http.post(
+      url,
+      headers: {
+        'Authorization': 'Bearer $groqKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "model": _selectedModel,
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are an expert web developer. Create a fully functional, beautiful, responsive PWA website using Tailwind CSS or standard CSS embedded inside HTML based on the user prompt. Return ONLY clean raw HTML code, no markdown wrappers."
+          },
+          {
+            "role": "user",
+            "content": "Create a PWA website for: $userPrompt"
+          }
+        ],
+        "temperature": 0.7
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      String content = data['choices'][0]['message']['content'];
+      
+      // यदि मॉडल ने गलती से ```html ... ``` जोड़ दिया हो तो उसे साफ़ करें
+      content = content.replaceAll('```html', '').replaceAll('```', '').trim();
+      return content;
+    } else {
+      throw Exception('Groq API Error: ${response.body}');
+    }
   }
 
   Future<void> _startWebsiteBuildAndDeploy() async {
@@ -170,21 +203,22 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     setState(() {
       _isAutonomousRunning = true;
       _progressValue = 0.3;
-      _currentPhase = '⚡ Fetching template from GitHub...';
+      _currentPhase = '🤖 Generating code via Groq ($_selectedModel)...';
       _logs.clear();
       _liveDeploymentUrl = '';
     });
-    _addLog('🚀 Starting Cloud PWA Generation for: "$userPrompt"');
+    _addLog('🚀 Starting Cloud PWA Build for: "$userPrompt" using $_selectedModel');
 
     try {
-      String cleanHtml = await _fetchTemplateFromGitHub(userPrompt);
+      // 1. Groq से कोड बनवाएं
+      String cleanHtml = await _generateCodeViaGroq(userPrompt);
 
       setState(() {
         _generatedWebsiteCode = cleanHtml;
         _progressValue = 0.6;
-        _currentPhase = '🚀 Creating unique project & deploying to Vercel...';
+        _currentPhase = '🚀 Deploying fresh PWA project to Vercel...';
       });
-      _addLog('✔️ Template fetched & compiled successfully.');
+      _addLog('✔️ Code generated successfully from Groq.');
 
       final prefs = await SharedPreferences.getInstance();
       final vercelToken = prefs.getString('vercel_token') ?? '';
@@ -193,12 +227,12 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
         throw Exception('Vercel Token missing in settings!');
       }
 
-      // 🛠️ यहाँ हर बार प्रॉम्प्ट और टाइम के हिसाब से एक नया यूनिक प्रोजेक्ट नाम बनेगा
+      // 2. यूनिक प्रोजेक्ट नाम तैयार करें
       String sanitizedPrompt = userPrompt.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
-      if (sanitizedPrompt.length > 15) sanitizedPrompt = sanitizedPrompt.substring(0, 15);
+      if (sanitizedPrompt.length > 12) sanitizedPrompt = sanitizedPrompt.substring(0, 12);
       String uniqueProjectName = 'pwa-$sanitizedPrompt-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
 
-      // 🚀 सीधा Vercel API पर फाइल डिप्लॉयमेंट (हर बार बिल्कुल नया लिंक मिलेगा)
+      // 3. Vercel पर डिप्लॉय करें
       String liveUrl = await _deployDirectlyToVercel(uniqueProjectName, cleanHtml, vercelToken);
 
       setState(() {
@@ -216,7 +250,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     }
   }
 
-  // 🚀 Vercel पर डायरेक्ट यूनिक प्रोजेक्ट भेजने का फंक्शन
+  // 🚀 Vercel पर डायरेक्ट प्रोजेक्ट भेजने का फंक्शन
   Future<String> _deployDirectlyToVercel(String uniqueProjectName, String htmlContent, String vercelToken) async {
     final url = Uri.parse('https://api.vercel.com/v13/deployments');
     
@@ -300,31 +334,63 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Groq 10k-Crore PWA Studio'),
+        title: const Text('Groq 10k-Crore PWA Studio Pro'),
         actions: [
           IconButton(icon: const Icon(Icons.settings), onPressed: _showSettingsDialog),
         ],
       ),
       body: Column(
         children: [
+          // 🛠 मॉडल चयन और प्रॉम्प्ट इनपुट बार
           Padding(
             padding: const EdgeInsets.all(12.0),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _promptController,
-                    decoration: const InputDecoration(
-                      hintText: 'Enter business idea (e.g. Gym, Salon, Store)...',
-                      border: OutlineInputBorder(),
+                Row(
+                  children: [
+                    const Text('Model: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.blueGrey[900],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedModel,
+                            isExpanded: true,
+                            items: _modelsList.map((model) => DropdownMenuItem(
+                              value: model,
+                              child: Text(model, style: const TextStyle(fontSize: 12)),
+                            )).toList(),
+                            onChanged: (val) => setState(() => _selectedModel = val!),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  onPressed: _isAutonomousRunning ? null : _startWebsiteBuildAndDeploy,
-                  icon: const Icon(Icons.rocket_launch),
-                  label: const Text('Build PWA'),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _promptController,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter business idea (e.g. Gym, Salon, Store)...',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: _isAutonomousRunning ? null : _startWebsiteBuildAndDeploy,
+                      icon: const Icon(Icons.rocket_launch),
+                      label: const Text('Build PWA'),
+                    ),
+                  ],
                 ),
               ],
             ),
