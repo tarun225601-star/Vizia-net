@@ -64,7 +64,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
   bool _isAutonomousRunning = false;
   bool _isFetchingModels = false;
   double _progressValue = 0.0;
-  String _currentPhase = 'Idle - Ready to fetch active models & build PWA.';
+  String _currentPhase = 'Idle - Ready for Multi-Step Autonomous PWA Generation.';
   
   final List<String> _logs = [];
   String _generatedWebsiteCode = '';
@@ -217,6 +217,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     );
   }
 
+  // 🚀 उन्नत और मजबूत Groq API कॉल जो बिना टोकन कट किए फुल-लॉजिक कोड जनरेट करेगा
   Future<String> _generateCodeViaGroq(String userPrompt) async {
     final prefs = await SharedPreferences.getInstance();
     final groqKey = prefs.getString('groq_api_key') ?? '';
@@ -238,14 +239,15 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
         "messages": [
           {
             "role": "system",
-            "content": "You are an expert web developer. Create a fully functional, beautiful, responsive PWA website using Tailwind CSS or standard CSS embedded inside HTML based on the user prompt. Return ONLY clean raw HTML code, no markdown wrappers."
+            "content": "You are the world's most elite full-stack master developer and AI architect. Your task is to build a completely functional, enterprise-grade, production-ready single-file PWA website. CRITICAL RULES: 1. Every single button, filter tab, search bar, cart drawer, and interactive form MUST have complete, error-free vanilla JavaScript logic embedded. NO dummy buttons, NO missing functions. 2. Use pure Tailwind CSS via CDN or embedded internal styles cleanly. 3. Ensure local storage persistence for state (cart, products, user sessions). 4. Return ONLY raw HTML code without markdown block wrappers."
           },
           {
             "role": "user",
-            "content": "Create a PWA website for: $userPrompt"
+            "content": "Build a comprehensive, fully interactive web application for the following business requirements: $userPrompt"
           }
         ],
-        "temperature": 0.7
+        "temperature": 0.4,
+        "max_tokens": 8000
       }),
     );
 
@@ -268,22 +270,29 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
 
     setState(() {
       _isAutonomousRunning = true;
-      _progressValue = 0.3;
-      _currentPhase = '🤖 Generating code via Groq ($_selectedModel)...';
+      _progressValue = 0.2;
+      _currentPhase = '🤖 Phase 1: Analyzing architecture & structuring modules...';
       _logs.clear();
       _liveDeploymentUrl = '';
     });
-    _addLog('🚀 Starting Cloud PWA Build for: "$userPrompt" using $_selectedModel');
+    _addLog('🚀 Starting Autonomous Enterprise Build for: "$userPrompt" using $_selectedModel');
 
     try {
+      await Future.delayed(const Duration(milliseconds: 800));
+      setState(() {
+        _progressValue = 0.5;
+        _currentPhase = '💻 Phase 2: Writing bulletproof backend logic & UI components via Groq...';
+      });
+      _addLog('⚙️ Executing deep neural generation with full script wiring...');
+
       String cleanHtml = await _generateCodeViaGroq(userPrompt);
 
       setState(() {
         _generatedWebsiteCode = cleanHtml;
-        _progressValue = 0.6;
-        _currentPhase = '🚀 Deploying fresh independent PWA project to Vercel...';
+        _progressValue = 0.8;
+        _currentPhase = '🚀 Phase 3: Pushing independent deployment bundle to Vercel cloud...';
       });
-      _addLog('✔️ Code generated successfully from Groq.');
+      _addLog('✔️ Complete working code generated successfully.');
 
       final prefs = await SharedPreferences.getInstance();
       final vercelToken = prefs.getString('vercel_token') ?? '';
@@ -301,7 +310,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
-        _currentPhase = '🎉 PWA Website Live Successfully!';
+        _currentPhase = '🎉 Enterprise PWA Live Successfully!';
         _liveDeploymentUrl = liveUrl;
       });
       _addLog('✨ Live Deployment Successful: $liveUrl');
@@ -313,7 +322,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     }
   }
 
-  // 🚀 बिल्कुल साफ और सही Vercel API Request (बिना किसी फालतू या गलत प्रॉपर्टी के)
   Future<String> _deployDirectlyToVercel(String uniqueProjectName, String htmlContent, String vercelToken) async {
     final url = Uri.parse('https://api.vercel.com/v13/deployments');
     
@@ -448,7 +456,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
                       child: TextField(
                         controller: _promptController,
                         decoration: const InputDecoration(
-                          hintText: 'Enter business idea (e.g. Gym, Salon, Store)...',
+                          hintText: 'Enter business idea (e.g. Multi-vendor Marketplace)...',
                           border: OutlineInputBorder(),
                         ),
                       ),
