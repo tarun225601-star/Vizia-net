@@ -132,7 +132,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     );
   }
 
-  // 🚀 सीधे तेरी गिटहब रिपॉजिटरी से टेम्पलेट खींचने वाला स्मार्ट फंक्शन
+  // 🚀 गिटहब से टेम्पलेट खींचने वाला फंक्शन
   Future<String> _fetchTemplateFromGitHub(String userPrompt) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -169,8 +169,8 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
 
     setState(() {
       _isAutonomousRunning = true;
-      _progressValue = 0.2;
-      _currentPhase = '⚡ Fetching template from your GitHub Repo...';
+      _progressValue = 0.3;
+      _currentPhase = '⚡ Fetching template from GitHub...';
       _logs.clear();
       _liveDeploymentUrl = '';
     });
@@ -182,46 +182,24 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
       setState(() {
         _generatedWebsiteCode = cleanHtml;
         _progressValue = 0.6;
-        _currentPhase = '🌐 Pushing PWA code to GitHub...';
+        _currentPhase = '🚀 Creating unique project & deploying to Vercel...';
       });
       _addLog('✔️ Template fetched & compiled successfully.');
 
       final prefs = await SharedPreferences.getInstance();
-      final user = prefs.getString('github_user') ?? '';
-      final repo = prefs.getString('github_repo') ?? '';
-      final token = prefs.getString('github_token') ?? '';
       final vercelToken = prefs.getString('vercel_token') ?? '';
 
-      if (user.isEmpty || repo.isEmpty || token.isEmpty || vercelToken.isEmpty) {
-        throw Exception('GitHub or Vercel credentials missing in settings!');
+      if (vercelToken.isEmpty) {
+        throw Exception('Vercel Token missing in settings!');
       }
 
-      await _pushFileToGitHub('$user/$repo', token, 'index.html', cleanHtml);
-      
-      const manifestContent = '''{
-  "name": "Generated App",
-  "short_name": "App",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#0b132b",
-  "theme_color": "#00f5d4",
-  "icons": [
-    {
-      "src": "https://img.icons8.com/fluency/96/application.png",
-      "sizes": "96x96",
-      "type": "image/png"
-    }
-  ]
-}''';
-      await _pushFileToGitHub('$user/$repo', token, 'manifest.json', manifestContent);
-      _addLog('✅ Pushed index.html & manifest.json to GitHub repository.');
+      // 🛠️ यहाँ हर बार प्रॉम्प्ट और टाइम के हिसाब से एक नया यूनिक प्रोजेक्ट नाम बनेगा
+      String sanitizedPrompt = userPrompt.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
+      if (sanitizedPrompt.length > 15) sanitizedPrompt = sanitizedPrompt.substring(0, 15);
+      String uniqueProjectName = 'pwa-$sanitizedPrompt-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
 
-      setState(() {
-        _progressValue = 0.8;
-        _currentPhase = '🚀 Deploying live on Vercel...';
-      });
-
-      String liveUrl = await _deployToVercel(repo, vercelToken);
+      // 🚀 सीधा Vercel API पर फाइल डिप्लॉयमेंट (हर बार बिल्कुल नया लिंक मिलेगा)
+      String liveUrl = await _deployDirectlyToVercel(uniqueProjectName, cleanHtml, vercelToken);
 
       setState(() {
         _progressValue = 1.0;
@@ -238,33 +216,20 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     }
   }
 
-  Future<void> _pushFileToGitHub(String fullRepo, String token, String path, String content) async {
-    final url = Uri.parse('https://api.github.com/repos/$fullRepo/contents/$path');
-    String? sha;
-    final getRes = await http.get(url, headers: {'Authorization': 'Bearer $token', 'Accept': 'application/vnd.github+json'});
-    if (getRes.statusCode == 200) {
-      sha = jsonDecode(getRes.body)['sha'];
-    }
-    final body = {
-      "message": "PWA Deployment: Update $path",
-      "content": base64Encode(utf8.encode(content)),
-      if (sha != null) "sha": sha,
-    };
-    await http.put(url, headers: {'Authorization': 'Bearer $token', 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'}, body: jsonEncode(body));
-  }
-
-  Future<String> _deployToVercel(String repoName, String vercelToken) async {
+  // 🚀 Vercel पर डायरेक्ट यूनिक प्रोजेक्ट भेजने का फंक्शन
+  Future<String> _deployDirectlyToVercel(String uniqueProjectName, String htmlContent, String vercelToken) async {
     final url = Uri.parse('https://api.vercel.com/v13/deployments');
-    final prefs = await SharedPreferences.getInstance();
-    final user = prefs.getString('github_user') ?? '';
-
+    
     final body = {
-      "name": repoName.toLowerCase(),
-      "gitSource": {
-        "type": "github",
-        "repo": repoName,
-        "org": user,
-        "ref": "main" // 🛠️ यह यहाँ जोड़ दिया है ताकि Vercel एरर न दे!
+      "name": uniqueProjectName,
+      "files": [
+        {
+          "file": "index.html",
+          "data": htmlContent
+        }
+      ],
+      "projectSettings": {
+        "framework": null
       }
     };
 
@@ -279,9 +244,14 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = jsonDecode(response.body);
-      return "https://${data['url']}";
+      if (data['url'] != null) {
+        return "https://${data['url']}";
+      } else if (data['name'] != null) {
+        return "https://${data['name']}.vercel.app";
+      }
+      throw Exception('Deployment response missing URL');
     } else {
-      throw Exception('Vercel Deployment Failed: ${response.body}');
+      throw Exception('Vercel Direct Deployment Failed: ${response.body}');
     }
   }
 
