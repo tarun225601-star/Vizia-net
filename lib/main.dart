@@ -247,7 +247,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
           }
         ],
         "temperature": 0.4,
-        "max_tokens": 8000
+        "max_tokens": 5000
       }),
     );
 
