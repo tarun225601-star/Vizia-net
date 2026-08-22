@@ -35,7 +35,7 @@ class GroqStudioApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Groq 10k-Crore Web Studio',
+      title: 'Groq 10k-Crore PWA Studio',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0B132B),
         primaryColor: const Color(0xFF00F5D4),
@@ -63,17 +63,16 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
   
   bool _isAutonomousRunning = false;
   double _progressValue = 0.0;
-  String _currentPhase = 'Idle - Ready to build & deploy website.';
+  String _currentPhase = 'Idle - Ready to build PWA Website.';
   
   final List<String> _logs = [];
   String _generatedWebsiteCode = '';
   String _liveDeploymentUrl = '';
 
-  final List<String> _fallbackModels = [
+  // सिर्फ एक्टिव और चालू Groq मॉडल्स की सूची
+  final List<String> _activeModels = [
     'llama-3.3-70b-versatile',
-    'llama-3.1-70b-versatile',
     'llama-3.1-8b-instant',
-    'gemma2-9b-it',
   ];
 
   @override
@@ -156,7 +155,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
       throw Exception('Groq API Key missing! Tap settings icon on top right.');
     }
 
-    for (String model in _fallbackModels) {
+    for (String model in _activeModels) {
       try {
         final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
         final response = await http.post(
@@ -186,7 +185,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
         continue;
       }
     }
-    throw Exception('All models failed. Check your API key.');
+    throw Exception('All active models failed. Check your API key.');
   }
 
   Future<void> _startWebsiteBuildAndDeploy() async {
@@ -199,21 +198,21 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     setState(() {
       _isAutonomousRunning = true;
       _progressValue = 0.2;
-      _currentPhase = '🧠 Generating complete website (HTML/CSS/JS)...';
+      _currentPhase = '🧠 Generating PWA-ready website...';
       _logs.clear();
       _liveDeploymentUrl = '';
     });
-    _addLog('🚀 Starting Website Generation for: "$userPrompt"');
+    _addLog('🚀 Starting PWA Website Generation for: "$userPrompt"');
 
     try {
       const systemPrompt = '''
-You are an expert Frontend Web Developer and UI/UX Designer.
-Create a fully functional, beautiful, single-file responsive website (HTML containing embedded CSS and JavaScript) based on the user's business idea.
+You are an expert Frontend Web Developer and PWA Architect.
+Create a fully functional, stunning, single-file responsive PWA website (HTML containing embedded Tailwind CSS, JS, and a complete Web App Manifest inside a <script type="application/manifest+json"> or standard link manifest).
 CRITICAL RULES:
-1. Output MUST be ONLY valid HTML code.
-2. Use Tailwind CSS via CDN for stunning modern styling.
-3. Include interactive JavaScript elements if required by the business logic.
-4. NO markdown backticks in the response, start directly with <!DOCTYPE html>.
+1. Output MUST be ONLY valid HTML code starting with <!DOCTYPE html>.
+2. Include a inline web app manifest or link tag so mobile browsers detect it as an installable app ("Add to Home Screen").
+3. Use Tailwind CSS via CDN for modern styling.
+4. NO markdown backticks in the response.
 ''';
 
       String rawCode = await _callGroqAPI(systemPrompt, userPrompt);
@@ -222,9 +221,9 @@ CRITICAL RULES:
       setState(() {
         _generatedWebsiteCode = cleanHtml;
         _progressValue = 0.6;
-        _currentPhase = '🌐 Pushing code to GitHub...';
+        _currentPhase = '🌐 Pushing PWA code to GitHub...';
       });
-      _addLog('✔️ Website code generated successfully.');
+      _addLog('✔️ PWA website code generated successfully.');
 
       final prefs = await SharedPreferences.getInstance();
       final user = prefs.getString('github_user') ?? '';
@@ -236,22 +235,37 @@ CRITICAL RULES:
         throw Exception('GitHub or Vercel credentials missing in settings!');
       }
 
-      // Push index.html to GitHub
       await _pushFileToGitHub('$user/$repo', token, 'index.html', cleanHtml);
-      _addLog('✅ Pushed index.html to GitHub repository.');
+      
+      const manifestContent = '''{
+  "name": "Generated App",
+  "short_name": "App",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b132b",
+  "theme_color": "#00f5d4",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/fluency/96/application.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    }
+  ]
+}''';
+      await _pushFileToGitHub('$user/$repo', token, 'manifest.json', manifestContent);
+      _addLog('✅ Pushed index.html & manifest.json to GitHub repository.');
 
       setState(() {
         _progressValue = 0.8;
         _currentPhase = '🚀 Deploying live on Vercel...';
       });
 
-      // Deploy via Vercel API
       String liveUrl = await _deployToVercel(repo, vercelToken);
 
       setState(() {
         _progressValue = 1.0;
         _isAutonomousRunning = false;
-        _currentPhase = '🎉 Website Live Successfully!';
+        _currentPhase = '🎉 PWA Website Live Successfully!';
         _liveDeploymentUrl = liveUrl;
       });
       _addLog('✨ Live Deployment Successful: $liveUrl');
@@ -284,7 +298,7 @@ CRITICAL RULES:
       sha = jsonDecode(getRes.body)['sha'];
     }
     final body = {
-      "message": "Automated Deployment: Update $path",
+      "message": "PWA Deployment: Update $path",
       "content": base64Encode(utf8.encode(content)),
       if (sha != null) "sha": sha,
     };
@@ -319,11 +333,52 @@ CRITICAL RULES:
     }
   }
 
+  void _showLiveWebView() {
+    if (_liveDeploymentUrl.isEmpty) return;
+
+    final WebViewController controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..loadRequest(Uri.parse(_liveDeploymentUrl));
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF1D3557),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: SizedBox(
+          width: double.maxFinite,
+          height: 550,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.between,
+                  children: [
+                    const Text('👀 Live Website Preview', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    IconButton(icon: const Icon(Icons.close, color: Colors.white70), onPressed: () => Navigator.pop(context)),
+                  ],
+                ),
+              ),
+              const Divider(color: Colors.white24, height: 1),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                  child: WebViewWidget(controller: controller),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Groq 10k-Crore Web Studio'),
+        title: const Text('Groq 10k-Crore PWA Studio'),
         actions: [
           IconButton(icon: const Icon(Icons.settings), onPressed: _showSettingsDialog),
         ],
@@ -338,7 +393,7 @@ CRITICAL RULES:
                   child: TextField(
                     controller: _promptController,
                     decoration: const InputDecoration(
-                      hintText: 'Enter business idea (e.g. Local Bakery Store)...',
+                      hintText: 'Enter business idea (e.g. Local Delivery App)...',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -347,7 +402,7 @@ CRITICAL RULES:
                 ElevatedButton.icon(
                   onPressed: _isAutonomousRunning ? null : _startWebsiteBuildAndDeploy,
                   icon: const Icon(Icons.rocket_launch),
-                  label: const Text('Build & Deploy'),
+                  label: const Text('Build PWA'),
                 ),
               ],
             ),
@@ -371,14 +426,34 @@ CRITICAL RULES:
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.between,
                 children: [
-                  const Text('🚀 Live Website Ready!', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.tealAccent, foregroundColor: Colors.black),
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: _liveDeploymentUrl));
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('📋 Live URL Copied!')));
-                    },
-                    child: const Text('Copy Link'),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('🚀 PWA Live & Ready!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.tealAccent)),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: _showLiveWebView,
+                        child: const Text('👀 Click here to preview live app inside studio', style: TextStyle(fontSize: 11, color: Colors.white, decoration: TextDecoration.underline)),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black),
+                        onPressed: _showLiveWebView,
+                        child: const Text('Preview'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.tealAccent, foregroundColor: Colors.black),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: _liveDeploymentUrl));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('📋 Live PWA URL Copied!')));
+                        },
+                        child: const Text('Copy Link'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -416,7 +491,7 @@ CRITICAL RULES:
                         color: Colors.blueGrey[900],
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                         width: double.infinity,
-                        child: const Text('Generated Website Code:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        child: const Text('Generated PWA Code:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
                       Expanded(
                         child: Container(
@@ -426,7 +501,7 @@ CRITICAL RULES:
                             children: [
                               SingleChildScrollView(
                                 child: SelectableText(
-                                  _generatedWebsiteCode.isEmpty ? 'Enter prompt and click Build & Deploy to generate website...' : _generatedWebsiteCode,
+                                  _generatedWebsiteCode.isEmpty ? 'Enter prompt and click Build PWA to generate...' : _generatedWebsiteCode,
                                   style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Colors.greenAccent),
                                 ),
                               ),
