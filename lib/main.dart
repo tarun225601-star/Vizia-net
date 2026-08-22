@@ -62,22 +62,26 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
   final TextEditingController _promptController = TextEditingController();
   
   bool _isAutonomousRunning = false;
+  bool _isFetchingModels = false;
   double _progressValue = 0.0;
-  String _currentPhase = 'Idle - Ready to build PWA Website via Groq & Cloud.';
+  String _currentPhase = 'Idle - Ready to fetch active models & build PWA.';
   
   final List<String> _logs = [];
   String _generatedWebsiteCode = '';
   String _liveDeploymentUrl = '';
 
-  // 🚀 बेहतरीन Llama और अन्य मॉडल्स की लिस्ट
-  final List<String> _modelsList = [
+  // सुरुवाती डिफ़ॉल्ट लिस्ट, जो API फेच होने के बाद लाइव मॉडल्स से बदल जाएगी
+  List<String> _modelsList = [
     'llama-3.3-70b-versatile',
-    'llama-3.1-70b-versatile',
-    'llama-3.1-8b-instant',
-    'gemma2-9b-it',
-    'mixtral-8x7b-32768'
+    'llama-3.1-8b-instant'
   ];
   String _selectedModel = 'llama-3.3-70b-versatile';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchActiveModelsFromGroq(); // ऐप खुलते ही लाइव मॉडल चेक करने की कोशिश करेगा
+  }
 
   @override
   void dispose() {
@@ -94,7 +98,68 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     });
   }
 
-  // ⚙️ सेटिंग्स डायलॉग जिसमें GitHub और Vercel की सारी फील्ड्स मौजूद हैं
+  // 🔍 तेरी API Key से लाइव चलने वाले मॉडल्स को ऑटो-फेच करने वाला फंक्शन
+  Future<void> _fetchActiveModelsFromGroq() async {
+    setState(() => _isFetchingModels = true);
+    _addLog('🔄 Fetching active models from Groq for your API Key...');
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final groqKey = prefs.getString('groq_api_key') ?? '';
+
+      if (groqKey.isEmpty) {
+        _addLog('⚠️ Groq API Key is empty. Please set it in Settings.');
+        setState(() => _isFetchingModels = false);
+        return;
+      }
+
+      final url = Uri.parse('https://api.groq.com/openai/v1/models');
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $groqKey',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List modelsData = data['data'];
+        
+        List<String> fetchedModels = [];
+        for (var model in modelsData) {
+          String modelId = model['id'];
+          // हम चैट वाले काम के मॉडल्स को प्रायोरिटी देंगे (जैसे llama या gpt या mixtral)
+          if (modelId.contains('llama') || modelId.contains('mixtral') || modelId.contains('gemma') || modelId.contains('gpt')) {
+            fetchedModels.add(modelId);
+          }
+        }
+
+        if (fetchedModels.isNotEmpty) {
+          setState(() {
+            _modelsList = fetchedModels;
+            if (!_modelsList.contains(_selectedModel)) {
+              _selectedModel = _modelsList.first;
+            }
+          });
+          _addLog('✅ Success! Loaded ${_modelsList.length} active models.');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('🔥 Loaded ${_modelsList.length} active models successfully!')),
+          );
+        } else {
+          _addLog('❌ No chat models found in response.');
+        }
+      } else {
+        _addLog('❌ Failed to fetch models: ${response.body}');
+      }
+    } catch (e) {
+      _addLog('❌ Error fetching models: $e');
+    } finally {
+      setState(() => _isFetchingModels = false);
+    }
+  }
+
+  // ⚙️ सेटिंग्स डायलॉग
   void _showSettingsDialog() async {
     final userController = TextEditingController();
     final repoController = TextEditingController();
@@ -139,16 +204,20 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
               await prefs.setString('vercel_token', vercelTokenController.text.trim());
               await prefs.setString('groq_api_key', groqKeyController.text.trim());
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ All Credentials Saved Successfully!')));
+              
+              // सेटिंग सेव होते ही तुरंत नए मॉडल्स फेच कर लो
+              _fetchActiveModelsFromGroq();
+              
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Credentials Saved & Models Refreshing!')));
             },
-            child: const Text('Save Settings'),
+            child: const Text('Save & Fetch Models'),
           ),
         ],
       ),
     );
   }
 
-  // 🚀 Groq API के जरिए कोड जनरेट करने वाला फंक्शन
+  // 🚀 Groq API के जरिए कोड जनरेट करना
   Future<String> _generateCodeViaGroq(String userPrompt) async {
     final prefs = await SharedPreferences.getInstance();
     final groqKey = prefs.getString('groq_api_key') ?? '';
@@ -184,8 +253,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       String content = data['choices'][0]['message']['content'];
-      
-      // यदि मॉडल ने गलती से ```html ... ``` जोड़ दिया हो तो उसे साफ़ करें
       content = content.replaceAll('```html', '').replaceAll('```', '').trim();
       return content;
     } else {
@@ -210,7 +277,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     _addLog('🚀 Starting Cloud PWA Build for: "$userPrompt" using $_selectedModel');
 
     try {
-      // 1. Groq से कोड बनवाएं
       String cleanHtml = await _generateCodeViaGroq(userPrompt);
 
       setState(() {
@@ -227,12 +293,10 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
         throw Exception('Vercel Token missing in settings!');
       }
 
-      // 2. यूनिक प्रोजेक्ट नाम तैयार करें
       String sanitizedPrompt = userPrompt.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
       if (sanitizedPrompt.length > 12) sanitizedPrompt = sanitizedPrompt.substring(0, 12);
       String uniqueProjectName = 'pwa-$sanitizedPrompt-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
 
-      // 3. Vercel पर डिप्लॉय करें
       String liveUrl = await _deployDirectlyToVercel(uniqueProjectName, cleanHtml, vercelToken);
 
       setState(() {
@@ -250,7 +314,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     }
   }
 
-  // 🚀 Vercel पर डायरेक्ट प्रोजेक्ट भेजने का फंक्शन
   Future<String> _deployDirectlyToVercel(String uniqueProjectName, String htmlContent, String vercelToken) async {
     final url = Uri.parse('https://api.vercel.com/v13/deployments');
     
@@ -336,12 +399,18 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
       appBar: AppBar(
         title: const Text('Groq 10k-Crore PWA Studio Pro'),
         actions: [
+          IconButton(
+            icon: _isFetchingModels 
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              : const Icon(Icons.refresh),
+            tooltip: 'Refresh Active Models',
+            onPressed: _fetchActiveModelsFromGroq,
+          ),
           IconButton(icon: const Icon(Icons.settings), onPressed: _showSettingsDialog),
         ],
       ),
       body: Column(
         children: [
-          // 🛠 मॉडल चयन और प्रॉम्प्ट इनपुट बार
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Column(
@@ -359,7 +428,7 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
-                            value: _selectedModel,
+                            value: _modelsList.contains(_selectedModel) ? _selectedModel : _modelsList.first,
                             isExpanded: true,
                             items: _modelsList.map((model) => DropdownMenuItem(
                               value: model,
