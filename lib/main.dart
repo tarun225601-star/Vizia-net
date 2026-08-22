@@ -97,7 +97,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     });
   }
 
-  // 🔍 सिर्फ असली चैट मॉडल फेच करने वाला और गार्ड मॉडल छांटने वाला फंक्शन
   Future<void> _fetchActiveModelsFromGroq() async {
     setState(() => _isFetchingModels = true);
     _addLog('🔄 Fetching clean active chat models from Groq...');
@@ -128,7 +127,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
         List<String> fetchedModels = [];
         for (var model in modelsData) {
           String modelId = model['id'];
-          // गार्ड, सेफगार्ड, एम्बेडिंग और मॉडरेटर वाले सारे बकवास मॉडल पूरी तरह बाहर कर दिए हैं
           if ((modelId.contains('llama') || modelId.contains('mixtral') || modelId.contains('gemma') || modelId.contains('gpt')) &&
               !modelId.contains('guard') && 
               !modelId.contains('safeguard') &&
@@ -294,7 +292,6 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
         throw Exception('Vercel Token missing in settings!');
       }
 
-      // 🌟 हर बार बिल्कुल नया और यूनिक प्रोजेक्ट नेम जनरेट होगा ताकि कोई ओवरराइट न हो
       String sanitizedPrompt = userPrompt.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
       if (sanitizedPrompt.length > 8) sanitizedPrompt = sanitizedPrompt.substring(0, 8);
       String uniqueProjectName = 'pwa-$sanitizedPrompt-${DateTime.now().millisecondsSinceEpoch}';
@@ -316,13 +313,12 @@ class _StudioHomeScreenState extends State<StudioHomeScreen> with SingleTickerPr
     }
   }
 
-  // 🚀 हर बार अलग प्रोजेक्ट और पब्लिक डिप्लॉयमेंट ताकि लॉगिन का नाटक न हो
+  // 🚀 बिल्कुल साफ और सही Vercel API Request (बिना किसी फालतू या गलत प्रॉपर्टी के)
   Future<String> _deployDirectlyToVercel(String uniqueProjectName, String htmlContent, String vercelToken) async {
     final url = Uri.parse('https://api.vercel.com/v13/deployments');
     
     final body = {
       "name": uniqueProjectName,
-      "public": true,
       "files": [
         {
           "file": "index.html",
