@@ -1,26 +1,18 @@
-name: desi_ai_app
-description: "A new Flutter project for AI Agent & Studio"
+name: viziag_mart
+description: "Viziag Mart - Hyperlocal Marketplace with Admin Approval & Dual Dashboard"
 publish_to: 'none'
-
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-    
-  
-  
-  # जरूरी पैकेजेस
-  shared_preferences: ^2.2.3
-  http: ^1.2.0
-  
-  # अगर तुझे इनकी भी जरूरत नहीं है, तो इन्हें भी हटा सकता है
-  supabase_flutter: ^2.5.4
+  cupertino_icons: ^1.0.6
   image_picker: ^1.0.7
-  webview_flutter: ^4.4.4
+  shared_preferences: ^2.2.2
+  provider: ^6.1.1
 
 dev_dependencies:
   flutter_test:
@@ -29,3 +21,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/
