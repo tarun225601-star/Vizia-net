@@ -3,6 +3,18 @@
 
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- WhatsApp और ब्राउज़र लिंक्स को लॉन्च करने के लिए क्वेरी परमिसन -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" android:host="wa.me" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="whatsapp" />
+        </intent>
+    </queries>
+
     <application
         android:label="Desi AI App"
         android:name="${applicationName}"
