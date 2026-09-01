@@ -33,36 +33,31 @@ class ViziagMartEnterpriseApp extends StatelessWidget {
 // CENTRAL DATABASE & CONFIG MODEL
 // ==========================================
 class ViziagDatabase {
-  // फायरबेस यूआरएल जो आपने दिया है (परमानेंट)
   static String firebaseRestUrl = "https://viziagmart-default-rtdb.firebaseio.com/"; 
   static String activeCityZone = "Faridabad, Delhi & Gurgaon";
 
-  // वर्तमान यूजर (कस्टमर) की जानकारी
   static String currentUserPhone = "";
   static String currentDeliveryAddress = "";
   static bool isUserLoggedIn = false;
 
-  // वेंडर/शॉप रजिस्टर्ड है या नहीं
   static bool isShopRegistered = true; 
 
-  // रजिस्टर्ड दुकानें (डिफ़ॉल्ट सैंपल डेटा)
   static List<Map<String, dynamic>> registeredShops = [
     {
       'shopId': 'shop_01',
       'shopName': 'Tarun Fruit & Vegetable Shop',
       'ownerName': 'Tarun Kumar',
-      'ownerPhotoPath': '', // गैलरी पाथ के लिए
+      'ownerPhotoPath': '',
       'phone': '9971968060',
       'whatsappNumber': '919971968060', 
       'category': 'Sabji & Fruits',
       'address': 'Sector 15A Ajronda Sabji Mandi, Faridabad',
-      'shopBannerPath': '', // गैलरी पाथ के लिए
+      'shopBannerPath': '',
       'isOpen': true,
       'isApproved': true,
     }
   ];
 
-  // प्रोडक्ट्स इन्वेंट्री
   static List<Map<String, dynamic>> productInventory = [
     {
       'id': 'p_101',
@@ -74,7 +69,7 @@ class ViziagDatabase {
       'unit': 'KG',
       'stock': 50,
       'location': 'Sector 15A, Faridabad',
-      'imagePath': '', // गैलरी पाथ के लिए
+      'imagePath': '',
       'isWholesale': false,
       'deliveryType': 'Express Delivery'
     },
@@ -184,11 +179,10 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('✅ Order placed successfully! Sent to shop WhatsApp: ${shop['shopName']}'), backgroundColor: Colors.green),
+      const SnackBar(content: Text('✅ Order placed successfully!'), backgroundColor: Colors.green),
     );
   }
 
-  // गैलरी से आई इमेज या डिफ़ॉल्ट दिखाने के लिए हेल्पर विजेट
   Widget _buildImageView(String? path, double height, double width, IconData fallbackIcon) {
     if (path != null && path.isNotEmpty) {
       return Image.file(File(path), height: height, width: width, fit: BoxFit.cover);
@@ -417,7 +411,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
   String _selectedUnit = 'KG';
   bool _isWholesaleItem = false;
 
-  // गैलरी से फोटो पाथ होल्ड करने के लिए
   String? _pickedOwnerPhotoPath;
   String? _pickedShopBannerPath;
   String? _pickedProdImagePath;
@@ -510,7 +503,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
           TextField(controller: _ownerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name', border: OutlineInputBorder(), isDense: true)),
           const SizedBox(height: 8),
           
-          // ओनर फोटो गैलरी पिकर
           Row(
             children: [
               Expanded(child: Text(_pickedOwnerPhotoPath == null ? 'Owner Photo: Not Selected' : 'Owner Photo: Selected ✅', style: const TextStyle(fontSize: 12))),
@@ -530,7 +522,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
           TextField(controller: _addressCtrl, decoration: const InputDecoration(labelText: 'Shop Address / Location', border: OutlineInputBorder(), isDense: true)),
           const SizedBox(height: 8),
 
-          // दुकान का बैनर फोटो गैलरी पिकर
           Row(
             children: [
               Expanded(child: Text(_pickedShopBannerPath == null ? 'Shop Banner: Not Selected' : 'Shop Banner: Selected ✅', style: const TextStyle(fontSize: 12))),
@@ -599,7 +590,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         TextField(controller: _stockCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Stock Quantity', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
 
-        // आइटम फोटो के लिए गैलरी पिकर बटन
         Row(
           children: [
             Expanded(child: Text(_pickedProdImagePath == null ? 'Item Photo: Not Selected' : 'Item Photo: Selected ✅', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
@@ -677,11 +667,22 @@ class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
 
   void _verifyOtpAndSaveAddress() {
     if (_otpCtrl.text.trim() != "1234") {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Invalid OTP! Enter 1234', backgroundColor: Colors.red)));
+      // FIX: backgroundColor सही जगह (SnackBar के अंदर) सेट किया गया है और const हटाया गया है
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('❌ Invalid OTP! Enter 1234'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
     if (_addressCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your delivery address!'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your delivery address!'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
 
@@ -692,7 +693,10 @@ class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ Mobile Verified & Delivery Address Saved Successfully!'), backgroundColor: Colors.green),
+      const SnackBar(
+        content: Text('✅ Mobile Verified & Delivery Address Saved Successfully!'),
+        backgroundColor: Colors.green,
+      ),
     );
   }
 
@@ -761,7 +765,8 @@ class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
 // TAB 4: SETTINGS
 // ==========================================
 class SettingsConfigView extends StatefulWidget {
-  const SettingsConfigView({super.key});
+  const SettingsConfigView(
+      {super.key});
 
   @override
   State<SettingsConfigView> createState() => _SettingsConfigViewState();
