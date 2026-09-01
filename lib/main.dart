@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(const ViziagMartEnterpriseApp());
@@ -36,12 +37,11 @@ class ViziagMartEnterpriseApp extends StatelessWidget {
 // ==========================================
 class ViziagDatabase {
   static String firebaseRestUrl = "https://viziagmart-default-rtdb.firebaseio.com/"; 
-  static String activeCityZone = "Faridabad, Delhi & Gurgaon";
 
-  static String currentUserPhone = "";
-  static String currentDeliveryAddress = "";
-  static bool isUserLoggedIn = false;
-
+  static String currentUserPhone = "9971968060";
+  static String currentCustomerName = "Tarun Kumar";
+  static String currentDeliveryAddress = "Sector 15A Ajronda Sabji Mandi, Faridabad";
+  static bool isUserLoggedIn = true;
   static bool isShopRegistered = true; 
 
   static List<Map<String, dynamic>> registeredShops = [
@@ -51,7 +51,7 @@ class ViziagDatabase {
       'ownerName': 'Tarun Kumar',
       'ownerPhotoPath': '',
       'phone': '9971968060',
-      'whatsappNumber': '919971968060', 
+      'whatsappNumber': '919971968060',
       'category': 'Sabji & Fruits',
       'address': 'Sector 15A Ajronda Sabji Mandi, Faridabad',
       'shopBannerPath': '',
@@ -75,7 +75,37 @@ class ViziagDatabase {
       'isWholesale': false,
       'deliveryType': 'Express Delivery'
     },
+    {
+      'id': 'p_102',
+      'shopName': 'Tarun Fruit & Vegetable Shop',
+      'owner': 'Tarun Kumar',
+      'name': 'Banana Premium',
+      'category': 'Fruits & Vegetables',
+      'price': 70.0,
+      'unit': 'pc',
+      'stock': 40,
+      'location': 'Sector 15A, Faridabad',
+      'imagePath': '',
+      'isWholesale': false,
+      'deliveryType': 'Express Delivery'
+    },
+    {
+      'id': 'p_103',
+      'shopName': 'Tarun Fruit & Vegetable Shop',
+      'owner': 'Tarun Kumar',
+      'name': 'Royal Gala Apple',
+      'category': 'Fruits & Vegetables',
+      'price': 300.0,
+      'unit': 'KG',
+      'stock': 30,
+      'location': 'Sector 15A, Faridabad',
+      'imagePath': '',
+      'isWholesale': false,
+      'deliveryType': 'Express Delivery'
+    },
   ];
+
+  static List<Map<String, dynamic>> cartItems = [];
 }
 
 // ==========================================
@@ -95,72 +125,128 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
     const MarketplaceBuyerView(),
     const ShopRegisterAndUpdateView(),
     const UserLoginAndAddressView(),
+    const CartAndWhatsAppCheckoutView(), 
     const SettingsConfigView(),
   ];
 
   @override
   Widget build(BuildContext context) {
+    int totalCartCount = ViziagDatabase.cartItems.fold(0, (sum, item) => sum + ((item['qty'] as num?)?.toInt() ?? 1));
+
     return Scaffold(
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(65),
+        preferredSize: const Size.fromHeight(70),
         child: AppBar(
           backgroundColor: const Color(0xFF1A1A1A),
           title: Row(
             children: [
               const Text(
-                'Viziag Mart',
-                style: TextStyle(color: Color(0xFFFF5722), fontWeight: FontWeight.w900, fontSize: 16),
+                'Viziag\nMart',
+                style: TextStyle(color: Color(0xFFFF5722), fontWeight: FontWeight.w900, fontSize: 13, height: 1.1),
               ),
               const Spacer(),
-              _buildNavBtn('Market', Icons.storefront, 0),
-              _buildNavBtn('Vendor', Icons.store, 1),
-              _buildNavBtn('User/OTP', Icons.person, 2),
-              _buildNavBtn('Settings', Icons.settings, 3),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF5722),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => setState(() => _selectedTabIndex = 0),
+                icon: const Icon(Icons.storefront, size: 12),
+                label: const Text('Marketplace', style: TextStyle(fontSize: 10)),
+              ),
+              const SizedBox(width: 4),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey.shade800,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => setState(() => _selectedTabIndex = 1),
+                icon: const Icon(Icons.store, size: 12),
+                label: const Text('Vendor Portal', style: TextStyle(fontSize: 10)),
+              ),
             ],
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(30),
+            child: Container(
+              color: const Color(0xFF2C2C2C),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => setState(() => _selectedTabIndex = 2),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person, color: Colors.blueAccent, size: 13),
+                        const SizedBox(width: 4),
+                        Text(
+                          ViziagDatabase.currentCustomerName,
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => setState(() => _selectedTabIndex = 2),
+                    child: const Text('(Edit Profile)', style: TextStyle(color: Colors.orangeAccent, fontSize: 10)),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
       body: _tabScreens[_selectedTabIndex],
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedTabIndex,
+        currentIndex: _selectedTabIndex > 3 ? 3 : _selectedTabIndex,
         selectedItemColor: const Color(0xFFFF5722),
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
-        onTap: (index) => setState(() => _selectedTabIndex = index),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.storefront), label: 'Market'),
-          BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Vendor'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_pin), label: 'Profile/OTP'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+        onTap: (index) {
+          if (index == 3) {
+            setState(() => _selectedTabIndex = 4); // Settings/Cart toggle
+          } else {
+            setState(() => _selectedTabIndex = index);
+          }
+        },
+        items: [
+          const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: ''),
+          const BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: ''),
+          const BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: ''),
+          BottomNavigationBarItem(
+            icon: Stack(
+              children: [
+                const Icon(Icons.shopping_cart_outlined),
+                if (totalCartCount > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      constraints: const BoxConstraints(minWidth: 12, minHeight: 12),
+                      child: Text('$totalCartCount', style: const TextStyle(color: Colors.white, fontSize: 8), textAlign: TextAlign.center),
+                    ),
+                  ),
+              ],
+            ),
+            label: '',
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildNavBtn(String title, IconData icon, int index) {
-    bool isSelected = _selectedTabIndex == index;
-    return InkWell(
-      onTap: () => setState(() => _selectedTabIndex = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFF5722) : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.white, size: 15),
-            Text(title, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
-          ],
-        ),
       ),
     );
   }
 }
 
 // ==========================================
-// TAB 1: RETAIL & WHOLESALE MARKETPLACE
+// TAB 1: RETAIL & WHOLESALE MARKETPLACE (3-GRID LAYOUT)
 // ==========================================
 class MarketplaceBuyerView extends StatefulWidget {
   const MarketplaceBuyerView({super.key});
@@ -172,6 +258,7 @@ class MarketplaceBuyerView extends StatefulWidget {
 class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   bool isWholesaleMarket = false;
   bool _isLoadingCloud = false;
+  final Map<String, double> _itemQuantities = {};
 
   @override
   void initState() {
@@ -179,7 +266,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     _fetchProductsFromCloud();
   }
 
-  // सर्वर से लाइव डेटा डाउनलोड करने का फंक्शन ताकि हर यूजर को दिखे
   Future<void> _fetchProductsFromCloud() async {
     setState(() => _isLoadingCloud = true);
     try {
@@ -192,7 +278,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
         List<Map<String, dynamic>> fetchedList = [];
         data.forEach((key, value) {
           var item = Map<String, dynamic>.from(value);
-          item['firebaseKey'] = key; // डिलीट या अपडेट के लिए की संभाल कर रखी
+          item['firebaseKey'] = key;
           fetchedList.add(item);
         });
 
@@ -207,16 +293,28 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     }
   }
 
-  void _placeOrder(Map<String, dynamic> shop, Map<String, dynamic> prod) {
-    if (!ViziagDatabase.isUserLoggedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Please login with your mobile number & set delivery address first!'), backgroundColor: Colors.red),
-      );
-      return;
+  void _addToCart(Map<String, dynamic> prod, double qty) {
+    String prodName = prod['name'];
+    var existingIndex = ViziagDatabase.cartItems.indexWhere((item) => item['name'] == prodName);
+
+    if (existingIndex >= 0) {
+      setState(() {
+        ViziagDatabase.cartItems[existingIndex]['qty'] = qty;
+      });
+    } else {
+      setState(() {
+        ViziagDatabase.cartItems.add({
+          'name': prodName,
+          'price': prod['price'],
+          'unit': prod['unit'] ?? 'KG',
+          'qty': qty,
+          'shopName': prod['shopName'] ?? 'Tarun Fruit & Vegetable Shop',
+        });
+      });
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ Order placed successfully!'), backgroundColor: Colors.green),
+      SnackBar(content: Text('🛒 Added $qty ${prod['unit'] ?? 'KG'} $prodName to Cart!'), duration: const Duration(milliseconds: 800)),
     );
   }
 
@@ -239,196 +337,171 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 
   @override
   Widget build(BuildContext context) {
+    var filteredProducts = ViziagDatabase.productInventory.where((p) => p['isWholesale'] == isWholesaleMarket).toList();
+
     return Column(
       children: [
+        // Header info banner
         Container(
-          color: Colors.amber.shade100,
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          color: Colors.white,
           child: Row(
             children: [
-              const Icon(Icons.location_on, color: Colors.deepOrange, size: 18),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  ViziagDatabase.isUserLoggedIn
-                      ? 'Delivering to: ${ViziagDatabase.currentDeliveryAddress} (${ViziagDatabase.currentUserPhone})'
-                      : '⚠️ User not logged in. Tap "User/OTP" tab to set address.',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 18),
+              const Text('🔥', style: TextStyle(fontSize: 14)),
+              const SizedBox(width: 4),
+              const Text('Local Hyper-Local Market', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Spacer(),
+              TextButton(
                 onPressed: _fetchProductsFromCloud,
-                tooltip: 'Refresh Market',
-              )
+                child: const Text('Refresh', style: TextStyle(fontSize: 11)),
+              ),
             ],
           ),
         ),
         Container(
-          color: Colors.black87,
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          color: Colors.grey.shade200,
           child: Row(
             children: [
+              const Icon(Icons.check_box, color: Colors.green, size: 14),
+              const SizedBox(width: 4),
               Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: !isWholesaleMarket ? const Color(0xFFFF5722) : Colors.grey.shade800,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: () => setState(() => isWholesaleMarket = false),
-                  icon: const Icon(Icons.shopping_bag, size: 14),
-                  label: const Text('🛍️ Retail', style: TextStyle(fontSize: 11)),
+                child: Text(
+                  'Verified Buyer: ${ViziagDatabase.currentCustomerName}',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isWholesaleMarket ? Colors.purple.shade700 : Colors.grey.shade800,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: () => setState(() => isWholesaleMarket = true),
-                  icon: const Icon(Icons.inventory_2, size: 14),
-                  label: const Text('📦 Wholesale', style: TextStyle(fontSize: 11)),
-                ),
+              GestureDetector(
+                onTap: () {},
+                child: const Text('(Logout)', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
         ),
         if (_isLoadingCloud)
           const LinearProgressIndicator(color: Color(0xFFFF5722)),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(12),
-            children: ViziagDatabase.registeredShops.map((shop) {
-              bool shopOpen = shop['isOpen'] ?? true;
-              var shopProducts = ViziagDatabase.productInventory.where((p) =>
-                p['shopName'] == shop['shopName'] && p['isWholesale'] == isWholesaleMarket
-              ).toList();
 
-              if (shopProducts.isEmpty) return const SizedBox.shrink();
+        // 3-Grid View Builder
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(6),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3, // EXACTLY 3 ITEMS PER ROW (3 ग्रेड लाइन यूआई)
+              childAspectRatio: 0.52, // कार्ड की लम्बाई-चौड़ाई का अनुपात
+              crossAxisSpacing: 6,
+              mainAxisSpacing: 6,
+            ),
+            itemCount: filteredProducts.length,
+            itemBuilder: (context, index) {
+              var prod = filteredProducts[index];
+              String prodKey = prod['id'] ?? prod['name'];
+              double unitPrice = (prod['price'] ?? 100.0).toDouble();
+              double selectedQty = _itemQuantities[prodKey] ?? 1.0;
+              double totalPrice = unitPrice * selectedQty;
 
               return Card(
-                margin: const EdgeInsets.only(bottom: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 1,
+                margin: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-                          child: _buildImageView(shop['shopBannerPath'], 90, double.infinity, Icons.store),
-                        ),
-                        Container(
-                          height: 90,
-                          decoration: BoxDecoration(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-                            color: Colors.black.withOpacity(0.4),
-                          ),
-                        ),
-                        Positioned(
-                          top: 6,
-                          right: 6,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: shopOpen ? Colors.green : Colors.red,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              shopOpen ? '🟢 OPEN' : '🔴 CLOSED',
-                              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 6,
-                          left: 10,
-                          right: 10,
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                child: ClipOval(
-                                  child: _buildImageView(shop['ownerPhotoPath'], 36, 36, Icons.person),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      shop['shopName'],
-                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                    ),
-                                    Text(
-                                      'WhatsApp Orders Enabled • ${shop['address']}',
-                                      style: const TextStyle(color: Colors.white70, fontSize: 9),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    // Product Image
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                      child: _buildImageView(prod['imagePath'], 75, double.infinity, Icons.fastfood),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        children: shopOpen ? shopProducts.map((prod) => Container(
-                          margin: const EdgeInsets.only(bottom: 6),
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            border: Border.all(color: Colors.grey.shade200),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: _buildImageView(prod['imagePath'], 45, 45, Icons.fastfood),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                  decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(2)),
+                                  child: Text(
+                                    prod['shopName'] ?? 'Tarun shop',
+                                    style: const TextStyle(fontSize: 7, color: Colors.blue, fontWeight: FontWeight.bold),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  prod['name'],
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  '₹${unitPrice.toInt()}/${prod['unit'] ?? 'kg'}',
+                                  style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 9),
+                                ),
+                                const Text(
+                                  '🚚 Home Delivery',
+                                  style: TextStyle(fontSize: 7, color: Colors.black54),
+                                  maxLines: 1,
+                                ),
+                              ],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
-                                    Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                    Text('₹${prod['price']} / ${prod['unit']} • Stock: ${prod['stock']}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 10)),
+                                    const Text('Qty:', style: TextStyle(fontSize: 7)),
+                                    const SizedBox(width: 2),
+                                    SizedBox(
+                                      width: 26,
+                                      height: 16,
+                                      child: TextField(
+                                        keyboardType: TextInputType.number,
+                                        style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
+                                        decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 0)),
+                                        controller: TextEditingController(text: selectedQty.toInt().toString())
+                                          ..selection = TextSelection.fromPosition(TextPosition(offset: selectedQty.toInt().toString().length)),
+                                        onChanged: (val) {
+                                          double? q = double.tryParse(val);
+                                          if (q != null && q > 0) {
+                                            setState(() => _itemQuantities[prodKey] = q);
+                                          }
+                                        },
+                                      ),
+                                    ),
                                   ],
                                 ),
-                              ),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF25D366), 
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                const SizedBox(height: 2),
+                                Text('Total: ₹${totalPrice.toInt()}', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.blue)),
+                                const SizedBox(height: 2),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 20,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFE91E63),
+                                      foregroundColor: Colors.white,
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                    onPressed: () => _addToCart(prod, selectedQty),
+                                    child: const Text('Add to Cart', style: TextStyle(fontSize: 7, fontWeight: FontWeight.bold)),
+                                  ),
                                 ),
-                                onPressed: () => _placeOrder(shop, prod),
-                                child: const Text('Order WhatsApp', style: TextStyle(fontSize: 10)),
-                              )
-                            ],
-                          ),
-                        )).toList() : [
-                          const Padding(
-                            padding: EdgeInsets.all(10.0),
-                            child: Text('🔴 Shop is currently CLOSED.', style: TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold)),
-                          )
-                        ],
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
               );
-            }).toList(),
+            },
           ),
         ),
       ],
@@ -447,12 +520,6 @@ class ShopRegisterAndUpdateView extends StatefulWidget {
 }
 
 class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
-  final TextEditingController _shopNameCtrl = TextEditingController();
-  final TextEditingController _ownerNameCtrl = TextEditingController();
-  final TextEditingController _phoneCtrl = TextEditingController();
-  final TextEditingController _whatsappCtrl = TextEditingController(); 
-  final TextEditingController _addressCtrl = TextEditingController();
-
   final TextEditingController _prodNameCtrl = TextEditingController();
   final TextEditingController _priceCtrl = TextEditingController();
   final TextEditingController _stockCtrl = TextEditingController();
@@ -460,52 +527,16 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
   String _selectedUnit = 'KG';
   bool _isWholesaleItem = false;
   bool _isUploadingToCloud = false;
-
-  String? _pickedOwnerPhotoPath;
-  String? _pickedShopBannerPath;
   String? _pickedProdImagePath;
   final ImagePicker _picker = ImagePicker();
 
-  Future<void> _pickImage(String type) async {
+  Future<void> _pickImage() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
-      setState(() {
-        if (type == 'owner') _pickedOwnerPhotoPath = image.path;
-        if (type == 'banner') _pickedShopBannerPath = image.path;
-        if (type == 'product') _pickedProdImagePath = image.path;
-      });
+      setState(() => _pickedProdImagePath = image.path);
     }
   }
 
-  void _registerShopDirectly() {
-    if (_shopNameCtrl.text.isEmpty || _whatsappCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill shop name and WhatsApp number!')));
-      return;
-    }
-
-    setState(() {
-      ViziagDatabase.registeredShops.insert(0, {
-        'shopId': 'shop_${DateTime.now().millisecondsSinceEpoch}',
-        'shopName': _shopNameCtrl.text,
-        'ownerName': _ownerNameCtrl.text,
-        'ownerPhotoPath': _pickedOwnerPhotoPath ?? '',
-        'phone': _phoneCtrl.text,
-        'whatsappNumber': _whatsappCtrl.text,
-        'category': 'General Store',
-        'address': _addressCtrl.text,
-        'shopBannerPath': _pickedShopBannerPath ?? '',
-        'isOpen': true,
-        'isApproved': true,
-      });
-      ViziagDatabase.isShopRegistered = true; 
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🎉 Shop Registered Successfully!'), backgroundColor: Colors.green),
-    );
-  }
-
-  // ग्लोबल क्लाउड पर आइटम पब्लिश करने का मुख्य फंक्शन
   Future<void> _publishProductToCloud() async {
     if (_prodNameCtrl.text.isEmpty || _priceCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill item name and price!')));
@@ -531,13 +562,12 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
     };
 
     try {
-      // Firebase पर डेटा पोस्ट (Save) करें ताकि कोई भी यूजर ऐप खोले तो उसे दिखे
       final response = await http.post(
         Uri.parse('${ViziagDatabase.firebaseRestUrl}/products.json'),
         body: json.encode(newProduct),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         setState(() {
           ViziagDatabase.productInventory.insert(0, newProduct);
         });
@@ -545,127 +575,35 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         _prodNameCtrl.clear();
         _priceCtrl.clear();
         _stockCtrl.clear();
-        setState(() {
-          _pickedProdImagePath = null;
-        });
+        setState(() => _pickedProdImagePath = null);
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('🚀 Product Published Live to Global Cloud!'), backgroundColor: Colors.green),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ Failed to save on Cloud database'), backgroundColor: Colors.red),
+          const SnackBar(content: Text('🚀 Product Published Live to Cloud!'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('⚠️ Error: $e'), backgroundColor: Colors.red),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('⚠️ Error: $e')));
     } finally {
       setState(() => _isUploadingToCloud = false);
     }
   }
 
-  // क्लाउड से आइटम डिलीट करने का फंक्शन
-  Future<void> _deleteProductFromCloud(Map<String, dynamic> prod) async {
-    String? firebaseKey = prod['firebaseKey'];
-    
-    setState(() {
-      ViziagDatabase.productInventory.remove(prod);
-    });
-
-    if (firebaseKey != null && firebaseKey.isNotEmpty) {
-      try {
-        await http.delete(
-          Uri.parse('${ViziagDatabase.firebaseRestUrl}/products/$firebaseKey.json'),
-        );
-      } catch (e) {
-        debugPrint("Delete cloud error: $e");
-      }
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🗑️ Deleted ${prod['name']}')));
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (!ViziagDatabase.isShopRegistered) {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text('🏪 Register Your Shop (One-Time)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          TextField(controller: _shopNameCtrl, decoration: const InputDecoration(labelText: 'Shop Name', border: OutlineInputBorder(), isDense: true)),
-          const SizedBox(height: 8),
-          TextField(controller: _ownerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name', border: OutlineInputBorder(), isDense: true)),
-          const SizedBox(height: 8),
-          
-          Row(
-            children: [
-              Expanded(child: Text(_pickedOwnerPhotoPath == null ? 'Owner Photo: Not Selected' : 'Owner Photo: Selected ✅', style: const TextStyle(fontSize: 12))),
-              ElevatedButton.icon(
-                onPressed: () => _pickImage('owner'),
-                icon: const Icon(Icons.photo_library, size: 16),
-                label: const Text('Gallery se Chunein'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Calling Mobile Number', border: OutlineInputBorder(), isDense: true)),
-          const SizedBox(height: 8),
-          TextField(controller: _whatsappCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'WhatsApp Number (For Orders)', border: OutlineInputBorder(), isDense: true)),
-          const SizedBox(height: 8),
-          TextField(controller: _addressCtrl, decoration: const InputDecoration(labelText: 'Shop Address / Location', border: OutlineInputBorder(), isDense: true)),
-          const SizedBox(height: 8),
-
-          Row(
-            children: [
-              Expanded(child: Text(_pickedShopBannerPath == null ? 'Shop Banner: Not Selected' : 'Shop Banner: Selected ✅', style: const TextStyle(fontSize: 12))),
-              ElevatedButton.icon(
-                onPressed: () => _pickImage('banner'),
-                icon: const Icon(Icons.image, size: 16),
-                label: const Text('Gallery se Chunein'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
-            onPressed: _registerShopDirectly,
-            child: const Text('Register Shop Now'),
-          ),
-        ],
-      );
-    }
-
     var myShop = ViziagDatabase.registeredShops[0];
     bool isShopOpen = myShop['isOpen'] ?? true;
-    var myProducts = ViziagDatabase.productInventory.where((p) => p['shopName'] == myShop['shopName']).toList();
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Card(
-          color: isShopOpen ? Colors.green.shade50 : Colors.red.shade50,
-          child: SwitchListTile(
-            title: Text(
-              isShopOpen ? '🟢 Shop Status: OPEN' : '🔴 Shop Status: CLOSED',
-              style: TextStyle(fontWeight: FontWeight.bold, color: isShopOpen ? Colors.green.shade800 : Colors.red.shade800, fontSize: 13),
-            ),
-            subtitle: const Text('Toggle switch to open or close your shop instantly', style: TextStyle(fontSize: 10)),
-            value: isShopOpen,
-            activeColor: Colors.green,
-            onChanged: (val) {
-              setState(() {
-                myShop['isOpen'] = val;
-              });
-            },
-          ),
+        SwitchListTile(
+          title: Text(isShopOpen ? '🟢 Shop Status: OPEN' : '🔴 Shop Status: CLOSED', style: const TextStyle(fontWeight: FontWeight.bold)),
+          value: isShopOpen,
+          activeColor: Colors.green,
+          onChanged: (val) => setState(() => myShop['isOpen'] = val),
         ),
-        const SizedBox(height: 15),
-        const Text('📦 Add Item to Global Cloud (Visible to All Users)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        const Text('📦 Add Item to Global Cloud', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         TextField(controller: _prodNameCtrl, decoration: const InputDecoration(labelText: 'Item Name', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
@@ -677,7 +615,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
               child: DropdownButtonFormField<String>(
                 value: _selectedUnit,
                 decoration: const InputDecoration(labelText: 'Unit', border: OutlineInputBorder(), isDense: true),
-                items: ['KG', 'Piece', '20 KG Box', 'Packet'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                items: ['KG', 'pc', '20 KG Box', 'Packet'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
                 onChanged: (val) => setState(() => _selectedUnit = val!),
               ),
             ),
@@ -686,57 +624,26 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         const SizedBox(height: 8),
         TextField(controller: _stockCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Stock Quantity', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
-
-        Row(
-          children: [
-            Expanded(child: Text(_pickedProdImagePath == null ? 'Item Photo: Not Selected' : 'Item Photo: Selected ✅', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700, foregroundColor: Colors.white),
-              onPressed: () => _pickImage('product'),
-              icon: const Icon(Icons.add_a_photo, size: 16),
-              label: const Text('Gallery se Photo Chunein'),
-            ),
-          ],
+        ElevatedButton.icon(
+          onPressed: _pickImage,
+          icon: const Icon(Icons.add_a_photo, size: 14),
+          label: Text(_pickedProdImagePath == null ? 'Select Photo from Gallery' : 'Photo Selected ✅'),
         ),
-        const SizedBox(height: 8),
-
-        CheckboxListTile(
-          title: const Text('List as Wholesale Item', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-          value: _isWholesaleItem,
-          activeColor: Colors.purple,
-          onChanged: (val) => setState(() => _isWholesaleItem = val ?? false),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 15),
         _isUploadingToCloud
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF5722)))
+            ? const Center(child: CircularProgressIndicator())
             : ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
                 onPressed: _publishProductToCloud,
                 child: const Text('Publish Item Live to Cloud 🚀'),
               ),
-        const Divider(height: 25),
-        const Text('📋 Manage / Delete Items', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        ...myProducts.map((prod) => Card(
-          child: ListTile(
-            leading: prod['imagePath'] != null && prod['imagePath'].isNotEmpty
-                ? Image.file(File(prod['imagePath']), width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.image))
-                : const Icon(Icons.image, size: 40),
-            title: Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            subtitle: Text('₹${prod['price']} / ${prod['unit']} • Stock: ${prod['stock']}', style: const TextStyle(fontSize: 11)),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-              onPressed: () => _deleteProductFromCloud(prod),
-            ),
-          ),
-        )),
       ],
     );
   }
 }
 
 // ==========================================
-// TAB 3: USER MOBILE OTP & DELIVERY ADDRESS VIEW
+// TAB 3: CUSTOMER PROFILE CONFIG
 // ==========================================
 class UserLoginAndAddressView extends StatefulWidget {
   const UserLoginAndAddressView({super.key});
@@ -746,52 +653,17 @@ class UserLoginAndAddressView extends StatefulWidget {
 }
 
 class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
+  final TextEditingController _nameCtrl = TextEditingController(text: ViziagDatabase.currentCustomerName);
   final TextEditingController _userPhoneCtrl = TextEditingController(text: ViziagDatabase.currentUserPhone);
-  final TextEditingController _otpCtrl = TextEditingController();
   final TextEditingController _addressCtrl = TextEditingController(text: ViziagDatabase.currentDeliveryAddress);
-  bool _otpSent = false;
 
-  void _sendOtp() {
-    if (_userPhoneCtrl.text.length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter valid 10-digit mobile number!')));
-      return;
-    }
-    setState(() => _otpSent = true);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('📱 OTP Sent! Use code: 1234')));
-  }
-
-  void _verifyOtpAndSaveAddress() {
-    if (_otpCtrl.text.trim() != "1234") {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('❌ Invalid OTP! Enter 1234'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-    if (_addressCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your delivery address!'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
+  void _saveCustomerProfile() {
     setState(() {
+      ViziagDatabase.currentCustomerName = _nameCtrl.text.trim();
       ViziagDatabase.currentUserPhone = _userPhoneCtrl.text.trim();
       ViziagDatabase.currentDeliveryAddress = _addressCtrl.text.trim();
-      ViziagDatabase.isUserLoggedIn = true;
     });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('✅ Mobile Verified & Delivery Address Saved Successfully!'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Profile Saved Successfully!'), backgroundColor: Colors.green));
   }
 
   @override
@@ -800,55 +672,19 @@ class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
       padding: const EdgeInsets.all(16.0),
       child: ListView(
         children: [
-          const Text('👤 Customer Mobile OTP & Delivery Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text('👤 Customer Profile & Delivery Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          TextField(
-            controller: _userPhoneCtrl,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Your Mobile Number', border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone)),
-          ),
+          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Your Name', border: OutlineInputBorder())),
           const SizedBox(height: 10),
-          if (!_otpSent)
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
-              onPressed: _sendOtp,
-              child: const Text('Send OTP'),
-            ),
-          if (_otpSent) ...[
-            const SizedBox(height: 10),
-            TextField(
-              controller: _otpCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Enter OTP (Type 1234)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.security)),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _addressCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Delivery Address (Where you want items delivered)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.home)),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-              onPressed: _verifyOtpAndSaveAddress,
-              child: const Text('Verify OTP & Save Address'),
-            ),
-          ],
-          if (ViziagDatabase.isUserLoggedIn) ...[
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.green.shade50, border: Border.all(color: Colors.green), borderRadius: BorderRadius.circular(8)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('✅ Logged In Customer Profile:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-                  Text('Phone: ${ViziagDatabase.currentUserPhone}'),
-                  Text('Address: ${ViziagDatabase.currentDeliveryAddress}'),
-                ],
-              ),
-            ),
-          ]
+          TextField(controller: _userPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder())),
+          const SizedBox(height: 10),
+          TextField(controller: _addressCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Full Delivery Address', border: OutlineInputBorder())),
+          const SizedBox(height: 15),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
+            onPressed: _saveCustomerProfile,
+            child: const Text('Save Profile & Address'),
+          ),
         ],
       ),
     );
@@ -856,38 +692,102 @@ class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
 }
 
 // ==========================================
-// TAB 4: SETTINGS
+// TAB 4: WHATSAPP CHECKOUT CART VIEW
 // ==========================================
-class SettingsConfigView extends StatefulWidget {
-  const SettingsConfigView({super.key});
+class CartAndWhatsAppCheckoutView extends StatefulWidget {
+  const CartAndWhatsAppCheckoutView({super.key});
 
   @override
-  State<SettingsConfigView> createState() => _SettingsConfigViewState();
+  State<CartAndWhatsAppCheckoutView> createState() => _CartAndWhatsAppCheckoutViewState();
 }
 
-class _SettingsConfigViewState extends State<SettingsConfigView> {
-  final TextEditingController _firebaseUrlCtrl = TextEditingController(text: ViziagDatabase.firebaseRestUrl);
+class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutView> {
+  Future<void> _sendOrderToWhatsApp() async {
+    if (ViziagDatabase.cartItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your cart is empty!')));
+      return;
+    }
+
+    String vendorPhone = ViziagDatabase.registeredShops[0]['whatsappNumber'] ?? '919971968060';
+    String message = "🛍️ *New Order from Viziag Mart*\n\n👤 *Customer:* ${ViziagDatabase.currentCustomerName}\n📞 *Phone:* ${ViziagDatabase.currentUserPhone}\n📍 *Address:* ${ViziagDatabase.currentDeliveryAddress}\n\n";
+
+    double grandTotal = 0;
+    for (int i = 0; i < ViziagDatabase.cartItems.length; i++) {
+      var item = ViziagDatabase.cartItems[i];
+      double itemTotal = (item['price'] as double) * (item['qty'] as double);
+      grandTotal += itemTotal;
+      message += "${i + 1}. ${item['name']} - ${item['qty']} ${item['unit']} = *₹${itemTotal.toStringAsFixed(0)}*\n";
+    }
+    message += "\n💰 *Grand Total: ₹${grandTotal.toStringAsFixed(0)}*";
+
+    String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(message)}";
+    final Uri uri = Uri.parse(whatsappUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    var cart = ViziagDatabase.cartItems;
+    double grandTotal = cart.fold(0, (sum, item) => sum + ((item['price'] as double) * (item['qty'] as double)));
+
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(12.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('⚙️ App & Database Settings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 15),
-          TextField(
-            controller: _firebaseUrlCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Firebase Database URL (Hardcoded Active)',
-              border: OutlineInputBorder(),
-            ),
+          const Text('🛒 Your Shopping Cart', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Expanded(
+            child: cart.isEmpty
+                ? const Center(child: Text('Cart is empty. Add items from Marketplace!'))
+                : ListView.builder(
+                    itemCount: cart.length,
+                    itemBuilder: (context, index) {
+                      var item = cart[index];
+                      return ListTile(
+                        title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('Qty: ${item['qty']} ${item['unit']} • ₹${item['price']} each'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => setState(() => ViziagDatabase.cartItems.removeAt(index)),
+                        ),
+                      );
+                    },
+                  ),
           ),
-          const SizedBox(height: 15),
-          const Text('Note: Firebase URL is securely configured in the app backend.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          if (cart.isNotEmpty)
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+                onPressed: _sendOrderToWhatsApp,
+                icon: const Icon(Icons.chat),
+                label: Text('Send Order to WhatsApp (₹${grandTotal.toStringAsFixed(0)}) 🚀', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
         ],
       ),
+    );
+  }
+}
+
+// ==========================================
+// TAB 5: SETTINGS & CONFIG
+// ==========================================
+class SettingsConfigView extends StatelessWidget {
+  const SettingsConfigView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: const [
+        Text('⚙️ Settings & Vendor Configuration', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Divider(),
+        Text('You can update your shop details and user preferences via the dedicated Vendor and Profile tabs.'),
+      ],
     );
   }
 }
