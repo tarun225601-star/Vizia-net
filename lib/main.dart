@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const ViziagMartEnterpriseApp());
@@ -169,6 +171,41 @@ class MarketplaceBuyerView extends StatefulWidget {
 
 class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   bool isWholesaleMarket = false;
+  bool _isLoadingCloud = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProductsFromCloud();
+  }
+
+  // सर्वर से लाइव डेटा डाउनलोड करने का फंक्शन ताकि हर यूजर को दिखे
+  Future<void> _fetchProductsFromCloud() async {
+    setState(() => _isLoadingCloud = true);
+    try {
+      final response = await http.get(
+        Uri.parse('${ViziagDatabase.firebaseRestUrl}/products.json'),
+      );
+
+      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
+        Map<String, dynamic> data = json.decode(response.body);
+        List<Map<String, dynamic>> fetchedList = [];
+        data.forEach((key, value) {
+          var item = Map<String, dynamic>.from(value);
+          item['firebaseKey'] = key; // डिलीट या अपडेट के लिए की संभाल कर रखी
+          fetchedList.add(item);
+        });
+
+        setState(() {
+          ViziagDatabase.productInventory = fetchedList.reversed.toList();
+        });
+      }
+    } catch (e) {
+      debugPrint("Cloud fetch error: $e");
+    } finally {
+      setState(() => _isLoadingCloud = false);
+    }
+  }
 
   void _placeOrder(Map<String, dynamic> shop, Map<String, dynamic> prod) {
     if (!ViziagDatabase.isUserLoggedIn) {
@@ -185,7 +222,12 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 
   Widget _buildImageView(String? path, double height, double width, IconData fallbackIcon) {
     if (path != null && path.isNotEmpty) {
-      return Image.file(File(path), height: height, width: width, fit: BoxFit.cover);
+      if (path.startsWith('http')) {
+        return Image.network(path, height: height, width: width, fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(height: height, width: width, color: Colors.grey.shade300, child: Icon(fallbackIcon, size: height * 0.4)));
+      }
+      return Image.file(File(path), height: height, width: width, fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => Container(height: height, width: width, color: Colors.grey.shade300, child: Icon(fallbackIcon, size: height * 0.4)));
     }
     return Container(
       height: height,
@@ -216,6 +258,11 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 18),
+                onPressed: _fetchProductsFromCloud,
+                tooltip: 'Refresh Market',
+              )
             ],
           ),
         ),
@@ -250,6 +297,8 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
             ],
           ),
         ),
+        if (_isLoadingCloud)
+          const LinearProgressIndicator(color: Color(0xFFFF5722)),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.all(12),
@@ -410,6 +459,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
 
   String _selectedUnit = 'KG';
   bool _isWholesaleItem = false;
+  bool _isUploadingToCloud = false;
 
   String? _pickedOwnerPhotoPath;
   String? _pickedShopBannerPath;
@@ -455,39 +505,86 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
     );
   }
 
-  void _publishProduct() {
+  // ग्लोबल क्लाउड पर आइटम पब्लिश करने का मुख्य फंक्शन
+  Future<void> _publishProductToCloud() async {
     if (_prodNameCtrl.text.isEmpty || _priceCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill item name and price!')));
       return;
     }
 
+    setState(() => _isUploadingToCloud = true);
     var activeShop = ViziagDatabase.registeredShops[0];
 
+    var newProduct = {
+      'id': 'p_${DateTime.now().millisecondsSinceEpoch}',
+      'shopName': activeShop['shopName'],
+      'owner': activeShop['ownerName'],
+      'name': _prodNameCtrl.text,
+      'category': 'General',
+      'price': double.tryParse(_priceCtrl.text) ?? 100.0,
+      'unit': _selectedUnit,
+      'stock': int.tryParse(_stockCtrl.text) ?? 20,
+      'location': activeShop['address'],
+      'imagePath': _pickedProdImagePath ?? '',
+      'isWholesale': _isWholesaleItem,
+      'deliveryType': _isWholesaleItem ? 'Bulk Delivery' : 'Express Delivery'
+    };
+
+    try {
+      // Firebase पर डेटा पोस्ट (Save) करें ताकि कोई भी यूजर ऐप खोले तो उसे दिखे
+      final response = await http.post(
+        Uri.parse('${ViziagDatabase.firebaseRestUrl}/products.json'),
+        body: json.encode(newProduct),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          ViziagDatabase.productInventory.insert(0, newProduct);
+        });
+
+        _prodNameCtrl.clear();
+        _priceCtrl.clear();
+        _stockCtrl.clear();
+        setState(() {
+          _pickedProdImagePath = null;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('🚀 Product Published Live to Global Cloud!'), backgroundColor: Colors.green),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ Failed to save on Cloud database'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('⚠️ Error: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() => _isUploadingToCloud = false);
+    }
+  }
+
+  // क्लाउड से आइटम डिलीट करने का फंक्शन
+  Future<void> _deleteProductFromCloud(Map<String, dynamic> prod) async {
+    String? firebaseKey = prod['firebaseKey'];
+    
     setState(() {
-      ViziagDatabase.productInventory.insert(0, {
-        'id': 'p_${DateTime.now().millisecondsSinceEpoch}',
-        'shopName': activeShop['shopName'],
-        'owner': activeShop['ownerName'],
-        'name': _prodNameCtrl.text,
-        'category': 'General',
-        'price': double.tryParse(_priceCtrl.text) ?? 100.0,
-        'unit': _selectedUnit,
-        'stock': int.tryParse(_stockCtrl.text) ?? 20,
-        'location': activeShop['address'],
-        'imagePath': _pickedProdImagePath ?? '',
-        'isWholesale': _isWholesaleItem,
-        'deliveryType': _isWholesaleItem ? 'Bulk Delivery' : 'Express Delivery'
-      });
+      ViziagDatabase.productInventory.remove(prod);
     });
 
-    _prodNameCtrl.clear();
-    _priceCtrl.clear();
-    _stockCtrl.clear();
-    setState(() {
-      _pickedProdImagePath = null;
-    });
+    if (firebaseKey != null && firebaseKey.isNotEmpty) {
+      try {
+        await http.delete(
+          Uri.parse('${ViziagDatabase.firebaseRestUrl}/products/$firebaseKey.json'),
+        );
+      } catch (e) {
+        debugPrint("Delete cloud error: $e");
+      }
+    }
 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Product Published Live Successfully!')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🗑️ Deleted ${prod['name']}')));
   }
 
   @override
@@ -568,7 +665,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
           ),
         ),
         const SizedBox(height: 15),
-        const Text('📦 Add Item to Shop (Gallery Photo)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        const Text('📦 Add Item to Global Cloud (Visible to All Users)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         TextField(controller: _prodNameCtrl, decoration: const InputDecoration(labelText: 'Item Name', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
@@ -609,29 +706,27 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
           activeColor: Colors.purple,
           onChanged: (val) => setState(() => _isWholesaleItem = val ?? false),
         ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
-          onPressed: _publishProduct,
-          child: const Text('Publish Item Live 🚀'),
-        ),
+        const SizedBox(height: 8),
+        _isUploadingToCloud
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF5722)))
+            : ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
+                onPressed: _publishProductToCloud,
+                child: const Text('Publish Item Live to Cloud 🚀'),
+              ),
         const Divider(height: 25),
         const Text('📋 Manage / Delete Items', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         ...myProducts.map((prod) => Card(
           child: ListTile(
             leading: prod['imagePath'] != null && prod['imagePath'].isNotEmpty
-                ? Image.file(File(prod['imagePath']), width: 40, height: 40, fit: BoxFit.cover)
+                ? Image.file(File(prod['imagePath']), width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.image))
                 : const Icon(Icons.image, size: 40),
             title: Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             subtitle: Text('₹${prod['price']} / ${prod['unit']} • Stock: ${prod['stock']}', style: const TextStyle(fontSize: 11)),
             trailing: IconButton(
               icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-              onPressed: () {
-                setState(() {
-                  ViziagDatabase.productInventory.remove(prod);
-                });
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🗑️ Deleted ${prod['name']}')));
-              },
+              onPressed: () => _deleteProductFromCloud(prod),
             ),
           ),
         )),
@@ -667,7 +762,6 @@ class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
 
   void _verifyOtpAndSaveAddress() {
     if (_otpCtrl.text.trim() != "1234") {
-      // FIX: backgroundColor सही जगह (SnackBar के अंदर) सेट किया गया है और const हटाया गया है
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('❌ Invalid OTP! Enter 1234'),
@@ -765,8 +859,7 @@ class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
 // TAB 4: SETTINGS
 // ==========================================
 class SettingsConfigView extends StatefulWidget {
-  const SettingsConfigView(
-      {super.key});
+  const SettingsConfigView({super.key});
 
   @override
   State<SettingsConfigView> createState() => _SettingsConfigViewState();
