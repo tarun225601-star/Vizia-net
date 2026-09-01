@@ -14,362 +14,489 @@ class ViziagMartApp extends StatelessWidget {
       title: 'Viziag Mart',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.deepOrange,
+        primaryColor: const Color(0xFFFF5722),
         scaffoldBackgroundColor: const Color(0xFFF8F9FA),
+        fontFamily: 'sans-serif',
       ),
-      home: const RoleSelectionScreen(),
+      home: const ViziagHomePortal(),
     );
   }
 }
 
-// Global Mock Database & Config Storage
-class AppDatabase {
-  static String firebaseDatabaseUrl = "https://viziag-mart-default-rtdb.firebaseio.com/"; // Default fallback
-
-  static List<Map<String, dynamic>> shops = [
-    {
-      'id': 'shop_1',
-      'name': 'Tarun Fruit Shop',
-      'owner': 'Tarun Kumar',
-      'phone': '9971968060',
-      'location': 'Sector 15a Faridabad',
-      'isApproved': true,
-      'isBanned': false,
-    }
-  ];
-
+// Global App State & Database Memory
+class AppMemory {
+  static String firebaseDatabaseUrl = "https://viziag-mart-default-rtdb.firebaseio.com/";
+  
   static List<Map<String, dynamic>> products = [
     {
-      'shopId': 'shop_1',
       'shopName': 'Tarun fruit shop',
-      'name': '20L Water Jar (10 Min Delivery)',
-      'price': 40.0,
-      'unit': 'Jar',
-      'location': 'Sector 15a Faridabad',
+      'name': 'Apple',
+      'price': 100.0,
+      'unit': 'KG',
+      'location': 'Sector 15a ajronda sabji mandi faridabad',
+      'inStock': true,
+    },
+    {
+      'shopName': 'Tarun fruit shop',
+      'name': 'Banana',
+      'price': 70.0,
+      'unit': 'Piece',
+      'location': 'Sector 15a ajronda sabji mandi faridabad',
+      'inStock': true,
+    },
+    {
+      'shopName': 'Tarun fruit shop',
+      'name': 'Roya gala apple',
+      'price': 300.0,
+      'unit': 'KG',
+      'location': 'Sector 15a ajronda sabji mandi faridabad',
       'inStock': true,
     },
   ];
+
+  static List<Map<String, dynamic>> shops = [
+    {
+      'name': 'Tarun fruit shop',
+      'owner': 'Tarun kumar',
+      'phone': '9971968060',
+      'isApproved': true, // True = Live, False = Locked by Admin Gatekeeper
+      'isBanned': false,
+    }
+  ];
 }
 
-// 1. Role Selection Screen
-class RoleSelectionScreen extends StatelessWidget {
-  const RoleSelectionScreen({super.key});
+// Main Hub combining Header Navigation just like your HTML screenshot
+class ViziagHomePortal extends StatefulWidget {
+  const ViziagHomePortal({super.key});
+
+  @override
+  State<ViziagHomePortal> createState() => _ViziagHomePortalState();
+}
+
+class _ViziagHomePortalState extends State<ViziagHomePortal> {
+  int _currentIndex = 0; // 0: Marketplace, 1: Vendor Portal, 2: Admin Panel
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Viziag Mart - HyperLocal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.black87,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
-            tooltip: 'Firebase & App Settings',
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const AppSettingsScreen()));
-            },
-          )
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(65),
+        child: AppBar(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: Row(
+            children: [
+              const Text(
+                'Viziag\nMart',
+                style: TextStyle(color: Color(0xFFFF5722), fontWeight: FontWeight.bold, fontSize: 16, height: 1.1),
+              ),
+              const Spacer(),
+              // Top Navigation Buttons just like your screenshot header
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _currentIndex == 0 ? const Color(0xFFFF5722) : Colors.grey.shade800,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  elevation: 0,
+                ),
+                onPressed: () => setState(() => _currentIndex = 0),
+                icon: const Icon(Icons.home, size: 16),
+                label: const Text('Marketplace', style: TextStyle(fontSize: 12)),
+              ),
+              const SizedBox(width: 6),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _currentIndex == 1 ? const Color(0xFFFF5722) : Colors.grey.shade800,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  elevation: 0,
+                ),
+                onPressed: () => setState(() => _currentIndex = 1),
+                icon: const Icon(Icons.store, size: 16),
+                label: const Text('Vendor Portal', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+      ),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: const [
+          MarketplaceTabView(),
+          VendorPortalTabView(),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      // Bottom Bar with Settings Shortcut
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Colors.white,
+        selectedItemColor: const Color(0xFFFF5722),
+        currentIndex: 0,
+        onTap: (index) {
+          if (index == 1) {
+            Navigator.push(context, MaterialPageRoute(builder: (c) => const FirebaseSettingsScreen()));
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Shop Hub'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Firebase Config'),
+        ],
+      ),
+    );
+  }
+}
+
+// 1. MARKETPLACE TAB VIEW (Exact replica of your Buyer UI Screenshot)
+class MarketplaceTabView extends StatefulWidget {
+  const MarketplaceTabView({super.key});
+
+  @override
+  State<MarketplaceTabView> createState() => _MarketplaceTabViewState();
+}
+
+class _MarketplaceTabViewState extends State<MarketplaceTabView> {
+  String buyerName = "Tarun kumar";
+  String buyerPhone = "9971968060";
+  bool isVerifiedBuyer = true;
+
+  void _openBuyerLoginModal() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final nameCtrl = TextEditingController(text: buyerName);
+        final phoneCtrl = TextEditingController(text: buyerPhone);
+        return AlertDialog(
+          title: const Text('👤 Buyer Details & Login'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Mobile Number (10 Digits)', border: OutlineInputBorder())),
+              const SizedBox(height: 10),
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Your Name', border: OutlineInputBorder())),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
+              onPressed: () {
+                setState(() {
+                  buyerName = nameCtrl.text;
+                  buyerPhone = phoneCtrl.text;
+                  isVerifiedBuyer = true;
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Save & Continue'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Top Banner like your screenshot: "Verified Buyer: Tarun kumar (Logout)"
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          color: Colors.amber.shade50,
+          child: Row(
+            children: [
+              const Icon(Icons.local_fire_department, color: Colors.deepOrange),
+              const SizedBox(width: 8),
+              const Text('Local Hyper-Local Market', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Spacer(),
+              GestureDetector(
+                onTap: _openBuyerLoginModal,
+                child: Text(
+                  isVerifiedBuyer ? '✅ Verified Buyer: $buyerName' : 'Login / Register',
+                  style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Product List Grid/Cards
+        Expanded(
+          child: ListView.builder(
+            itemCount: AppMemory.products.length,
+            itemBuilder: (context, index) {
+              var p = AppMemory.products[index];
+              return Card(
+                margin: const EdgeInsets.all(10),
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.fastfood, size: 40, color: Colors.deepOrange),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(4)),
+                              child: Text(p['shopName'], style: TextStyle(color: Colors.blue.shade800, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(p['name'], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            Text('₹${p['price']} (${p['unit']})', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 15)),
+                            const Text('🚚 Home Delivery Available', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                            Text('📍 ${p['location']}', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE53935), foregroundColor: Colors.white).wrap(
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE53935), foregroundColor: Colors.white),
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Order placed for ${p['name']}!')));
+                                  },
+                                  child: const Text('🛒 Add to Cart'),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// 2. VENDOR PORTAL TAB VIEW (Exact replica of your Vendor Form & Product Upload Screenshot)
+class VendorPortalTabView extends StatefulWidget {
+  const VendorPortalTabView({super.key});
+
+  @override
+  State<VendorPortalTabView> createState() => _VendorPortalTabViewState();
+}
+
+class _VendorPortalTabViewState extends State<VendorPortalTabView> {
+  final nameCtrl = TextEditingController();
+  final priceCtrl = TextEditingController();
+  String selectedUnit = 'Per KG';
+  String selectedGst = '0% GST (Tax Free)';
+  String selectedDelivery = 'Home Delivery Available';
+
+  void _publishProduct() {
+    if (nameCtrl.text.isEmpty || priceCtrl.text.isEmpty) return;
+    setState(() {
+      AppMemory.products.add({
+        'shopName': 'Tarun fruit shop',
+        'name': nameCtrl.text,
+        'price': double.parse(priceCtrl.text),
+        'unit': selectedUnit,
+        'location': 'Sector 15a ajronda sabji mandi faridabad',
+        'inStock': true,
+      });
+    });
+    nameCtrl.clear();
+    priceCtrl.clear();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Product Published Live Successfully! 🚀')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Vendor Header
+        Row(
           children: [
-            const Icon(Icons.storefront, size: 80, color: Colors.deepOrange),
-            const SizedBox(height: 20),
-            const Text(
-              'Welcome to Viziag Mart',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Tarun', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
+                Text('Mobile: 9971968060', style: TextStyle(color: Colors.grey)),
+              ],
             ),
-            const SizedBox(height: 10),
-            const Text(
-              'Faridabad, Delhi & Gurgaon Secure Marketplace',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 40),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white, padding: const EdgeInsets.all(15)),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const BuyerMarketplaceScreen())),
-              icon: const Icon(Icons.shopping_bag),
-              label: const Text('I am a Buyer (Marketplace)', style: TextStyle(fontSize: 16)),
-            ),
-            const SizedBox(height: 15),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, padding: const EdgeInsets.all(15)),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const VendorLoginScreen())),
-              icon: const Icon(Icons.store),
-              label: const Text('Vendor Portal (Shop Login)', style: TextStyle(fontSize: 16)),
-            ),
-            const SizedBox(height: 15),
+            const Spacer(),
             OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(padding: const EdgeInsets.all(15), side: const BorderSide(color: Colors.deepOrange)),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminPanelScreen())),
-              icon: const Icon(Icons.admin_panel_settings, color: Colors.deepOrange),
-              label: const Text('Master Admin Panel (Gatekeeper)', style: TextStyle(color: Colors.black, fontSize: 15)),
+              onPressed: () {
+                // Master Admin Panel Shortcut for testing gatekeeper
+                Navigator.push(context, MaterialPageRoute(builder: (c) => const MasterAdminGatekeeperScreen()));
+              },
+              icon: const Icon(Icons.admin_panel_settings, size: 16),
+              label: const Text('Admin Gatekeeper'),
             ),
           ],
         ),
+        const Divider(height: 30),
+        const Text('📦 Add / Manage Product Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        
+        // Product Photo Field
+        InputDecorator(
+          decoration: const InputDecoration(labelText: 'Product Photo', border: OutlineInputBorder()),
+          child: Row(
+            children: [
+              ElevatedButton(onPressed: () {}, child: const Text('Choose File')),
+              const SizedBox(width: 10),
+              const Text('No file chosen', style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        
+        TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name (e.g. Samosa / Apple)', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        
+        DropdownButtonFormField<String>(
+          value: selectedUnit,
+          decoration: const InputDecoration(labelText: 'Pricing Type (Rate Type)', border: OutlineInputBorder()),
+          items: ['Per Piece', 'Per KG', 'Per Jar'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          onChanged: (val) => setState(() => selectedUnit = val!),
+        ),
+        const SizedBox(height: 12),
+        
+        TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price (₹)', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        
+        DropdownButtonFormField<String>(
+          value: selectedGst,
+          decoration: const InputDecoration(labelText: 'GST Rate (%)', border: OutlineInputBorder()),
+          items: ['0% GST (Tax Free)', '5% GST', '12% GST'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          onChanged: (val) => setState(() => selectedGst = val!),
+        ),
+        const SizedBox(height: 12),
+
+        DropdownButtonFormField<String>(
+          value: selectedDelivery,
+          decoration: const InputDecoration(labelText: 'Delivery Option', border: OutlineInputBorder()),
+          items: ['Home Delivery Available', 'Pickup Only', '10 Min Express'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          onChanged: (val) => setState(() => selectedDelivery = val!),
+        ),
+        const SizedBox(height: 15),
+
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white, padding: const EdgeInsets.all(15)),
+          onPressed: _publishProduct,
+          child: const Text('Publish Product Live 🚀', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(height: 25),
+        const Text('📋 Your Uploaded Items (Compact View)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+
+        // List of uploaded items
+        ...AppMemory.products.map((p) => Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: ListTile(
+            title: Text(p['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('₹${p['price']} (${p['unit']})\nStatus: In Stock ✅'),
+            isThreeLine: true,
+            trailing: IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () => setState(() => AppMemory.products.remove(p)),
+            ),
+          ),
+        )),
+      ],
+    );
+  }
+}
+
+// 3. MASTER ADMIN GATEKEEPER SCREEN (Where company controls shop activation & instant ban)
+class MasterAdminGatekeeperScreen extends StatefulWidget {
+  const MasterAdminGatekeeperScreen({super.key});
+
+  @override
+  State<MasterAdminGatekeeperScreen> createState() => _MasterAdminGatekeeperScreenState();
+}
+
+class _MasterAdminGatekeeperScreenState extends State<MasterAdminGatekeeperScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Master Admin Gatekeeper Panel'), backgroundColor: Colors.black),
+      body: ListView.builder(
+        itemCount: AppMemory.shops.length,
+        itemBuilder: (context, index) {
+          var s = AppMemory.shops[index];
+          return Card(
+            margin: const EdgeInsets.all(10),
+            child: ListTile(
+              title: Text(s['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('Owner: ${s['owner']} • Phone: ${s['phone']}\nApproval Status: ${s['isApproved'] ? 'Active ✅' : 'Locked 🔒'}'),
+              isThreeLine: true,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: s['isApproved'] ? Colors.red : Colors.green, foregroundColor: Colors.white),
+                    onPressed: () {
+                      setState(() {
+                        s['isApproved'] = !s['isApproved'];
+                      });
+                    },
+                    child: Text(s['isApproved'] ? 'Revoke' : 'Approve Shop'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 }
 
-// 2. App Settings Screen (To dynamic input Firebase URL)
-class AppSettingsScreen extends StatefulWidget {
-  const AppSettingsScreen({super.key});
+// 4. Firebase Config Screen
+class FirebaseSettingsScreen extends StatefulWidget {
+  const FirebaseSettingsScreen({super.key});
 
   @override
-  State<AppSettingsScreen> createState() => _AppSettingsScreenState();
+  State<FirebaseSettingsScreen> createState() => _FirebaseSettingsScreenState();
 }
 
-class _AppSettingsScreenState extends State<AppSettingsScreen> {
-  final _urlController = TextEditingController(text: AppDatabase.firebaseDatabaseUrl);
+class _FirebaseSettingsScreenState extends State<FirebaseSettingsScreen> {
+  final urlCtrl = TextEditingController(text: AppMemory.firebaseDatabaseUrl);
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedUrl();
-  }
-
-  // Load saved Firebase URL from phone memory
-  _loadSavedUrl() async {
+  _save() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _urlController.text = prefs.getString('firebase_url') ?? AppDatabase.firebaseDatabaseUrl;
-    });
-  }
-
-  // Save Firebase URL dynamically
-  _saveUrl() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('firebase_url', _urlController.text.trim());
-    AppDatabase.firebaseDatabaseUrl = _urlController.text.trim();
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Firebase URL Updated & Saved Successfully! 🚀')),
-    );
+    await prefs.setString('fb_url', urlCtrl.text);
+    AppMemory.firebaseDatabaseUrl = urlCtrl.text;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Firebase URL Saved!')));
     Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Firebase & Backend Settings'), backgroundColor: Colors.black87),
+      appBar: AppBar(title: const Text('Configure Backend URL'), backgroundColor: Colors.black87),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Configure Backend Database',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Enter your Firebase Realtime Database or Firestore REST endpoint URL below so the app can sync data dynamically without hard-coding.',
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _urlController,
-              decoration: const InputDecoration(
-                labelText: 'Firebase Database URL',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.link),
-              ),
-            ),
+            TextField(controller: urlCtrl, decoration: const InputDecoration(labelText: 'Firebase Realtime DB URL', border: OutlineInputBorder())),
             const SizedBox(height: 20),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)),
-              onPressed: _saveUrl,
-              child: const Text('Save & Apply Configuration', style: TextStyle(fontSize: 16)),
+              onPressed: _save,
+              child: const Text('Save Configuration'),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// 3. Buyer Marketplace Screen
-class BuyerMarketplaceScreen extends StatelessWidget {
-  const BuyerMarketplaceScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Viziag Mart [Marketplace]'), backgroundColor: Colors.deepOrange),
-      body: ListView.builder(
-        itemCount: AppDatabase.products.length,
-        itemBuilder: (context, index) {
-          final product = AppDatabase.products[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: ListTile(
-              leading: const CircleAvatar(backgroundColor: Colors.deepOrange, child: Icon(Icons.water_drop, color: Colors.white)),
-              title: Text(product['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('${product['shopName']} • ${product['location']}\nPrice: ₹${product['price']}'),
-              isThreeLine: true,
-              trailing: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Order Placed! 10-minute delivery assigned.')),
-                  );
-                },
-                child: const Text('Buy Now'),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// 4. Vendor Login Screen (With Approval Lock Check)
-class VendorLoginScreen extends StatefulWidget {
-  const VendorLoginScreen({super.key});
-
-  @override
-  State<VendorLoginScreen> createState() => _VendorLoginScreenState();
-}
-
-class _VendorLoginScreenState extends State<VendorLoginScreen> {
-  final _phoneController = TextEditingController(text: '9971968060');
-  final _shopNameController = TextEditingController(text: 'Tarun Fruit Shop');
-
-  void _loginVendor(BuildContext context) {
-    String phone = _phoneController.text.trim();
-    String shopName = _shopNameController.text.trim();
-
-    var existingShop = AppDatabase.shops.firstWhere(
-      (s) => s['phone'] == phone,
-      orElse: () => {},
-    );
-
-    if (existingShop.isEmpty) {
-      existingShop = {
-        'id': 'shop_${DateTime.now().millisecondsSinceEpoch}',
-        'name': shopName,
-        'phone': phone,
-        'isApproved': false, // Locked until company approves
-        'isBanned': false,
-      };
-      AppDatabase.shops.add(existingShop);
-    }
-
-    if (existingShop['isBanned'] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account Banned by Admin!')));
-      return;
-    }
-
-    if (existingShop['isApproved'] == false) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => PendingScreen(shopName: shopName)));
-    } else {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => VendorDashboard(shopName: shopName)));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Vendor Portal Login'), backgroundColor: Colors.black87),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(controller: _phoneController, decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder())),
-            const SizedBox(height: 15),
-            TextField(controller: _shopNameController, decoration: const InputDecoration(labelText: 'Shop Name', border: OutlineInputBorder())),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)),
-              onPressed: () => _loginVendor(context),
-              child: const Text('Login to Shop'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// 5. Pending Approval Screen
-class PendingScreen extends StatelessWidget {
-  final String shopName;
-  const PendingScreen({super.key, required this.shopName});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(shopName), backgroundColor: Colors.red),
-      body: const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20.0),
-          child: Text(
-            '🔒 Verification Pending!\n\nYour shop is in draft mode. Company admin physical verification is required to unlock.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// 6. Vendor Dashboard
-class VendorDashboard extends StatelessWidget {
-  final String shopName;
-  const VendorDashboard({super.key, required this.shopName});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('$shopName [Active]'), backgroundColor: Colors.black),
-      body: const Center(child: Text('Welcome to your active vendor dashboard!')),
-    );
-  }
-}
-
-// 7. Master Admin Panel
-class AdminPanelScreen extends StatefulWidget {
-  const AdminPanelScreen({super.key});
-
-  @override
-  State<AdminPanelScreen> createState() => _AdminPanelScreenState();
-}
-
-class _AdminPanelScreenState extends State<AdminPanelScreen> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Master Admin Panel'), backgroundColor: Colors.red.shade900),
-      body: ListView.builder(
-        itemCount: AppDatabase.shops.length,
-        itemBuilder: (context, index) {
-          var shop = AppDatabase.shops[index];
-          return Card(
-            child: ListTile(
-              title: Text(shop['name']),
-              subtitle: Text('Status: ${shop['isApproved'] ? 'Active ✅' : 'Pending 🔒'}'),
-              trailing: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: shop['isApproved'] ? Colors.grey : Colors.green),
-                onPressed: () {
-                  setState(() {
-                    shop['isApproved'] = !shop['isApproved'];
-                  });
-                },
-                child: Text(shop['isApproved'] ? 'Revoke' : 'Approve'),
-              ),
-            ),
-          );
-        },
       ),
     );
   }
