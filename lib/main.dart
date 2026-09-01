@@ -181,7 +181,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
               const Spacer(),
               _buildHeaderNavButton('Market', Icons.storefront, 0),
               const SizedBox(width: 4),
-              _buildHeaderNavButton('Vendor', Icons.edit_shop, 1),
+              _buildHeaderNavButton('Vendor', Icons.edit.store, 1),
               const SizedBox(width: 4),
               _buildHeaderNavButton('Admin', Icons.security, 2),
             ],
