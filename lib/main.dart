@@ -1,4 +1,4 @@
-                import 'dart:io';
+import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -148,7 +148,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
                   const Spacer(),
                   GestureDetector(
                     onTap: () => setState(() => _selectedTabIndex = 2),
-                    child: const Text('(Edit Profile)', style: TextStyle(color: Colors.orangeAccent, fontSize: 10)),
+                    child: const Text('(Edit Profile & Address)', style: TextStyle(color: Colors.orangeAccent, fontSize: 10)),
                   ),
                 ],
               ),
@@ -199,7 +199,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
 }
 
 // ==========================================
-// TAB 1: 3-GRID MARKETPLACE (CLOUD SYNCED)
+// TAB 1: 3-GRID MARKETPLACE (CLOUD SYNCED + RETAIL/WHOLESALE TOGGLE)
 // ==========================================
 class MarketplaceBuyerView extends StatefulWidget {
   const MarketplaceBuyerView({super.key});
@@ -299,18 +299,34 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 
     return Column(
       children: [
+        // Top Bar with Retail/Wholesale Toggle and Cloud Sync Button
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           color: Colors.white,
           child: Row(
             children: [
-              const Text('🔥', style: TextStyle(fontSize: 14)),
-              const SizedBox(width: 4),
-              const Text('Cloud Synchronized Hyper-Local Market', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              ToggleButtons(
+                isSelected: [!isWholesaleMarket, isWholesaleMarket],
+                onPressed: (index) {
+                  setState(() {
+                    isWholesaleMarket = index == 1;
+                  });
+                },
+                borderRadius: BorderRadius.circular(6),
+                selectedColor: Colors.white,
+                fillColor: const Color(0xFFFF5722),
+                color: Colors.black,
+                constraints: const BoxConstraints(minHeight: 28, minWidth: 70),
+                children: const [
+                  Text('Retail', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  Text('Wholesale', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              ),
               const Spacer(),
-              TextButton(
+              TextButton.icon(
                 onPressed: _fetchProductsFromCloud,
-                child: const Text('Sync Cloud', style: TextStyle(fontSize: 11)),
+                icon: const Icon(Icons.sync, size: 14),
+                label: const Text('Sync', style: TextStyle(fontSize: 11)),
               ),
             ],
           ),
@@ -318,7 +334,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
         if (_isLoadingCloud)
           const LinearProgressIndicator(color: Color(0xFFFF5722)),
 
-        // 3-Grid View Layout (3 Columns) with ONLY Add to Cart button (No direct WhatsApp button here)
+        // 3-Grid View Layout (3 Columns)
         Expanded(
           child: filteredProducts.isEmpty
               ? const Center(child: Text('No products on cloud yet. Add items from Vendor Portal!'))
@@ -420,7 +436,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                                             foregroundColor: Colors.white,
                                             padding: EdgeInsets.zero,
                                           ),
-                                          onPressed: () => _addToCard(prod, selectedQty),
+                                          onPressed: () => _addToCart(prod, selectedQty),
                                           child: const Text('Add to Cart', style: TextStyle(fontSize: 7, fontWeight: FontWeight.bold)),
                                         ),
                                       ),
@@ -524,6 +540,8 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
 
   @override
   Widget build(BuildContext context) {
+    var activeShop = ViziagDatabase.registeredShops[0];
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -549,6 +567,23 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         const SizedBox(height: 8),
         TextField(controller: _stockCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Stock Quantity', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
+        Row(
+          children: [
+            const Text('Item Type: '),
+            ChoiceChip(
+              label: const Text('Retail'),
+              selected: !_isWholesaleItem,
+              onSelected: (val) => setState(() => _isWholesaleItem = false),
+            ),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Text('Wholesale'),
+              selected: _isWholesaleItem,
+              onSelected: (val) => setState(() => _isWholesaleItem = true),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
         ElevatedButton.icon(
           onPressed: _pickImage,
           icon: const Icon(Icons.add_a_photo, size: 14),
@@ -562,6 +597,9 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
                 onPressed: _publishProductToCloud,
                 child: const Text('Publish & Save Permanently to Cloud 🚀'),
               ),
+        const Divider(height: 30),
+        Text('Active Shop: ${activeShop['shopName']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        Text('Owner: ${activeShop['ownerName']} | Phone: ${activeShop['phone']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
       ],
     );
   }
