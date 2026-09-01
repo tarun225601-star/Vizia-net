@@ -1,4 +1,4 @@
-import 'dart:io';
+                import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -164,15 +164,15 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
         type: BottomNavigationBarType.fixed,
         onTap: (index) {
           if (index == 3) {
-            setState(() => _selectedTabIndex = 4); 
+            setState(() => _selectedTabIndex = 3); // Cart Tab index
           } else {
             setState(() => _selectedTabIndex = index);
           }
         },
         items: [
-          const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: ''),
-          const BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: ''),
-          const BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: ''),
+          const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Market'),
+          const BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: 'Vendor'),
+          const BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
           BottomNavigationBarItem(
             icon: Stack(
               children: [
@@ -190,7 +190,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
                   ),
               ],
             ),
-            label: '',
+            label: 'Cart',
           ),
         ],
       ),
@@ -273,7 +273,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 
   Widget _buildCloudImageView(String? path, double height, double width, IconData fallbackIcon) {
     if (path != null && path.isNotEmpty) {
-      // अगर इमेज बेस64 स्ट्रिंग या ऑनलाइन यूआरएल है तो ऐप रीइंस्टॉल होने पर भी क्लाउड से लोड होगी
       if (path.startsWith('http')) {
         return Image.network(path, height: height, width: width, fit: BoxFit.cover,
             errorBuilder: (context, error, stackTrace) => Container(height: height, width: width, color: Colors.grey.shade300, child: Icon(fallbackIcon, size: height * 0.4)));
@@ -319,14 +318,14 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
         if (_isLoadingCloud)
           const LinearProgressIndicator(color: Color(0xFFFF5722)),
 
-        // 3-Grid View Layout (जैसा आपने स्क्रीनशॉट में माँगा है)
+        // 3-Grid View Layout (3 Columns) with ONLY Add to Cart button (No direct WhatsApp button here)
         Expanded(
           child: filteredProducts.isEmpty
               ? const Center(child: Text('No products on cloud yet. Add items from Vendor Portal!'))
               : GridView.builder(
                   padding: const EdgeInsets.all(6),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3, // तीन ग्रेड लाइन (3 Columns)
+                    crossAxisCount: 3, 
                     childAspectRatio: 0.52,
                     crossAxisSpacing: 6,
                     mainAxisSpacing: 6,
@@ -466,7 +465,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
   Future<void> _pickImage() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
     if (image != null) {
-      // इमेज को Base64 में कन्वर्ट करेंगे ताकि ऐप डिलीट होने या रीइंस्टॉल होने पर भी Firebase पर सुरक्षित रहे
       final bytes = await image.readAsBytes();
       String base64Image = "data:image/jpeg;base64,${base64Encode(bytes)}";
       setState(() => _pickedProdImagePath = base64Image);
@@ -619,7 +617,7 @@ class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
 }
 
 // ==========================================
-// TAB 4: WHATSAPP CHECKOUT CART VIEW
+// TAB 4: WHATSAPP CHECKOUT & BILLING CART VIEW
 // ==========================================
 class CartAndWhatsAppCheckoutView extends StatefulWidget {
   const CartAndWhatsAppCheckoutView({super.key});
@@ -663,7 +661,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       padding: const EdgeInsets.all(12.0),
       child: Column(
         children: [
-          const Text('🛒 Your Shopping Cart', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text('🛒 Your Shopping Cart & Total Bill', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           Expanded(
             child: cart.isEmpty
@@ -672,26 +670,46 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                     itemCount: cart.length,
                     itemBuilder: (context, index) {
                       var item = cart[index];
-                      return ListTile(
-                        title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Qty: ${item['qty']} ${item['unit']} • ₹${item['price']} each'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => setState(() => ViziagDatabase.cartItems.removeAt(index)),
+                      double itemTotal = (item['price'] as double) * (item['qty'] as double);
+                      return Card(
+                        child: ListTile(
+                          title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('Qty: ${item['qty']} ${item['unit']} • ₹${item['price']} each\nTotal: ₹${itemTotal.toStringAsFixed(0)}'),
+                          isThreeLine: true,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => setState(() => ViziagDatabase.cartItems.removeAt(index)),
+                          ),
                         ),
                       );
                     },
                   ),
           ),
           if (cart.isNotEmpty)
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
-                onPressed: _sendOrderToWhatsApp,
-                icon: const Icon(Icons.chat),
-                label: Text('Send Order to WhatsApp (₹${grandTotal.toStringAsFixed(0)}) 🚀', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4)]),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Grand Total:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text('₹${grandTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+                      onPressed: _sendOrderToWhatsApp,
+                      icon: const Icon(Icons.chat),
+                      label: Text('Send Order to WhatsApp (₹${grandTotal.toStringAsFixed(0)}) 🚀', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
