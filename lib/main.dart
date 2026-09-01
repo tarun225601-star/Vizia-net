@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 void main() {
   runApp(const ViziagMartEnterpriseApp());
@@ -31,27 +33,30 @@ class ViziagMartEnterpriseApp extends StatelessWidget {
 // CENTRAL DATABASE & CONFIG MODEL
 // ==========================================
 class ViziagDatabase {
-  static String firebaseRestUrl = ""; 
+  // फायरबेस यूआरएल जो आपने दिया है (परमानेंट)
+  static String firebaseRestUrl = "https://viziagmart-default-rtdb.firebaseio.com/"; 
   static String activeCityZone = "Faridabad, Delhi & Gurgaon";
-  static const String secretAdminCode = "202137"; // कंपनी का फिक्स सिक्रेट कोड
 
   // वर्तमान यूजर (कस्टमर) की जानकारी
   static String currentUserPhone = "";
   static String currentDeliveryAddress = "";
   static bool isUserLoggedIn = false;
 
-  // रजिस्टर्ड दुकानें (WhatsApp नंबर के साथ)
+  // वेंडर/शॉप रजिस्टर्ड है या नहीं
+  static bool isShopRegistered = true; 
+
+  // रजिस्टर्ड दुकानें (डिफ़ॉल्ट सैंपल डेटा)
   static List<Map<String, dynamic>> registeredShops = [
     {
       'shopId': 'shop_01',
       'shopName': 'Tarun Fruit & Vegetable Shop',
       'ownerName': 'Tarun Kumar',
-      'ownerPhoto': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde',
+      'ownerPhotoPath': '', // गैलरी पाथ के लिए
       'phone': '9971968060',
-      'whatsappNumber': '919971968060', // आर्डर देखने के लिए WhatsApp नंबर
+      'whatsappNumber': '919971968060', 
       'category': 'Sabji & Fruits',
       'address': 'Sector 15A Ajronda Sabji Mandi, Faridabad',
-      'shopBanner': 'https://images.unsplash.com/photo-1542838132-92c53300491e',
+      'shopBannerPath': '', // गैलरी पाथ के लिए
       'isOpen': true,
       'isApproved': true,
     }
@@ -69,7 +74,7 @@ class ViziagDatabase {
       'unit': 'KG',
       'stock': 50,
       'location': 'Sector 15A, Faridabad',
-      'imageUrl': 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6',
+      'imagePath': '', // गैलरी पाथ के लिए
       'isWholesale': false,
       'deliveryType': 'Express Delivery'
     },
@@ -178,15 +183,21 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
       return;
     }
 
-    // WhatsApp पर आर्डर भेजने की सुविधा
-    String whatsappMsg = "Hello ${shop['shopName']}, I want to order:\n"
-        "📦 Item: ${prod['name']}\n"
-        "💰 Price: ₹${prod['price']} / ${prod['unit']}\n"
-        "📍 Deliver To: ${ViziagDatabase.currentDeliveryAddress}\n"
-        "📞 Customer Ph: ${ViziagDatabase.currentUserPhone}";
-
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('✅ Order placed successfully! Sent to shop WhatsApp: ${shop['whatsappName'] ?? shop['shopName']}'), backgroundColor: Colors.green),
+      SnackBar(content: Text('✅ Order placed successfully! Sent to shop WhatsApp: ${shop['shopName']}'), backgroundColor: Colors.green),
+    );
+  }
+
+  // गैलरी से आई इमेज या डिफ़ॉल्ट दिखाने के लिए हेल्पर विजेट
+  Widget _buildImageView(String? path, double height, double width, IconData fallbackIcon) {
+    if (path != null && path.isNotEmpty) {
+      return Image.file(File(path), height: height, width: width, fit: BoxFit.cover);
+    }
+    return Container(
+      height: height,
+      width: width,
+      color: Colors.grey.shade300,
+      child: Icon(fallbackIcon, size: height * 0.4, color: Colors.grey.shade600),
     );
   }
 
@@ -194,7 +205,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // यूजर डिलीवरी एड्रेस बार
         Container(
           color: Colors.amber.shade100,
           padding: const EdgeInsets.all(8),
@@ -251,10 +261,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
             padding: const EdgeInsets.all(12),
             children: ViziagDatabase.registeredShops.map((shop) {
               bool shopOpen = shop['isOpen'] ?? true;
-              bool isApproved = shop['isApproved'] ?? false;
-
-              if (!isApproved) return const SizedBox.shrink();
-
               var shopProducts = ViziagDatabase.productInventory.where((p) =>
                 p['shopName'] == shop['shopName'] && p['isWholesale'] == isWholesaleMarket
               ).toList();
@@ -271,19 +277,13 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                       children: [
                         ClipRRect(
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-                          child: Image.network(
-                            shop['shopBanner'],
-                            height: 90,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (c, o, s) => Container(height: 90, color: Colors.grey),
-                          ),
+                          child: _buildImageView(shop['shopBannerPath'], 90, double.infinity, Icons.store),
                         ),
                         Container(
                           height: 90,
                           decoration: BoxDecoration(
                             borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-                            color: Colors.black.withOpacity(0.5),
+                            color: Colors.black.withOpacity(0.4),
                           ),
                         ),
                         Positioned(
@@ -309,7 +309,9 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                             children: [
                               CircleAvatar(
                                 radius: 18,
-                                backgroundImage: NetworkImage(shop['ownerPhoto']),
+                                child: ClipOval(
+                                  child: _buildImageView(shop['ownerPhotoPath'], 36, 36, Icons.person),
+                                ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -349,7 +351,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
-                                child: Image.network(prod['imageUrl'], width: 45, height: 45, fit: BoxFit.cover),
+                                child: _buildImageView(prod['imagePath'], 45, 45, Icons.fastfood),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -363,7 +365,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                               ),
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF25D366), // WhatsApp Green color for orders
+                                  backgroundColor: const Color(0xFF25D366), 
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 ),
@@ -392,7 +394,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 }
 
 // ==========================================
-// TAB 2: VENDOR REGISTRATION & WHATSAPP FORM
+// TAB 2: VENDOR DASHBOARD & ITEM PUBLISH FORM
 // ==========================================
 class ShopRegisterAndUpdateView extends StatefulWidget {
   const ShopRegisterAndUpdateView({super.key});
@@ -405,9 +407,8 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
   final TextEditingController _shopNameCtrl = TextEditingController();
   final TextEditingController _ownerNameCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
-  final TextEditingController _whatsappCtrl = TextEditingController(); // WhatsApp नंबर यहाँ डाला जाएगा
+  final TextEditingController _whatsappCtrl = TextEditingController(); 
   final TextEditingController _addressCtrl = TextEditingController();
-  final TextEditingController _secretCodeCtrl = TextEditingController();
 
   final TextEditingController _prodNameCtrl = TextEditingController();
   final TextEditingController _priceCtrl = TextEditingController();
@@ -416,44 +417,48 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
   String _selectedUnit = 'KG';
   bool _isWholesaleItem = false;
 
-  void _registerNewShopWithSecretCode() {
+  // गैलरी से फोटो पाथ होल्ड करने के लिए
+  String? _pickedOwnerPhotoPath;
+  String? _pickedShopBannerPath;
+  String? _pickedProdImagePath;
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _pickImage(String type) async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        if (type == 'owner') _pickedOwnerPhotoPath = image.path;
+        if (type == 'banner') _pickedShopBannerPath = image.path;
+        if (type == 'product') _pickedProdImagePath = image.path;
+      });
+    }
+  }
+
+  void _registerShopDirectly() {
     if (_shopNameCtrl.text.isEmpty || _whatsappCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill shop name and WhatsApp number!')));
       return;
     }
 
-    if (_secretCodeCtrl.text.trim() != ViziagDatabase.secretAdminCode) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('❌ Invalid Secret Admin Code (202137 required)!'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-
     setState(() {
-      ViziagDatabase.registeredShops.add({
+      ViziagDatabase.registeredShops.insert(0, {
         'shopId': 'shop_${DateTime.now().millisecondsSinceEpoch}',
         'shopName': _shopNameCtrl.text,
         'ownerName': _ownerNameCtrl.text,
-        'ownerPhoto': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde',
+        'ownerPhotoPath': _pickedOwnerPhotoPath ?? '',
         'phone': _phoneCtrl.text,
-        'whatsappNumber': _whatsappCtrl.text, // व्हाट्सएप सेव किया गया
+        'whatsappNumber': _whatsappCtrl.text,
         'category': 'General Store',
         'address': _addressCtrl.text,
-        'shopBanner': 'https://images.unsplash.com/photo-1542838132-92c53300491e',
+        'shopBannerPath': _pickedShopBannerPath ?? '',
         'isOpen': true,
         'isApproved': true,
       });
+      ViziagDatabase.isShopRegistered = true; 
     });
 
-    _shopNameCtrl.clear();
-    _ownerNameCtrl.clear();
-    _phoneCtrl.clear();
-    _whatsappCtrl.clear();
-    _addressCtrl.clear();
-    _secretCodeCtrl.clear();
-
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🎉 Shop Registered Successfully with WhatsApp Order Integration!'), backgroundColor: Colors.green),
+      const SnackBar(content: Text('🎉 Shop Registered Successfully!'), backgroundColor: Colors.green),
     );
   }
 
@@ -463,18 +468,20 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
       return;
     }
 
+    var activeShop = ViziagDatabase.registeredShops[0];
+
     setState(() {
       ViziagDatabase.productInventory.insert(0, {
         'id': 'p_${DateTime.now().millisecondsSinceEpoch}',
-        'shopName': ViziagDatabase.registeredShops[0]['shopName'],
-        'owner': ViziagDatabase.registeredShops[0]['ownerName'],
+        'shopName': activeShop['shopName'],
+        'owner': activeShop['ownerName'],
         'name': _prodNameCtrl.text,
-        'category': 'Fruits & Vegetables',
+        'category': 'General',
         'price': double.tryParse(_priceCtrl.text) ?? 100.0,
         'unit': _selectedUnit,
         'stock': int.tryParse(_stockCtrl.text) ?? 20,
-        'location': 'Faridabad',
-        'imageUrl': 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6',
+        'location': activeShop['address'],
+        'imagePath': _pickedProdImagePath ?? '',
         'isWholesale': _isWholesaleItem,
         'deliveryType': _isWholesaleItem ? 'Bulk Delivery' : 'Express Delivery'
       });
@@ -483,12 +490,68 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
     _prodNameCtrl.clear();
     _priceCtrl.clear();
     _stockCtrl.clear();
+    setState(() {
+      _pickedProdImagePath = null;
+    });
 
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Product Published Live Successfully!')));
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!ViziagDatabase.isShopRegistered) {
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text('🏪 Register Your Shop (One-Time)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          TextField(controller: _shopNameCtrl, decoration: const InputDecoration(labelText: 'Shop Name', border: OutlineInputBorder(), isDense: true)),
+          const SizedBox(height: 8),
+          TextField(controller: _ownerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name', border: OutlineInputBorder(), isDense: true)),
+          const SizedBox(height: 8),
+          
+          // ओनर फोटो गैलरी पिकर
+          Row(
+            children: [
+              Expanded(child: Text(_pickedOwnerPhotoPath == null ? 'Owner Photo: Not Selected' : 'Owner Photo: Selected ✅', style: const TextStyle(fontSize: 12))),
+              ElevatedButton.icon(
+                onPressed: () => _pickImage('owner'),
+                icon: const Icon(Icons.photo_library, size: 16),
+                label: const Text('Gallery se Chunein'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Calling Mobile Number', border: OutlineInputBorder(), isDense: true)),
+          const SizedBox(height: 8),
+          TextField(controller: _whatsappCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'WhatsApp Number (For Orders)', border: OutlineInputBorder(), isDense: true)),
+          const SizedBox(height: 8),
+          TextField(controller: _addressCtrl, decoration: const InputDecoration(labelText: 'Shop Address / Location', border: OutlineInputBorder(), isDense: true)),
+          const SizedBox(height: 8),
+
+          // दुकान का बैनर फोटो गैलरी पिकर
+          Row(
+            children: [
+              Expanded(child: Text(_pickedShopBannerPath == null ? 'Shop Banner: Not Selected' : 'Shop Banner: Selected ✅', style: const TextStyle(fontSize: 12))),
+              ElevatedButton.icon(
+                onPressed: () => _pickImage('banner'),
+                icon: const Icon(Icons.image, size: 16),
+                label: const Text('Gallery se Chunein'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
+            onPressed: _registerShopDirectly,
+            child: const Text('Register Shop Now'),
+          ),
+        ],
+      );
+    }
+
     var myShop = ViziagDatabase.registeredShops[0];
     bool isShopOpen = myShop['isOpen'] ?? true;
     var myProducts = ViziagDatabase.productInventory.where((p) => p['shopName'] == myShop['shopName']).toList();
@@ -513,47 +576,8 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
             },
           ),
         ),
-        const SizedBox(height: 10),
-        const Text('🏪 Register Shop & WhatsApp Orders Form', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        TextField(controller: _shopNameCtrl, decoration: const InputDecoration(labelText: 'Shop Name', border: OutlineInputBorder(), isDense: true)),
-        const SizedBox(height: 8),
-        TextField(controller: _ownerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name (Photo Included)', border: OutlineInputBorder(), isDense: true)),
-        const SizedBox(height: 8),
-        TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Calling Mobile Number', border: OutlineInputBorder(), isDense: true)),
-        const SizedBox(height: 8),
-        // यहाँ शॉप वाला अपना WhatsApp नंबर डालेगा जिस पर आर्डर दिखेंगे
-        TextField(
-          controller: _whatsappCtrl,
-          keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(
-            labelText: 'WhatsApp Number (To Receive Customer Orders)',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.phone_android, color: Colors.green),
-            isDense: true,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(controller: _addressCtrl, decoration: const InputDecoration(labelText: 'Shop Address / Location', border: OutlineInputBorder(), isDense: true)),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _secretCodeCtrl,
-          obscureText: true,
-          decoration: const InputDecoration(
-            labelText: 'Company Secret Code (202137)',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.lock, color: Color(0xFFFF5722)),
-            isDense: true,
-          ),
-        ),
-        const SizedBox(height: 10),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
-          onPressed: _registerNewShopWithSecretCode,
-          child: const Text('Verify Code & Register Shop'),
-        ),
-        const Divider(height: 25),
-        const Text('📦 Add Item to Shop', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 15),
+        const Text('📦 Add Item to Shop (Gallery Photo)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         TextField(controller: _prodNameCtrl, decoration: const InputDecoration(labelText: 'Item Name', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
@@ -573,6 +597,22 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         ),
         const SizedBox(height: 8),
         TextField(controller: _stockCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Stock Quantity', border: OutlineInputBorder(), isDense: true)),
+        const SizedBox(height: 8),
+
+        // आइटम फोटो के लिए गैलरी पिकर बटन
+        Row(
+          children: [
+            Expanded(child: Text(_pickedProdImagePath == null ? 'Item Photo: Not Selected' : 'Item Photo: Selected ✅', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700, foregroundColor: Colors.white),
+              onPressed: () => _pickImage('product'),
+              icon: const Icon(Icons.add_a_photo, size: 16),
+              label: const Text('Gallery se Photo Chunein'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
         CheckboxListTile(
           title: const Text('List as Wholesale Item', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           value: _isWholesaleItem,
@@ -589,8 +629,11 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         const SizedBox(height: 8),
         ...myProducts.map((prod) => Card(
           child: ListTile(
+            leading: prod['imagePath'] != null && prod['imagePath'].isNotEmpty
+                ? Image.file(File(prod['imagePath']), width: 40, height: 40, fit: BoxFit.cover)
+                : const Icon(Icons.image, size: 40),
             title: Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            subtitle: Text('₹${prod['price']} / ${prod['unit']}', style: const TextStyle(fontSize: 11)),
+            subtitle: Text('₹${prod['price']} / ${prod['unit']} • Stock: ${prod['stock']}', style: const TextStyle(fontSize: 11)),
             trailing: IconButton(
               icon: const Icon(Icons.delete, color: Colors.red, size: 20),
               onPressed: () {
@@ -634,7 +677,7 @@ class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
 
   void _verifyOtpAndSaveAddress() {
     if (_otpCtrl.text.trim() != "1234") {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Invalid OTP! Enter 1234'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Invalid OTP! Enter 1234', backgroundColor: Colors.red)));
       return;
     }
     if (_addressCtrl.text.isEmpty) {
@@ -739,22 +782,12 @@ class _SettingsConfigViewState extends State<SettingsConfigView> {
           TextField(
             controller: _firebaseUrlCtrl,
             decoration: const InputDecoration(
-              labelText: 'Firebase Database URL',
+              labelText: 'Firebase Database URL (Hardcoded Active)',
               border: OutlineInputBorder(),
-              hintText: 'https://your-app-default-rtdb.firebaseio.com/',
             ),
           ),
           const SizedBox(height: 15),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
-            onPressed: () {
-              setState(() {
-                ViziagDatabase.firebaseRestUrl = _firebaseUrlCtrl.text.trim();
-              });
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Settings Saved!')));
-            },
-            child: const Text('Save Settings'),
-          ),
+          const Text('Note: Firebase URL is securely configured in the app backend.', style: TextStyle(fontSize: 12, color: Colors.grey)),
         ],
       ),
     );
