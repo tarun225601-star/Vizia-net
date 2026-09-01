@@ -49,11 +49,11 @@ class ViziagDatabase {
       'ownerName': 'Tarun Kumar',
       'ownerPhotoPath': '', 
       'phone': '9971968060',
-      'whatsappNumber': '919971968060', // दुकान का व्हाट्सएप नंबर
+      'whatsappNumber': '919971968060',
       'category': 'Sabji & Fruits',
       'address': 'Sector 15A Ajronda Sabji Mandi, Faridabad',
       'shopBannerPath': '', 
-      'bio': 'रोंदा की सबसे विश्वसनीय दुकान। ताज़ा फल और सब्जियां उचित दामों पर उपलब्ध।',
+      'bio': 'अजोंदा की सबसे विश्वसनीय दुकान। ताज़ा फल और सब्जियां उचित दामों पर उपलब्ध।',
       'isOpen': true,
     }
   ];
@@ -77,7 +77,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
 
   final List<Widget> _tabScreens = [
     const MarketplaceBuyerView(),
-    const ShopRegisterAndUpdateView(),
+    const VendorAuthAndPortalView(), // 🔐 यहाँ डबल-पिन लॉगिन और वेंडर पोर्टल जोड़ दिया गया है
     const UserLoginAndAddressView(),
     const CartAndWhatsAppCheckoutView(), 
     const SettingsConfigView(),
@@ -121,8 +121,8 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 onPressed: () => setState(() => _selectedTabIndex = 1),
-                icon: const Icon(Icons.store, size: 12),
-                label: const Text('Vendor Portal', style: TextStyle(fontSize: 10)),
+                icon: const Icon(Icons.lock_outline, size: 12),
+                label: const Text('Vendor Login', style: TextStyle(fontSize: 10)),
               ),
             ],
           ),
@@ -172,7 +172,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
         },
         items: [
           const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Market'),
-          const BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: 'Vendor'),
+          const BottomNavigationBarItem(icon: Icon(Icons.lock_person_outlined), label: 'Vendor'),
           const BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
           BottomNavigationBarItem(
             icon: Stack(
@@ -518,6 +518,204 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 }
 
 // ==========================================
+// 🔐 VENDOR LOGIN, DOUBLE PIN & PORTAL WRAPPER
+// ==========================================
+class VendorAuthAndPortalView extends StatefulWidget {
+  const VendorAuthAndPortalView({super.key});
+
+  @override
+  State<VendorAuthAndPortalView> createState() => _VendorAuthAndPortalViewState();
+}
+
+class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
+  bool _isLoggedIn = false; // चेक करेगा कि वेंडर ने पिन डालकर लॉगइन किया है या नहीं
+  final TextEditingController _loginPhoneCtrl = TextEditingController();
+  final TextEditingController _loginPinCtrl = TextEditingController();
+
+  final TextEditingController _regPhoneCtrl = TextEditingController();
+  final TextEditingController _createPinCtrl = TextEditingController();
+  final TextEditingController _reEnterPinCtrl = TextEditingController();
+
+  bool _isRegisteringNew = false;
+  bool _isLoadingAuth = false;
+
+  // फायरबेस से वेंडर का पिन चेक करना या नया पिन सेव करना
+  Future<void> _verifyOrLoginVendor() async {
+    String phone = _loginPhoneCtrl.text.trim();
+    String pin = _loginPinCtrl.text.trim();
+
+    if (phone.isEmpty || pin.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('कृपया मोबाइल नंबर और 4-अंक का पिन दर्ज करें!')));
+      return;
+    }
+
+    setState(() => _isLoadingAuth = true);
+    try {
+      final response = await http.get(Uri.parse('${ViziagDatabase.firebaseRestUrl}/vendors/$phone.json'));
+      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
+        var data = json.decode(response.body);
+        if (data['pin'] == pin) {
+          setState(() {
+            _isLoggedIn = true;
+            ViziagDatabase.currentUserPhone = phone;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ सफलतापूर्वक लॉगिन हो गया!'), backgroundColor: Colors.green));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ गलत पिन (Incorrect PIN)!'), backgroundColor: Colors.red));
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ यह नंबर रजिस्टर्ड नहीं है। कृपया पहले पिन सेट करें।')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      setState(() => _isLoadingAuth = false);
+    }
+  }
+
+  Future<void> _saveNewVendorPin() async {
+    String phone = _regPhoneCtrl.text.trim();
+    String pin1 = _createPinCtrl.text.trim();
+    String pin2 = _reEnterPinCtrl.text.trim();
+
+    if (phone.isEmpty || pin1.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('कृपया सही मोबाइल नंबर और 4-अंकों का पिन दर्ज करें!')));
+      return;
+    }
+
+    if (pin1 != pin2) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ दोनों पिन मेल नहीं खा रहे हैं (Pins do not match)!'), backgroundColor: Colors.red));
+      return;
+    }
+
+    setState(() => _isLoadingAuth = true);
+    try {
+      var vendorData = {'phone': phone, 'pin': pin1};
+      final response = await http.put(
+        Uri.parse('${ViziagDatabase.firebaseRestUrl}/vendors/$phone.json'),
+        body: json.encode(vendorData),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _isLoggedIn = true;
+          _isRegisteringNew = false;
+          ViziagDatabase.currentUserPhone = phone;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 पिन सफलतापूर्व सेव हो गया! अब आप वेंडर पोर्टल में हैं।'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      setState(() => _isLoadingAuth = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isLoggedIn) {
+      // 🔐 Login / Register PIN Screen
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: SingleChildScrollView(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 6)],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(Icons.lock_person, size: 50, color: Color(0xFFFF5722)),
+                  const SizedBox(height: 10),
+                  Text(
+                    _isRegisteringNew ? '🛠️नया पिन बनाएं (Create PIN)' : '🔐 दुकानदार लॉगिन (Vendor Login)',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 15),
+
+                  if (!_isRegisteringNew) ...[
+                    TextField(
+                      controller: _loginPhoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(labelText: 'मोबाइल नंबर (Mobile Number)', border: OutlineInputBorder(), isDense: true),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _loginPinCtrl,
+                      obscureText: true,
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      decoration: const InputDecoration(labelText: '4-अंक का पिन (4-Digit PIN)', border: OutlineInputBorder(), isDense: true, counterText: ''),
+                    ),
+                    const SizedBox(height: 15),
+                    _isLoadingAuth
+                        ? const Center(child: CircularProgressIndicator())
+                        : ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
+                            onPressed: _verifyOrLoginVendor,
+                            child: const Text('लॉगिन करें (Login)'),
+                          ),
+                    const SizedBox(height: 10),
+                    TextButton(
+                      onPressed: () => setState(() => _isRegisteringNew = true),
+                      child: const Text('नया अकाउंट है? पिन सेट करें (Create PIN)'),
+                    ),
+                  ] else ...[
+                    TextField(
+                      controller: _regPhoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(labelText: 'मोबाइल नंबर (Mobile Number)', border: OutlineInputBorder(), isDense: true),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _createPinCtrl,
+                      obscureText: true,
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      decoration: const InputDecoration(labelText: 'पिन दर्ज करें (Enter 4-Digit PIN)', border: OutlineInputBorder(), isDense: true, counterText: ''),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _reEnterPinCtrl,
+                      obscureText: true,
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      decoration: const InputDecoration(labelText: 'दोबारा पिन डालें (Re-enter PIN)', border: OutlineInputBorder(), isDense: true, counterText: ''),
+                    ),
+                    const SizedBox(height: 15),
+                    _isLoadingAuth
+                        ? const Center(child: CircularProgressIndicator())
+                        : ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                            onPressed: _saveNewVendorPin,
+                            child: const Text('पिन सेव करें और लॉगिन करें (Save & Login)'),
+                          ),
+                    const SizedBox(height: 10),
+                    TextButton(
+                      onPressed: () => setState(() => _isRegisteringNew = false),
+                      child: const Text('पहले से पिन है? लॉगिन करें (Back to Login)'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ✅ Once logged in via PIN, show the actual Shop Register & Product Update Portal
+    return const ShopRegisterAndUpdateView();
+  }
+}
+
+// ==========================================
 // TAB 2: VENDOR PORTAL (SHOP DETAILS, WHATSAPP, ITEMS, STATUS & DELETE)
 // ==========================================
 class ShopRegisterAndUpdateView extends StatefulWidget {
@@ -528,14 +726,12 @@ class ShopRegisterAndUpdateView extends StatefulWidget {
 }
 
 class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
-  // दुकान की डिटेल्स अपडेट करने के लिए कंट्रोलर्स
   late final TextEditingController _shopNameCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['shopName']);
   late final TextEditingController _ownerNameCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['ownerName']);
   late final TextEditingController _shopWhatsappCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['whatsappNumber']);
   late final TextEditingController _shopAddressCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['address']);
   late final TextEditingController _shopBioCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['bio']);
 
-  // नए आइटम जोड़ने के लिए कंट्रोलर्स
   final TextEditingController _prodNameCtrl = TextEditingController();
   final TextEditingController _priceCtrl = TextEditingController();
   final TextEditingController _stockCtrl = TextEditingController();
@@ -700,7 +896,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         ),
         const SizedBox(height: 12),
 
-        // दुकान और WhatsApp नंबर सेट करने के लिए फील्ड्स
         const Text('📍 Shop & WhatsApp Configuration', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         TextField(controller: _shopNameCtrl, decoration: const InputDecoration(labelText: 'Shop Name', border: OutlineInputBorder(), isDense: true)),
@@ -797,9 +992,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         
         const Divider(height: 35),
 
-        // ==========================================
-        // 📋 ITEMIZED LIST OF ADDED PRODUCTS WITH CONTROLS
-        // ==========================================
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -942,7 +1134,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       return;
     }
 
-    // यहाँ अब सीधे उस दुकान का व्हाट्सएप नंबर जाएगा जो वेंडर पोर्टल पर सेट किया गया है
     String vendorPhone = ViziagDatabase.registeredShops[0]['whatsappNumber'] ?? '919971968060';
     String message = "🛍️ *New Order from Viziag Mart*\n\n👤 *Customer:* ${ViziagDatabase.currentCustomerName}\n📞 *Phone:* ${ViziagDatabase.currentUserPhone}\n📍 *Address:* ${ViziagDatabase.currentDeliveryAddress}\n\n";
 
