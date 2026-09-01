@@ -49,12 +49,12 @@ class ViziagDatabase {
       'ownerName': 'Tarun Kumar',
       'ownerPhotoPath': '', 
       'phone': '9971968060',
-      'whatsappNumber': '919971968060',
+      'whatsappNumber': '919971968060', // दुकान का व्हाट्सएप नंबर
       'category': 'Sabji & Fruits',
       'address': 'Sector 15A Ajronda Sabji Mandi, Faridabad',
       'shopBannerPath': '', 
       'bio': 'रोंदा की सबसे विश्वसनीय दुकान। ताज़ा फल और सब्जियां उचित दामों पर उपलब्ध।',
-      'isOpen': true, // दुकान ओपन/क्लोज स्टेटस
+      'isOpen': true,
     }
   ];
 
@@ -293,7 +293,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
           'price': prod['price'],
           'unit': prod['unit'] ?? 'KG',
           'qty': qty,
-          'shopName': prod['shopName'] ?? 'Tarun Fruit & Vegetable Shop',
+          'shopName': prod['shopName'] ?? shop['shopName'],
         });
       });
     }
@@ -311,7 +311,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     return ListView(
       padding: const EdgeInsets.all(8),
       children: [
-        // Top Toggle
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           color: Colors.white,
@@ -387,6 +386,8 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                         children: [
                           Text(shop['shopName'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                           Text('📍 ${shop['address']}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                          const SizedBox(height: 2),
+                          Text('📞 WhatsApp: ${shop['whatsappNumber']}', style: const TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 2),
                           Text(shop['bio'], style: const TextStyle(fontSize: 10, color: Colors.black87), maxLines: 2, overflow: TextOverflow.ellipsis),
                         ],
@@ -517,7 +518,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 }
 
 // ==========================================
-// TAB 2: VENDOR PORTAL (ADD ITEMS, LIST, STATUS & DELETE)
+// TAB 2: VENDOR PORTAL (SHOP DETAILS, WHATSAPP, ITEMS, STATUS & DELETE)
 // ==========================================
 class ShopRegisterAndUpdateView extends StatefulWidget {
   const ShopRegisterAndUpdateView({super.key});
@@ -527,6 +528,14 @@ class ShopRegisterAndUpdateView extends StatefulWidget {
 }
 
 class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
+  // दुकान की डिटेल्स अपडेट करने के लिए कंट्रोलर्स
+  late final TextEditingController _shopNameCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['shopName']);
+  late final TextEditingController _ownerNameCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['ownerName']);
+  late final TextEditingController _shopWhatsappCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['whatsappNumber']);
+  late final TextEditingController _shopAddressCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['address']);
+  late final TextEditingController _shopBioCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['bio']);
+
+  // नए आइटम जोड़ने के लिए कंट्रोलर्स
   final TextEditingController _prodNameCtrl = TextEditingController();
   final TextEditingController _priceCtrl = TextEditingController();
   final TextEditingController _stockCtrl = TextEditingController();
@@ -536,6 +545,17 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
   bool _isUploadingToCloud = false;
   String? _pickedProdImagePath;
   final ImagePicker _picker = ImagePicker();
+
+  void _saveShopDetails() {
+    setState(() {
+      ViziagDatabase.registeredShops[0]['shopName'] = _shopNameCtrl.text.trim();
+      ViziagDatabase.registeredShops[0]['ownerName'] = _ownerNameCtrl.text.trim();
+      ViziagDatabase.registeredShops[0]['whatsappNumber'] = _shopWhatsappCtrl.text.trim();
+      ViziagDatabase.registeredShops[0]['address'] = _shopAddressCtrl.text.trim();
+      ViziagDatabase.registeredShops[0]['bio'] = _shopBioCtrl.text.trim();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Shop Details & WhatsApp Number Saved!'), backgroundColor: Colors.green));
+  }
 
   Future<void> _pickProductImage() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
@@ -586,7 +606,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
       'stock': int.tryParse(_stockCtrl.text) ?? 20,
       'imagePath': _pickedProdImagePath ?? '',
       'isWholesale': _isWholesaleItem,
-      'inStock': true, // डिफ़ॉल्ट इन स्टॉक
+      'inStock': true,
     };
 
     try {
@@ -617,7 +637,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
     }
   }
 
-  // आइटम डिलीट करने का फंक्शन (Firebase से भी और ऐप से भी)
   Future<void> _deleteProduct(int index, Map<String, dynamic> prod) async {
     String? firebaseKey = prod['firebaseKey'];
     try {
@@ -633,7 +652,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
     }
   }
 
-  // इन स्टॉक / आउट ऑफ़ स्टॉक टॉगल करने का फंक्शन
   void _toggleStockStatus(int index) {
     setState(() {
       bool currentStatus = ViziagDatabase.productInventory[index]['inStock'] ?? true;
@@ -649,7 +667,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('🛠️ Vendor Control Panel', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text('🛠️ Vendor Control Panel & Shop Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
 
         // 🏪 Shop Open/Close Master Button
@@ -681,6 +699,36 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
           ),
         ),
         const SizedBox(height: 12),
+
+        // दुकान और WhatsApp नंबर सेट करने के लिए फील्ड्स
+        const Text('📍 Shop & WhatsApp Configuration', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        TextField(controller: _shopNameCtrl, decoration: const InputDecoration(labelText: 'Shop Name', border: OutlineInputBorder(), isDense: true)),
+        const SizedBox(height: 8),
+        TextField(controller: _ownerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name', border: OutlineInputBorder(), isDense: true)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _shopWhatsappCtrl, 
+          keyboardType: TextInputType.phone, 
+          decoration: const InputDecoration(
+            labelText: 'WhatsApp Number (e.g. 919971968060)', 
+            helperText: 'ऑर्डर इसी नंबर पर WhatsApp पर जाएगा (देश का कोड 91 जरूर लगाएं)',
+            helperStyle: TextStyle(fontSize: 9),
+            border: OutlineInputBorder(), 
+            isDense: true
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(controller: _shopAddressCtrl, decoration: const InputDecoration(labelText: 'Shop Address', border: OutlineInputBorder(), isDense: true)),
+        const SizedBox(height: 8),
+        TextField(controller: _shopBioCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Shop Bio / Description', border: OutlineInputBorder(), isDense: true)),
+        const SizedBox(height: 8),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
+          onPressed: _saveShopDetails,
+          child: const Text('Save Shop & WhatsApp Number'),
+        ),
+        const SizedBox(height: 10),
 
         Row(
           children: [
@@ -789,7 +837,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
                                 Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                 Text('₹${prod['price']} / ${prod['unit'] ?? 'KG'} • ${prod['isWholesale'] == true ? 'Wholesale' : 'Retail'}', style: const TextStyle(fontSize: 11, color: Colors.green)),
                                 const SizedBox(height: 4),
-                                // Stock status badge
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                   decoration: BoxDecoration(color: inStock ? Colors.blue.shade50 : Colors.red.shade50, borderRadius: BorderRadius.circular(3)),
@@ -798,7 +845,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
                               ],
                             ),
                           ),
-                          // Controls: Stock Toggle & Delete
                           Column(
                             children: [
                               IconButton(
@@ -896,6 +942,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       return;
     }
 
+    // यहाँ अब सीधे उस दुकान का व्हाट्सएप नंबर जाएगा जो वेंडर पोर्टल पर सेट किया गया है
     String vendorPhone = ViziagDatabase.registeredShops[0]['whatsappNumber'] ?? '919971968060';
     String message = "🛍️ *New Order from Viziag Mart*\n\n👤 *Customer:* ${ViziagDatabase.currentCustomerName}\n📞 *Phone:* ${ViziagDatabase.currentUserPhone}\n📍 *Address:* ${ViziagDatabase.currentDeliveryAddress}\n\n";
 
