@@ -181,7 +181,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
               const Spacer(),
               _buildHeaderNavButton('Market', Icons.storefront, 0),
               const SizedBox(width: 4),
-              _buildHeaderNavButton('Vendor', Icons.edit.store, 1),
+              _buildHeaderNavButton('Vendor', Icons.store, 1), // <--- यहाँ सही आइकॉन लगा दिया है
               const SizedBox(width: 4),
               _buildHeaderNavButton('Admin', Icons.security, 2),
             ],
@@ -249,13 +249,12 @@ class MarketplaceBuyerView extends StatefulWidget {
 }
 
 class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
-  bool isWholesaleMarket = false; // दो अलग डैशबोर्ड टॉगल: रिटेल vs होलसेल मार्केटप्लेस
+  bool isWholesaleMarket = false; 
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // मार्केटप्लेस टाइप टॉगल बार (Retail vs Wholesale)
         Container(
           color: Colors.black87,
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -288,13 +287,10 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
             ],
           ),
         ),
-        
-        // दुकान-वार (Shop-wise) लिस्टिंग डैशबोर्ड
         Expanded(
           child: ListView(
             padding: const EdgeInsets.all(12),
             children: ViziagDatabase.registeredShops.map((shop) {
-              // इस दुकान के प्रोडक्ट्स फ़िल्टर करें (रिटेल या होलसेल के आधार पर)
               var shopProducts = ViziagDatabase.productInventory.where((p) =>
                 p['shopName'] == shop['shopName'] && p['isWholesale'] == isWholesaleMarket
               ).toList();
@@ -308,7 +304,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // दुकान का बैनर और प्रोफाइल हेडर
                     Stack(
                       children: [
                         ClipRRect(
@@ -361,8 +356,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                         ),
                       ],
                     ),
-                    
-                    // दुकान के अंदर के सारे आइटम (सेब, अनार, आदि)
                     Padding(
                       padding: const EdgeInsets.all(10.0),
                       child: Column(
@@ -443,16 +436,15 @@ class _VendorPortalManageViewState extends State<VendorPortalManageView> {
 
   String _selectedCategory = 'Fruits & Vegetables';
   String _selectedUnit = 'KG';
-  bool _isWholesaleItem = false; // होलसेल या रिटेल चेकबॉक्स
+  bool _isWholesaleItem = false;
   
   XFile? _pickedImageFile;
   Uint8List? _webImageBytes;
-  final ImageSpanPicker = ImagePicker();
+  final ImagePicker _imagePicker = ImagePicker();
 
-  // इमेज पिकर सॉल्यूशन (गैलरी से फोटो उठाने के लिए - वेब और मोबाइल दोनों सपोर्टेड)
   Future<void> _pickImageFromGallery() async {
     try {
-      final pickedFile = await ImageSpanPicker.pickImage(
+      final pickedFile = await _imagePicker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 80,
       );
@@ -519,7 +511,6 @@ class _VendorPortalManageViewState extends State<VendorPortalManageView> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // वेंडर शॉप प्रोफाइल हेडर
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -547,7 +538,6 @@ class _VendorPortalManageViewState extends State<VendorPortalManageView> {
         const Text('📦 Add New Item to Shop Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
 
-        // फिक्स्ड इमेज पिकर यूआई
         InputDecorator(
           decoration: const InputDecoration(labelText: 'Item Gallery Photo', border: OutlineInputBorder()),
           child: Row(
@@ -605,7 +595,6 @@ class _VendorPortalManageViewState extends State<VendorPortalManageView> {
         ),
         const SizedBox(height: 10),
 
-        // होलसेल आइटम चेकबॉक्स
         CheckboxListTile(
           title: const Text('List as Wholesale Item (होलसेल मार्केट में दिखाएं)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           value: _isWholesaleItem,
