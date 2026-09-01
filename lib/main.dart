@@ -33,7 +33,7 @@ class ViziagMartEnterpriseApp extends StatelessWidget {
 }
 
 // ==========================================
-// CENTRAL DATABASE & CONFIG MODEL
+// CENTRAL DATABASE & CLOUD SYNC MODEL
 // ==========================================
 class ViziagDatabase {
   static String firebaseRestUrl = "https://viziagmart-default-rtdb.firebaseio.com/"; 
@@ -41,9 +41,7 @@ class ViziagDatabase {
   static String currentUserPhone = "9971968060";
   static String currentCustomerName = "Tarun Kumar";
   static String currentDeliveryAddress = "Sector 15A Ajronda Sabji Mandi, Faridabad";
-  static bool isUserLoggedIn = true;
-  static bool isShopRegistered = true; 
-
+  
   static List<Map<String, dynamic>> registeredShops = [
     {
       'shopId': 'shop_01',
@@ -56,55 +54,10 @@ class ViziagDatabase {
       'address': 'Sector 15A Ajronda Sabji Mandi, Faridabad',
       'shopBannerPath': '',
       'isOpen': true,
-      'isApproved': true,
     }
   ];
 
-  static List<Map<String, dynamic>> productInventory = [
-    {
-      'id': 'p_101',
-      'shopName': 'Tarun Fruit & Vegetable Shop',
-      'owner': 'Tarun Kumar',
-      'name': 'Fresh Kashmiri Apple',
-      'category': 'Fruits & Vegetables',
-      'price': 120.0,
-      'unit': 'KG',
-      'stock': 50,
-      'location': 'Sector 15A, Faridabad',
-      'imagePath': '',
-      'isWholesale': false,
-      'deliveryType': 'Express Delivery'
-    },
-    {
-      'id': 'p_102',
-      'shopName': 'Tarun Fruit & Vegetable Shop',
-      'owner': 'Tarun Kumar',
-      'name': 'Banana Premium',
-      'category': 'Fruits & Vegetables',
-      'price': 70.0,
-      'unit': 'pc',
-      'stock': 40,
-      'location': 'Sector 15A, Faridabad',
-      'imagePath': '',
-      'isWholesale': false,
-      'deliveryType': 'Express Delivery'
-    },
-    {
-      'id': 'p_103',
-      'shopName': 'Tarun Fruit & Vegetable Shop',
-      'owner': 'Tarun Kumar',
-      'name': 'Royal Gala Apple',
-      'category': 'Fruits & Vegetables',
-      'price': 300.0,
-      'unit': 'KG',
-      'stock': 30,
-      'location': 'Sector 15A, Faridabad',
-      'imagePath': '',
-      'isWholesale': false,
-      'deliveryType': 'Express Delivery'
-    },
-  ];
-
+  static List<Map<String, dynamic>> productInventory = [];
   static List<Map<String, dynamic>> cartItems = [];
 }
 
@@ -211,7 +164,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
         type: BottomNavigationBarType.fixed,
         onTap: (index) {
           if (index == 3) {
-            setState(() => _selectedTabIndex = 4); // Settings/Cart toggle
+            setState(() => _selectedTabIndex = 4); 
           } else {
             setState(() => _selectedTabIndex = index);
           }
@@ -246,7 +199,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
 }
 
 // ==========================================
-// TAB 1: RETAIL & WHOLESALE MARKETPLACE (3-GRID LAYOUT)
+// TAB 1: 3-GRID MARKETPLACE (CLOUD SYNCED)
 // ==========================================
 class MarketplaceBuyerView extends StatefulWidget {
   const MarketplaceBuyerView({super.key});
@@ -287,7 +240,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
         });
       }
     } catch (e) {
-      debugPrint("Cloud fetch error: $e");
+      debugPrint("Cloud sync error: $e");
     } finally {
       setState(() => _isLoadingCloud = false);
     }
@@ -318,14 +271,20 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     );
   }
 
-  Widget _buildImageView(String? path, double height, double width, IconData fallbackIcon) {
+  Widget _buildCloudImageView(String? path, double height, double width, IconData fallbackIcon) {
     if (path != null && path.isNotEmpty) {
+      // अगर इमेज बेस64 स्ट्रिंग या ऑनलाइन यूआरएल है तो ऐप रीइंस्टॉल होने पर भी क्लाउड से लोड होगी
       if (path.startsWith('http')) {
         return Image.network(path, height: height, width: width, fit: BoxFit.cover,
             errorBuilder: (context, error, stackTrace) => Container(height: height, width: width, color: Colors.grey.shade300, child: Icon(fallbackIcon, size: height * 0.4)));
+      } else if (path.startsWith('data:image')) {
+        try {
+          final bytes = base64Decode(path.split(',').last);
+          return Image.memory(bytes, height: height, width: width, fit: BoxFit.cover);
+        } catch (_) {}
+      } else if (File(path).existsSync()) {
+        return Image.file(File(path), height: height, width: width, fit: BoxFit.cover);
       }
-      return Image.file(File(path), height: height, width: width, fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(height: height, width: width, color: Colors.grey.shade300, child: Icon(fallbackIcon, size: height * 0.4)));
     }
     return Container(
       height: height,
@@ -341,7 +300,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 
     return Column(
       children: [
-        // Header info banner
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           color: Colors.white,
@@ -349,32 +307,11 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
             children: [
               const Text('🔥', style: TextStyle(fontSize: 14)),
               const SizedBox(width: 4),
-              const Text('Local Hyper-Local Market', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Cloud Synchronized Hyper-Local Market', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
               const Spacer(),
               TextButton(
                 onPressed: _fetchProductsFromCloud,
-                child: const Text('Refresh', style: TextStyle(fontSize: 11)),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          color: Colors.grey.shade200,
-          child: Row(
-            children: [
-              const Icon(Icons.check_box, color: Colors.green, size: 14),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  'Verified Buyer: ${ViziagDatabase.currentCustomerName}',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              GestureDetector(
-                onTap: () {},
-                child: const Text('(Logout)', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
+                child: const Text('Sync Cloud', style: TextStyle(fontSize: 11)),
               ),
             ],
           ),
@@ -382,127 +319,123 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
         if (_isLoadingCloud)
           const LinearProgressIndicator(color: Color(0xFFFF5722)),
 
-        // 3-Grid View Builder
+        // 3-Grid View Layout (जैसा आपने स्क्रीनशॉट में माँगा है)
         Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(6),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3, // EXACTLY 3 ITEMS PER ROW (3 ग्रेड लाइन यूआई)
-              childAspectRatio: 0.52, // कार्ड की लम्बाई-चौड़ाई का अनुपात
-              crossAxisSpacing: 6,
-              mainAxisSpacing: 6,
-            ),
-            itemCount: filteredProducts.length,
-            itemBuilder: (context, index) {
-              var prod = filteredProducts[index];
-              String prodKey = prod['id'] ?? prod['name'];
-              double unitPrice = (prod['price'] ?? 100.0).toDouble();
-              double selectedQty = _itemQuantities[prodKey] ?? 1.0;
-              double totalPrice = unitPrice * selectedQty;
+          child: filteredProducts.isEmpty
+              ? const Center(child: Text('No products on cloud yet. Add items from Vendor Portal!'))
+              : GridView.builder(
+                  padding: const EdgeInsets.all(6),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3, // तीन ग्रेड लाइन (3 Columns)
+                    childAspectRatio: 0.52,
+                    crossAxisSpacing: 6,
+                    mainAxisSpacing: 6,
+                  ),
+                  itemCount: filteredProducts.length,
+                  itemBuilder: (context, index) {
+                    var prod = filteredProducts[index];
+                    String prodKey = prod['id'] ?? prod['name'];
+                    double unitPrice = (prod['price'] ?? 100.0).toDouble();
+                    double selectedQty = _itemQuantities[prodKey] ?? 1.0;
+                    double totalPrice = unitPrice * selectedQty;
 
-              return Card(
-                elevation: 1,
-                margin: EdgeInsets.zero,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Product Image
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                      child: _buildImageView(prod['imagePath'], 75, double.infinity, Icons.fastfood),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(4.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                                  decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(2)),
-                                  child: Text(
-                                    prod['shopName'] ?? 'Tarun shop',
-                                    style: const TextStyle(fontSize: 7, color: Colors.blue, fontWeight: FontWeight.bold),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  prod['name'],
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  '₹${unitPrice.toInt()}/${prod['unit'] ?? 'kg'}',
-                                  style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 9),
-                                ),
-                                const Text(
-                                  '🚚 Home Delivery',
-                                  style: TextStyle(fontSize: 7, color: Colors.black54),
-                                  maxLines: 1,
-                                ),
-                              ],
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Text('Qty:', style: TextStyle(fontSize: 7)),
-                                    const SizedBox(width: 2),
-                                    SizedBox(
-                                      width: 26,
-                                      height: 16,
-                                      child: TextField(
-                                        keyboardType: TextInputType.number,
-                                        style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                                        decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 0)),
-                                        controller: TextEditingController(text: selectedQty.toInt().toString())
-                                          ..selection = TextSelection.fromPosition(TextPosition(offset: selectedQty.toInt().toString().length)),
-                                        onChanged: (val) {
-                                          double? q = double.tryParse(val);
-                                          if (q != null && q > 0) {
-                                            setState(() => _itemQuantities[prodKey] = q);
-                                          }
-                                        },
+                    return Card(
+                      elevation: 1,
+                      margin: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                            child: _buildCloudImageView(prod['imagePath'], 75, double.infinity, Icons.fastfood),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                        decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(2)),
+                                        child: Text(
+                                          prod['shopName'] ?? 'Tarun shop',
+                                          style: const TextStyle(fontSize: 7, color: Colors.blue, fontWeight: FontWeight.bold),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text('Total: ₹${totalPrice.toInt()}', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.blue)),
-                                const SizedBox(height: 2),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 20,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFE91E63),
-                                      foregroundColor: Colors.white,
-                                      padding: EdgeInsets.zero,
-                                    ),
-                                    onPressed: () => _addToCart(prod, selectedQty),
-                                    child: const Text('Add to Cart', style: TextStyle(fontSize: 7, fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        prod['name'],
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        '₹${unitPrice.toInt()}/${prod['unit'] ?? 'kg'}',
+                                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 9),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                              ],
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Text('Qty:', style: TextStyle(fontSize: 7)),
+                                          const SizedBox(width: 2),
+                                          SizedBox(
+                                            width: 26,
+                                            height: 16,
+                                            child: TextField(
+                                              keyboardType: TextInputType.number,
+                                              style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
+                                              decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 0)),
+                                              controller: TextEditingController(text: selectedQty.toInt().toString())
+                                                ..selection = TextSelection.fromPosition(TextPosition(offset: selectedQty.toInt().toString().length)),
+                                              onChanged: (val) {
+                                                double? q = double.tryParse(val);
+                                                if (q != null && q > 0) {
+                                                  setState(() => _itemQuantities[prodKey] = q);
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text('Total: ₹${totalPrice.toInt()}', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.blue)),
+                                      const SizedBox(height: 2),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        height: 20,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFFE91E63),
+                                            foregroundColor: Colors.white,
+                                            padding: EdgeInsets.zero,
+                                          ),
+                                          onPressed: () => _addToCard(prod, selectedQty),
+                                          child: const Text('Add to Cart', style: TextStyle(fontSize: 7, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
     );
@@ -510,7 +443,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 }
 
 // ==========================================
-// TAB 2: VENDOR DASHBOARD & ITEM PUBLISH FORM
+// TAB 2: VENDOR DASHBOARD & PERMANENT CLOUD UPLOAD
 // ==========================================
 class ShopRegisterAndUpdateView extends StatefulWidget {
   const ShopRegisterAndUpdateView({super.key});
@@ -531,9 +464,12 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
   final ImagePicker _picker = ImagePicker();
 
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
     if (image != null) {
-      setState(() => _pickedProdImagePath = image.path);
+      // इमेज को Base64 में कन्वर्ट करेंगे ताकि ऐप डिलीट होने या रीइंस्टॉल होने पर भी Firebase पर सुरक्षित रहे
+      final bytes = await image.readAsBytes();
+      String base64Image = "data:image/jpeg;base64,${base64Encode(bytes)}";
+      setState(() => _pickedProdImagePath = base64Image);
     }
   }
 
@@ -578,7 +514,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         setState(() => _pickedProdImagePath = null);
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('🚀 Product Published Live to Cloud!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('🚀 Saved on Firebase Cloud permanently! App uninstall safe.'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
@@ -590,21 +526,12 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
 
   @override
   Widget build(BuildContext context) {
-    var myShop = ViziagDatabase.registeredShops[0];
-    bool isShopOpen = myShop['isOpen'] ?? true;
-
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        SwitchListTile(
-          title: Text(isShopOpen ? '🟢 Shop Status: OPEN' : '🔴 Shop Status: CLOSED', style: const TextStyle(fontWeight: FontWeight.bold)),
-          value: isShopOpen,
-          activeColor: Colors.green,
-          onChanged: (val) => setState(() => myShop['isOpen'] = val),
-        ),
-        const SizedBox(height: 10),
-        const Text('📦 Add Item to Global Cloud', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
+        const Text('📦 Add Item to Permanent Firebase Cloud', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text('Note: Photos and data saved here remain stored even if the app is uninstalled and reinstalled.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+        const SizedBox(height: 12),
         TextField(controller: _prodNameCtrl, decoration: const InputDecoration(labelText: 'Item Name', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
         Row(
@@ -627,7 +554,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         ElevatedButton.icon(
           onPressed: _pickImage,
           icon: const Icon(Icons.add_a_photo, size: 14),
-          label: Text(_pickedProdImagePath == null ? 'Select Photo from Gallery' : 'Photo Selected ✅'),
+          label: Text(_pickedProdImagePath == null ? 'Select Image (Cloud Safe)' : 'Image Selected ✅'),
         ),
         const SizedBox(height: 15),
         _isUploadingToCloud
@@ -635,7 +562,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
             : ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
                 onPressed: _publishProductToCloud,
-                child: const Text('Publish Item Live to Cloud 🚀'),
+                child: const Text('Publish & Save Permanently to Cloud 🚀'),
               ),
       ],
     );
@@ -786,7 +713,7 @@ class SettingsConfigView extends StatelessWidget {
       children: const [
         Text('⚙️ Settings & Vendor Configuration', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         Divider(),
-        Text('You can update your shop details and user preferences via the dedicated Vendor and Profile tabs.'),
+        Text('All product images and details are safely synced with Firebase Cloud Realtime Database and remain persistent even after app reinstallation.'),
       ],
     );
   }
