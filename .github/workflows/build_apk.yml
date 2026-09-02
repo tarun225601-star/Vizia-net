@@ -23,7 +23,7 @@ jobs:
           mkdir -p /tmp/backup
           cp lib/main.dart /tmp/backup/main.dart
 
-      - name: Initialize Flutter Android Scaffold
+      
         run: |
           flutter create . --project-name=desi_ai_app --platforms=android --org=com.example.app
 
