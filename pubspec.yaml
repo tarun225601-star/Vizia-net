@@ -18,7 +18,7 @@ dependencies:
 
   # 📍 सही और अपडेटेड जीपीएस व लोकेशन पैकेजेस (बिना किसी एरर के):
   geolocator: ^11.0.0           # रियल-टाइम GPS लोकेशन (Lat/Lng) के लिए
-  google_maps_flutter: ^2.5.3   # मैप्स पर लाइव टेम्पो दिखाने के लिए
+  
 
 dev_dependencies:
   flutter_test:
