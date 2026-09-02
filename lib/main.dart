@@ -1,4 +1,4 @@
-import 'dart:io';
+                         import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -202,7 +202,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
           ),
         ),
       ),
-      body: _tabScreens[_selectedTabIndex],
+      body: _tabScreens[_selectedTabIndex > 4 ? 4 : _selectedTabIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedTabIndex > 3 ? 3 : _selectedTabIndex,
         selectedItemColor: const Color(0xFFFF5722),
@@ -567,7 +567,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
+                SizedBox(
                   height: 110,
                   width: double.infinity,
                   child: shop['shopBannerPath'] != null && shop['shopBannerPath'].isNotEmpty
