@@ -18,18 +18,11 @@ jobs:
           flutter-version: '3.19.x'
           channel: 'stable'
 
-      - name: Save existing main.dart
+      - name: Force Kotlin Version in Android Build Gradle
         run: |
-          mkdir -p /tmp/backup
-          cp lib/main.dart /tmp/backup/main.dart
-
-      
-        
-          flutter create . --project-name=desi_ai_app --platforms=android --org=com.example.app
-
-      - name: Restore AI main.dart
-        run: |
-          cp /tmp/backup/main.dart lib/main.dart
+          if [ -f "android/build.gradle" ]; then
+            sed -i "s/ext.kotlin_version = '.*'/ext.kotlin_version = '1.9.0'/g" android/build.gradle
+          fi
 
       - name: Get Dependencies
         run: flutter pub get
