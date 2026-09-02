@@ -16,7 +16,7 @@ class ViziagMartEnterpriseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Viziag Mart - HyperLocal Marketplace',
+      title: 'Viziag Mart - HyperLocal Mandi Marketplace',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -42,19 +42,39 @@ class ViziagDatabase {
   static String currentCustomerName = "Tarun Kumar";
   static String currentDeliveryAddress = "Sector 15A Ajronda Sabji Mandi, Faridabad";
   
-  static List<Map<String, dynamic>> registeredShops = [
+  // मल्टी-मंडी और नंबर-वाइज आढ़ती/शॉप डायरेक्टरी
+  static List<Map<String, dynamic>> mandisList = [
     {
-      'shopId': 'shop_01',
-      'shopName': 'Tarun Fruit & Vegetable Shop',
-      'ownerName': 'Tarun Kumar',
-      'ownerPhotoPath': '', 
-      'phone': '9971968060',
-      'whatsappNumber': '919971968060',
-      'category': 'Sabji & Fruits',
-      'address': 'Sector 15A Ajronda Sabji Mandi, Faridabad',
-      'shopBannerPath': '', 
-      'bio': 'अजोंदा की सबसे विश्वसनीय दुकान। ताज़ा फल और सब्जियां उचित दामों पर उपलब्ध।',
-      'isOpen': true,
+      'mandiId': 'dabua_mandi',
+      'mandiName': 'डबुआ मंडी (Dabua Mandi)',
+      'location': 'Faridabad',
+      'shops': [
+        {
+          'shopId': 'shop_01',
+          'shopName': 'Tarun Fruit & Vegetable Shop',
+          'shopNumber': 'Shop No. 12',
+          'ownerName': 'Tarun Kumar',
+          'ownerPhotoPath': '', 
+          'phone': '9971968060',
+          'whatsappNumber': '919971968060',
+          'address': 'Sector 15A Ajronda Sabji Mandi, Faridabad',
+          'shopBannerPath': '', 
+          'bio': 'अजोंदा की सबसे विश्वसनीय दुकान। ताज़ा फल और सब्जियां उचित दामों पर उपलब्ध।',
+          'isOpen': true,
+        }
+      ]
+    },
+    {
+      'mandiId': 'old_mandi',
+      'mandiName': 'ओल्ड मंडी (Old Mandi Faridabad)',
+      'location': 'Old Faridabad',
+      'shops': []
+    },
+    {
+      'mandiId': 'ballabhgarh_mandi',
+      'mandiName': 'बल्लभगढ़ मंडी (Ballabhgarh Mandi)',
+      'location': 'Ballabhgarh',
+      'shops': []
     }
   ];
 
@@ -76,8 +96,8 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
   int _selectedTabIndex = 0;
 
   final List<Widget> _tabScreens = [
-    const MarketplaceBuyerView(),
-    const VendorAuthAndPortalView(), // 🔐 यहाँ डबल-पिन लॉगिन और वेंडर पोर्टल जोड़ दिया गया है
+    const MandiDirectoryView(), // मल्टी-मंडी और शॉप डायरेक्टरी व्यू
+    const VendorAuthAndPortalView(), // 🔐 वेंडर लॉगिन और पोर्टल
     const UserLoginAndAddressView(),
     const CartAndWhatsAppCheckoutView(), 
     const SettingsConfigView(),
@@ -200,7 +220,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
 }
 
 // ==========================================
-// IMAGE HELPER
+// IMAGE HELPER (Permanent Storage & Rendering)
 // ==========================================
 Widget buildShopOrProdImage(String? path, double height, double width, IconData fallbackIcon) {
   if (path != null && path.isNotEmpty) {
@@ -225,17 +245,115 @@ Widget buildShopOrProdImage(String? path, double height, double width, IconData 
 }
 
 // ==========================================
-// TAB 1: MARKETPLACE
+// STEP 1: MULTI-MANDI & SHOP DIRECTORY VIEW
+// ==========================================
+class MandiDirectoryView extends StatelessWidget {
+  const MandiDirectoryView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        const Text('🌾 चुनी हुई मंडी चुनें (Select Mandi)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: ViziagDatabase.mandisList.length,
+          itemBuilder: (context, index) {
+            var mandi = ViziagDatabase.mandisList[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFFF5722),
+                  child: Icon(Icons.storefront, color: Colors.white),
+                ),
+                title: Text(mandi['mandiName'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: Text('स्थान: ${mandi['location']} • ${mandi['shops'].length} दुकानें उपलब्ध', style: const TextStyle(fontSize: 11)),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xFFFF5722)),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => MandiShopsScreen(mandiData: mandi)),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ==========================================
+// MANDI SHOPS LIST SCREEN (Shop Number-wise)
+// ==========================================
+class MandiShopsScreen extends StatelessWidget {
+  final Map<String, dynamic> mandiData;
+  const MandiShopsScreen({super.key, required this.mandiData});
+
+  @override
+  Widget build(BuildContext context) {
+    List shops = mandiData['shops'] ?? [];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(mandiData['mandiName'], style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF1A1A1A),
+        foregroundColor: Colors.white,
+      ),
+      body: shops.isEmpty
+          ? const Center(child: Text('इस मंडी में अभी कोई दुकान रजिस्टर्ड नहीं है।'))
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: shops.length,
+              itemBuilder: (context, index) {
+                var shop = shops[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  child: ListTile(
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(25),
+                      child: buildShopOrProdImage(shop['ownerPhotoPath'], 50, 50, Icons.person),
+                    ),
+                    title: Text(shop['shopName'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    subtitle: Text('${shop['shopNumber']} • ${shop['address']}', style: const TextStyle(fontSize: 10)),
+                    trailing: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white, minimumSize: const Size(60, 30)),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => MarketplaceBuyerView(selectedShop: shop)),
+                        );
+                      },
+                      child: const Text('माल देखें', style: TextStyle(fontSize: 10)),
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
+
+// ==========================================
+// TAB 1 / MARKETPLACE BUYER VIEW (Fruit/Vegetable Tabs, Big UI & Live GPS)
 // ==========================================
 class MarketplaceBuyerView extends StatefulWidget {
-  const MarketplaceBuyerView({super.key});
+  final Map<String, dynamic>? selectedShop;
+  const MarketplaceBuyerView({super.key, this.selectedShop});
 
   @override
   State<MarketplaceBuyerView> createState() => _MarketplaceBuyerViewState();
 }
 
 class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
-  bool isWholesaleMarket = false;
+  bool isFruitTab = true; 
   bool _isLoadingCloud = false;
   final Map<String, double> _itemQuantities = {};
 
@@ -269,7 +387,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   }
 
   void _addToCart(Map<String, dynamic> prod, double qty) {
-    var shop = ViziagDatabase.registeredShops[0];
+    var shop = widget.selectedShop ?? ViziagDatabase.mandisList[0]['shops'][0];
     if (shop['isOpen'] == false) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Sorry! Shop is currently CLOSED by Vendor.'), backgroundColor: Colors.red));
       return;
@@ -303,222 +421,260 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     );
   }
 
+  Future<void> _callSupplier(String phoneNumber) async {
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('कॉल करने में असमर्थ!')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    var shop = ViziagDatabase.registeredShops[0];
-    var filteredProducts = ViziagDatabase.productInventory.where((p) => p['isWholesale'] == isWholesaleMarket).toList();
+    var shop = widget.selectedShop ?? ViziagDatabase.mandisList[0]['shops'][0];
+    var filteredProducts = ViziagDatabase.productInventory.where((p) {
+      bool matchesCategory = isFruitTab ? (p['category'] == 'Fruit' || p['category'] == null) : (p['category'] == 'Vegetable');
+      return matchesCategory;
+    }).toList();
 
-    return ListView(
-      padding: const EdgeInsets.all(8),
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          color: Colors.white,
-          child: Row(
-            children: [
-              ToggleButtons(
-                isSelected: [!isWholesaleMarket, isWholesaleMarket],
-                onPressed: (index) => setState(() => isWholesaleMarket = index == 1),
-                borderRadius: BorderRadius.circular(6),
-                selectedColor: Colors.white,
-                fillColor: const Color(0xFFFF5722),
-                color: Colors.black,
-                constraints: const BoxConstraints(minHeight: 28, minWidth: 70),
-                children: const [
-                  Text('Retail', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                  Text('Wholesale', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const Spacer(),
-              if (shop['isOpen'] == false)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
-                  child: const Text('SHOP CLOSED', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                ),
-              const SizedBox(width: 4),
-              TextButton.icon(
-                onPressed: _fetchProductsFromCloud,
-                icon: const Icon(Icons.sync, size: 14),
-                label: const Text('Sync', style: TextStyle(fontSize: 11)),
-              ),
-            ],
-          ),
-        ),
-        if (_isLoadingCloud) const LinearProgressIndicator(color: Color(0xFFFF5722)),
-        const SizedBox(height: 8),
-
-        // Shop Banner Profile
-        Container(
-          decoration: BoxDecoration(
+    return Scaffold(
+      appBar: widget.selectedShop != null
+          ? AppBar(title: Text(shop['shopName'], style: const TextStyle(fontSize: 14)), backgroundColor: const Color(0xFF1A1A1A), foregroundColor: Colors.white)
+          : null,
+      body: ListView(
+        padding: const EdgeInsets.all(8),
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4, spreadRadius: 1)],
+            child: Row(
+              children: [
+                ToggleButtons(
+                  isSelected: [isFruitTab, !isFruitTab],
+                  onPressed: (index) => setState(() => isFruitTab = index == 0),
+                  borderRadius: BorderRadius.circular(6),
+                  selectedColor: Colors.white,
+                  fillColor: const Color(0xFFFF5722),
+                  color: Colors.black,
+                  constraints: const BoxConstraints(minHeight: 32, minWidth: 90),
+                  children: const [
+                    Text('🍎 Fruit (फल)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    Text('🥦 Vegetable (सब्जी)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _fetchProductsFromCloud,
+                  icon: const Icon(Icons.sync, size: 14),
+                  label: const Text('Sync', style: TextStyle(fontSize: 11)),
+                ),
+              ],
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                height: 110,
-                width: double.infinity,
-                child: shop['shopBannerPath'] != null && shop['shopBannerPath'].isNotEmpty
-                    ? buildShopOrProdImage(shop['shopBannerPath'], 110, double.infinity, Icons.store)
-                    : Container(color: const Color(0xFF2C3E50), child: const Center(child: Text('🏪 Storefront Banner View', style: TextStyle(color: Colors.white70, fontSize: 11)))),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(10.0),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 55,
-                      height: 55,
-                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFFF5722), width: 2)),
-                      child: ClipOval(
-                        child: shop['ownerPhotoPath'] != null && shop['ownerPhotoPath'].isNotEmpty
-                            ? buildShopOrProdImage(shop['ownerPhotoPath'], 55, 55, Icons.person)
-                            : Container(color: Colors.grey.shade200, child: const Icon(Icons.person, size: 30, color: Colors.grey)),
+          if (_isLoadingCloud) const LinearProgressIndicator(color: Color(0xFFFF5722)),
+          const SizedBox(height: 8),
+
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4, spreadRadius: 1)],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 110,
+                  width: double.infinity,
+                  child: shop['shopBannerPath'] != null && shop['shopBannerPath'].isNotEmpty
+                      ? buildShopOrProdImage(shop['shopBannerPath'], 110, double.infinity, Icons.store)
+                      : Container(color: const Color(0xFF2C3E50), child: const Center(child: Text('🏪 Storefront Banner View', style: TextStyle(color: Colors.white70, fontSize: 11)))),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(10.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 55,
+                        height: 55,
+                        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFFF5722), width: 2)),
+                        child: ClipOval(
+                          child: shop['ownerPhotoPath'] != null && shop['ownerPhotoPath'].isNotEmpty
+                              ? buildShopOrProdImage(shop['ownerPhotoPath'], 55, 55, Icons.person)
+                              : Container(color: Colors.grey.shade200, child: const Icon(Icons.person, size: 30, color: Colors.grey)),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(shop['shopName'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            Text('📍 ${shop['address']}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                            const SizedBox(height: 2),
+                            Text('📞 ${shop['phone']}', style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                        onPressed: () => _callSupplier(shop['phone'] ?? '9971968060'),
+                        icon: const Icon(Icons.phone, size: 14),
+                        label: const Text('Call', style: TextStyle(fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text('✨ मंडी के थोक भाव & आइटम्स (Wholesale Catalog)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 6),
+
+          filteredProducts.isEmpty
+              ? const Padding(padding: EdgeInsets.all(30.0), child: Center(child: Text('इस श्रेणी में अभी कोई आइटम उपलब्ध नहीं है!')))
+              : GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.62,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: filteredProducts.length,
+                  itemBuilder: (context, index) {
+                    var prod = filteredProducts[index];
+                    String prodKey = prod['id'] ?? prod['name'];
+                    double unitPrice = (prod['price'] ?? 100.0).toDouble();
+                    double selectedQty = _itemQuantities[prodKey] ?? 1.0;
+                    double totalPrice = unitPrice * selectedQty;
+                    bool inStock = prod['inStock'] ?? true;
+
+                    return Card(
+                      elevation: 2,
+                      margin: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(shop['shopName'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          Text('📍 ${shop['address']}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                          const SizedBox(height: 2),
-                          Text('📞 WhatsApp: ${shop['whatsappNumber']}', style: const TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 2),
-                          Text(shop['bio'], style: const TextStyle(fontSize: 10, color: Colors.black87), maxLines: 2, overflow: TextOverflow.ellipsis),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Text('✨ Shop Items & Catalog', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        const SizedBox(height: 6),
-
-        // Grid View
-        filteredProducts.isEmpty
-            ? const Padding(padding: EdgeInsets.all(30.0), child: Center(child: Text('No products available right now!')))
-            : GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3, 
-                  childAspectRatio: 0.48,
-                  crossAxisSpacing: 6,
-                  mainAxisSpacing: 6,
-                ),
-                itemCount: filteredProducts.length,
-                itemBuilder: (context, index) {
-                  var prod = filteredProducts[index];
-                  String prodKey = prod['id'] ?? prod['name'];
-                  double unitPrice = (prod['price'] ?? 100.0).toDouble();
-                  double selectedQty = _itemQuantities[prodKey] ?? 1.0;
-                  double totalPrice = unitPrice * selectedQty;
-                  bool inStock = prod['inStock'] ?? true;
-
-                  return Card(
-                    elevation: 1,
-                    margin: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                              child: buildShopOrProdImage(prod['imagePath'], 70, double.infinity, Icons.fastfood),
-                            ),
-                            if (!inStock)
-                              Container(
-                                height: 70,
-                                color: Colors.black.withOpacity(0.6),
-                                child: const Center(
-                                  child: Text('OUT OF STOCK', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
-                                ),
-                              ),
-                          ],
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(4.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                    Text('₹${unitPrice.toInt()}/${prod['unit'] ?? 'kg'}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 9)),
-                                  ],
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Text('Qty:', style: TextStyle(fontSize: 7)),
-                                        const SizedBox(width: 2),
-                                        SizedBox(
-                                          width: 26,
-                                          height: 16,
-                                          child: TextField(
-                                            keyboardType: TextInputType.number,
-                                            style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
-                                            decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 0)),
-                                            controller: TextEditingController(text: selectedQty.toInt().toString())
-                                              ..selection = TextSelection.fromPosition(TextPosition(offset: selectedQty.toInt().toString().length)),
-                                            onChanged: (val) {
-                                              double? q = double.tryParse(val);
-                                              if (q != null && q > 0) setState(() => _itemQuantities[prodKey] = q);
-                                            },
+                          Stack(
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: Text(prod['name']),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox(
+                                            height: 200,
+                                            width: double.infinity,
+                                            child: buildShopOrProdImage(prod['imagePath'], 200, double.infinity, Icons.fastfood),
                                           ),
-                                        ),
+                                          const SizedBox(height: 10),
+                                          Text('भाव: ₹${unitPrice.toInt()}/${prod['unit'] ?? 'kg'}'),
+                                          const Text('यहाँ प्रोडक्ट की गैलरी फोटो दिखेंगी।'),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('बंद करें'))
                                       ],
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text('Total: ₹${totalPrice.toInt()}', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.blue)),
-                                    const SizedBox(height: 2),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 20,
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: inStock ? const Color(0xFFE91E63) : Colors.grey,
-                                          foregroundColor: Colors.white,
-                                          padding: EdgeInsets.zero,
-                                        ),
-                                        onPressed: inStock ? () => _addToCart(prod, selectedQty) : null,
-                                        child: Text(inStock ? 'Add to Cart' : 'Out of Stock', style: const TextStyle(fontSize: 7, fontWeight: FontWeight.bold)),
-                                      ),
-                                    ),
-                                  ],
+                                  );
+                                },
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                                  child: buildShopOrProdImage(prod['imagePath'], 120, double.infinity, Icons.fastfood),
                                 ),
-                              ],
+                              ),
+                              if (!inStock)
+                                Container(
+                                  height: 120,
+                                  color: Colors.black.withOpacity(0.6),
+                                  child: const Center(
+                                    child: Text('OUT OF STOCK', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.all(6.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      Text('₹${unitPrice.toInt()}/${prod['unit'] ?? 'kg'}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
+                                    ],
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Text('Qty:', style: TextStyle(fontSize: 10)),
+                                          const SizedBox(width: 4),
+                                          SizedBox(
+                                            width: 35,
+                                            height: 22,
+                                            child: TextField(
+                                              keyboardType: TextInputType.number,
+                                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                              decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 0)),
+                                              controller: TextEditingController(text: selectedQty.toInt().toString())
+                                                ..selection = TextSelection.fromPosition(TextPosition(offset: selectedQty.toInt().toString().length)),
+                                              onChanged: (val) {
+                                                double? q = double.tryParse(val);
+                                                if (q != null && q > 0) setState(() => _itemQuantities[prodKey] = q);
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text('Total: ₹${totalPrice.toInt()}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
+                                      const SizedBox(height: 4),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        height: 26,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: inStock ? const Color(0xFFFF5722) : Colors.grey,
+                                            foregroundColor: Colors.white,
+                                            padding: EdgeInsets.zero,
+                                          ),
+                                          onPressed: inStock ? () => _addToCart(prod, selectedQty) : null,
+                                          child: Text(inStock ? 'Add to Cart' : 'Out of Stock', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-      ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ],
+      ),
     );
   }
 }
 
 // ==========================================
-// 🔐 VENDOR LOGIN, DOUBLE PIN & PORTAL WRAPPER
+// 🔐 VENDOR LOGIN & PORTAL WRAPPER
 // ==========================================
 class VendorAuthAndPortalView extends StatefulWidget {
   const VendorAuthAndPortalView({super.key});
@@ -528,7 +684,7 @@ class VendorAuthAndPortalView extends StatefulWidget {
 }
 
 class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
-  bool _isLoggedIn = false; // चेक करेगा कि वेंडर ने पिन डालकर लॉगइन किया है या नहीं
+  bool _isLoggedIn = false;
   final TextEditingController _loginPhoneCtrl = TextEditingController();
   final TextEditingController _loginPinCtrl = TextEditingController();
 
@@ -539,7 +695,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   bool _isRegisteringNew = false;
   bool _isLoadingAuth = false;
 
-  // फायरबेस से वेंडर का पिन चेक करना या नया पिन सेव करना
   Future<void> _verifyOrLoginVendor() async {
     String phone = _loginPhoneCtrl.text.trim();
     String pin = _loginPinCtrl.text.trim();
@@ -614,7 +769,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   @override
   Widget build(BuildContext context) {
     if (!_isLoggedIn) {
-      // 🔐 Login / Register PIN Screen
       return Padding(
         padding: const EdgeInsets.all(16.0),
         child: Center(
@@ -633,7 +787,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                   const Icon(Icons.lock_person, size: 50, color: Color(0xFFFF5722)),
                   const SizedBox(height: 10),
                   Text(
-                    _isRegisteringNew ? '🛠️नया पिन बनाएं (Create PIN)' : '🔐 दुकानदार लॉगिन (Vendor Login)',
+                    _isRegisteringNew ? '🛠️ नया पिन बनाएं (Create PIN)' : '🔐 दुकानदार लॉगिन (Vendor Login)',
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
@@ -710,13 +864,12 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // ✅ Once logged in via PIN, show the actual Shop Register & Product Update Portal
     return const ShopRegisterAndUpdateView();
   }
 }
 
 // ==========================================
-// TAB 2: VENDOR PORTAL (SHOP DETAILS, WHATSAPP, ITEMS, STATUS & DELETE)
+// TAB 2: VENDOR PORTAL
 // ==========================================
 class ShopRegisterAndUpdateView extends StatefulWidget {
   const ShopRegisterAndUpdateView({super.key});
@@ -726,31 +879,43 @@ class ShopRegisterAndUpdateView extends StatefulWidget {
 }
 
 class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
-  late final TextEditingController _shopNameCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['shopName']);
-  late final TextEditingController _ownerNameCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['ownerName']);
-  late final TextEditingController _shopWhatsappCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['whatsappNumber']);
-  late final TextEditingController _shopAddressCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['address']);
-  late final TextEditingController _shopBioCtrl = TextEditingController(text: ViziagDatabase.registeredShops[0]['bio']);
+  // Safe reference to active shop
+  Map<String, dynamic> get activeShop => ViziagDatabase.mandisList[0]['shops'][0];
+
+  late final TextEditingController _shopNameCtrl = TextEditingController(text: activeShop['shopName']);
+  late final TextEditingController _ownerNameCtrl = TextEditingController(text: activeShop['ownerName']);
+  late final TextEditingController _shopWhatsappCtrl = TextEditingController(text: activeShop['whatsappNumber']);
+  late final TextEditingController _shopAddressCtrl = TextEditingController(text: activeShop['address']);
+  late final TextEditingController _shopBioCtrl = TextEditingController(text: activeShop['bio']);
 
   final TextEditingController _prodNameCtrl = TextEditingController();
   final TextEditingController _priceCtrl = TextEditingController();
   final TextEditingController _stockCtrl = TextEditingController();
 
   String _selectedUnit = 'KG';
-  bool _isWholesaleItem = false;
+  String _selectedCategory = 'Fruit';
   bool _isUploadingToCloud = false;
   String? _pickedProdImagePath;
   final ImagePicker _picker = ImagePicker();
 
-  void _saveShopDetails() {
+  Future<void> _saveShopDetailsToCloud() async {
     setState(() {
-      ViziagDatabase.registeredShops[0]['shopName'] = _shopNameCtrl.text.trim();
-      ViziagDatabase.registeredShops[0]['ownerName'] = _ownerNameCtrl.text.trim();
-      ViziagDatabase.registeredShops[0]['whatsappNumber'] = _shopWhatsappCtrl.text.trim();
-      ViziagDatabase.registeredShops[0]['address'] = _shopAddressCtrl.text.trim();
-      ViziagDatabase.registeredShops[0]['bio'] = _shopBioCtrl.text.trim();
+      activeShop['shopName'] = _shopNameCtrl.text.trim();
+      activeShop['ownerName'] = _ownerNameCtrl.text.trim();
+      activeShop['whatsappNumber'] = _shopWhatsappCtrl.text.trim();
+      activeShop['address'] = _shopAddressCtrl.text.trim();
+      activeShop['bio'] = _shopBioCtrl.text.trim();
     });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Shop Details & WhatsApp Number Saved!'), backgroundColor: Colors.green));
+
+    try {
+      await http.put(
+        Uri.parse('${ViziagDatabase.firebaseRestUrl}/shop_profile.json'),
+        body: json.encode(activeShop),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Shop details synced with Cloud!'), backgroundColor: Colors.green));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cloud sync error: $e')));
+    }
   }
 
   Future<void> _pickProductImage() async {
@@ -766,9 +931,9 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
     if (image != null) {
       final bytes = await image.readAsBytes();
       setState(() {
-        ViziagDatabase.registeredShops[0]['ownerPhotoPath'] = "data:image/jpeg;base64,${base64Encode(bytes)}";
+        activeShop['ownerPhotoPath'] = "data:image/jpeg;base64,${base64Encode(bytes)}";
       });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Owner Photo Updated!')));
+      _saveShopDetailsToCloud();
     }
   }
 
@@ -777,9 +942,9 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
     if (image != null) {
       final bytes = await image.readAsBytes();
       setState(() {
-        ViziagDatabase.registeredShops[0]['shopBannerPath'] = "data:image/jpeg;base64,${base64Encode(bytes)}";
+        activeShop['shopBannerPath'] = "data:image/jpeg;base64,${base64Encode(bytes)}";
       });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Banner Photo Updated!')));
+      _saveShopDetailsToCloud();
     }
   }
 
@@ -790,7 +955,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
     }
 
     setState(() => _isUploadingToCloud = true);
-    var activeShop = ViziagDatabase.registeredShops[0];
 
     var newProduct = {
       'id': 'p_${DateTime.now().millisecondsSinceEpoch}',
@@ -801,7 +965,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
       'unit': _selectedUnit,
       'stock': int.tryParse(_stockCtrl.text) ?? 20,
       'imagePath': _pickedProdImagePath ?? '',
-      'isWholesale': _isWholesaleItem,
+      'category': _selectedCategory,
       'inStock': true,
     };
 
@@ -857,8 +1021,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
 
   @override
   Widget build(BuildContext context) {
-    var shop = ViziagDatabase.registeredShops[0];
-    bool isShopOpen = shop['isOpen'] ?? true;
+    bool isShopOpen = activeShop['isOpen'] ?? true;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -866,7 +1029,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         const Text('🛠️ Vendor Control Panel & Shop Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
 
-        // 🏪 Shop Open/Close Master Button
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -888,7 +1050,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
                 value: isShopOpen,
                 activeColor: Colors.green,
                 onChanged: (val) {
-                  setState(() => shop['isOpen'] = val);
+                  setState(() => activeShop['isOpen'] = val);
                 },
               ),
             ],
@@ -907,7 +1069,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
           keyboardType: TextInputType.phone, 
           decoration: const InputDecoration(
             labelText: 'WhatsApp Number (e.g. 919971968060)', 
-            helperText: 'ऑर्डर इसी नंबर पर WhatsApp पर जाएगा (देश का कोड 91 जरूर लगाएं)',
+            helperText: 'ऑर्डर इसी नंबर पर WhatsApp पर जाएगा',
             helperStyle: TextStyle(fontSize: 9),
             border: OutlineInputBorder(), 
             isDense: true
@@ -920,8 +1082,8 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         const SizedBox(height: 8),
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
-          onPressed: _saveShopDetails,
-          child: const Text('Save Shop & WhatsApp Number'),
+          onPressed: _saveShopDetailsToCloud,
+          child: const Text('Save Shop & Permanent Sync'),
         ),
         const SizedBox(height: 10),
 
@@ -946,7 +1108,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         ),
         const Divider(height: 25),
 
-        const Text('📦 Add New Item', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        const Text('📦 Add New Item (Fruit / Vegetable)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         TextField(controller: _prodNameCtrl, decoration: const InputDecoration(labelText: 'Item Name', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
@@ -969,10 +1131,10 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         const SizedBox(height: 8),
         Row(
           children: [
-            const Text('Type: '),
-            ChoiceChip(label: const Text('Retail'), selected: !_isWholesaleItem, onSelected: (val) => setState(() => _isWholesaleItem = false)),
+            const Text('Category: '),
+            ChoiceChip(label: const Text('Fruit (फल)'), selected: _selectedCategory == 'Fruit', onSelected: (val) => setState(() => _selectedCategory = 'Fruit')),
             const SizedBox(width: 8),
-            ChoiceChip(label: const Text('Wholesale'), selected: _isWholesaleItem, onSelected: (val) => setState(() => _isWholesaleItem = true)),
+            ChoiceChip(label: const Text('Vegetable (सब्जी)'), selected: _selectedCategory == 'Vegetable', onSelected: (val) => setState(() => _selectedCategory = 'Vegetable')),
           ],
         ),
         const SizedBox(height: 8),
@@ -1027,7 +1189,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                Text('₹${prod['price']} / ${prod['unit'] ?? 'KG'} • ${prod['isWholesale'] == true ? 'Wholesale' : 'Retail'}', style: const TextStyle(fontSize: 11, color: Colors.green)),
+                                Text('₹${prod['price']} / ${prod['unit'] ?? 'KG'} • ${prod['category'] ?? 'Fruit'}', style: const TextStyle(fontSize: 11, color: Colors.green)),
                                 const SizedBox(height: 4),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -1134,7 +1296,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       return;
     }
 
-    String vendorPhone = ViziagDatabase.registeredShops[0]['whatsappNumber'] ?? '919971968060';
+    String vendorPhone = ViziagDatabase.mandisList[0]['shops'][0]['whatsappNumber'] ?? '919971968060';
     String message = "🛍️ *New Order from Viziag Mart*\n\n👤 *Customer:* ${ViziagDatabase.currentCustomerName}\n📞 *Phone:* ${ViziagDatabase.currentUserPhone}\n📍 *Address:* ${ViziagDatabase.currentDeliveryAddress}\n\n";
 
     double grandTotal = 0;
@@ -1153,13 +1315,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        String fallbackUrl = "whatsapp://send?phone=$vendorPhone&text=${Uri.encodeComponent(message)}";
-        final Uri fallbackUri = Uri.parse(fallbackUrl);
-        if (await canLaunchUrl(fallbackUri)) {
-          await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ WhatsApp is not installed on this device!')));
-        }
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ WhatsApp is not installed on this device!')));
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('⚠️ Error opening WhatsApp: $e')));
@@ -1245,7 +1401,7 @@ class SettingsConfigView extends StatelessWidget {
       children: const [
         Text('⚙️ Settings & Vendor Configuration', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         Divider(),
-        Text('All product images and details are safely synced with Firebase Cloud Realtime Database and remain persistent even after app reinstallation.'),
+        Text('All multi-mandi directories, shop photos, and inventory are safely synced with Firebase Cloud Realtime Database and remain permanent.'),
       ],
     );
   }
