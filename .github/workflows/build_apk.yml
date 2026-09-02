@@ -24,7 +24,7 @@ jobs:
           cp lib/main.dart /tmp/backup/main.dart
 
       
-        run: |
+        
           flutter create . --project-name=desi_ai_app --platforms=android --org=com.example.app
 
       - name: Restore AI main.dart
