@@ -91,6 +91,7 @@ class ViziagDatabase {
 
   static List<Map<String, dynamic>> productInventory = [];
   static List<Map<String, dynamic>> cartItems = [];
+  static List<Map<String, dynamic>> fetchedCustomerOrders = []; // 📥 ड्राइवर के लिए फेच किए गए ऑर्डर्स
 }
 
 // ==========================================
@@ -109,7 +110,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
   final List<Widget> _tabScreens = [
     const MandiDirectoryView(), 
     const VendorAuthAndPortalView(), 
-    const TempoDriverDashboardView(), // 🚚 टेम्पो ड्राइवर डैशबोर्ड और जीपीएस सेटिंग्स
+    const TempoDriverDashboardView(), // 🚚 टेम्पो ड्राइवर डैशबोर्ड और "Fetch Orders" सिस्टम
     const UserLoginAndAddressView(),
     const CartAndWhatsAppCheckoutView(), 
   ];
@@ -246,7 +247,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
 }
 
 // ==========================================
-// IMAGE HELPER (Permanent Storage & Rendering)
+// IMAGE HELPER
 // ==========================================
 Widget buildShopOrProdImage(String? path, double height, double width, IconData fallbackIcon) {
   if (path != null && path.isNotEmpty) {
@@ -316,9 +317,6 @@ class MandiDirectoryView extends StatelessWidget {
   }
 }
 
-// ==========================================
-// MANDI SHOPS LIST SCREEN
-// ==========================================
 class MandiShopsScreen extends StatelessWidget {
   final Map<String, dynamic> mandiData;
   const MandiShopsScreen({super.key, required this.mandiData});
@@ -368,7 +366,7 @@ class MandiShopsScreen extends StatelessWidget {
 }
 
 // ==========================================
-// MARKETPLACE BUYER VIEW & LIVE TEMPO TRACKING
+// MARKETPLACE BUYER VIEW
 // ==========================================
 class MarketplaceBuyerView extends StatefulWidget {
   final Map<String, dynamic>? selectedShop;
@@ -473,7 +471,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
       body: ListView(
         padding: const EdgeInsets.all(8),
         children: [
-          // 🚚 लाइव टेम्पो ट्रैकिंग विजेट (खरीदार के लिए)
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -734,7 +731,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 }
 
 // ==========================================
-// 🚚 TEMPO DRIVER DASHBOARD & GPS SETTINGS
+// 🚚 TEMPO DRIVER DASHBOARD & FETCH ORDERS SYSTEM
 // ==========================================
 class TempoDriverDashboardView extends StatefulWidget {
   const TempoDriverDashboardView({super.key});
@@ -744,99 +741,141 @@ class TempoDriverDashboardView extends StatefulWidget {
 }
 
 class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
-  late final TextEditingController _driverNameCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['driverName']);
-  late final TextEditingController _driverPhoneCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['driverPhone']);
-  late final TextEditingController _vehicleNumCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['vehicleNumber']);
-  late final TextEditingController _vehicleModelCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['vehicleModel']);
-  late final TextEditingController _locationNameCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['currentLocationName']);
-  late final TextEditingController _latCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['latitude'].toString());
-  late final TextEditingController _lngCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['longitude'].toString());
+  bool _isFetchingOrders = false;
 
-  bool _isSaving = false;
-
-  Future<void> _saveTempoDetailsToCloud() async {
-    setState(() => _isSaving = true);
+  // 📥 फायरबेस से ग्राहकों के सारे ऑर्डर फेच करना
+  Future<void> _fetchCustomerOrdersFromFirebase() async {
+    setState(() => _isFetchingOrders = true);
     try {
-      ViziagDatabase.tempoDriverProfile['driverName'] = _driverNameCtrl.text.trim();
-      ViziagDatabase.tempoDriverProfile['driverPhone'] = _driverPhoneCtrl.text.trim();
-      ViziagDatabase.tempoDriverProfile['vehicleNumber'] = _vehicleNumCtrl.text.trim();
-      ViziagDatabase.tempoDriverProfile['vehicleModel'] = _vehicleModelCtrl.text.trim();
-      ViziagDatabase.tempoDriverProfile['currentLocationName'] = _locationNameCtrl.text.trim();
-      ViziagDatabase.tempoDriverProfile['latitude'] = double.tryParse(_latCtrl.text) ?? 28.4089;
-      ViziagDatabase.tempoDriverProfile['longitude'] = double.tryParse(_lngCtrl.text) ?? 77.3178;
-
-      await http.put(
-        Uri.parse('${ViziagDatabase.firebaseRestUrl}/tempo_driver.json'),
-        body: json.encode(ViziagDatabase.tempoDriverProfile),
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ टेम्पो ड्राइवर डिटेल्स और जीपीएस लाइव सिंक हो गए!'), backgroundColor: Colors.green));
+      final response = await http.get(Uri.parse('${ViziagDatabase.firebaseRestUrl}/orders.json'));
+      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
+        Map<String, dynamic> data = json.decode(response.body);
+        List<Map<String, dynamic>> ordersList = [];
+        data.forEach((key, value) {
+          var order = Map<String, dynamic>.from(value);
+          order['orderKey'] = key;
+          ordersList.add(order);
+        });
+        setState(() {
+          ViziagDatabase.fetchedCustomerOrders = ordersList.reversed.toList();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('✅ ${ordersList.length} ऑर्डर सफलतापूर्व फेच हो गए!'), backgroundColor: Colors.green),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('⚠️ अभी कोई नया ऑर्डर नहीं मिला है।'), backgroundColor: Colors.orange),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
-      setState(() => _isSaving = false);
+      setState(() => _isFetchingOrders = false);
+    }
+  }
+
+  // 📲 ड्राइवर द्वारा व्हाट्सएप पर ग्राहक को ऑर्डर और लाइव लोकेशन भेजना
+  Future<void> _sendLocationAndOrderToCustomer(Map<String, dynamic> order) async {
+    String custPhone = order['customerPhone'] ?? '9971968060';
+    String custName = order['customerName'] ?? 'ग्राहक';
+    String custAddress = order['customerAddress'] ?? '';
+
+    // व्हाट्सएप मैसेज फॉर्मेट
+    String message = "🚚 *Viziag Mart Tempo Dispatch*\n\nनमस्ते $custName जी,\nआपका माल टेम्पो में लोड हो चुका है और ड्राइवर आपके पते पर रवाना हो रहा है।\n\n📍 *डिलिवरी पता:* $custAddress\n\n📍 *अपनी 8 घंटे की Live Location देखने के लिए यहाँ क्लिक करें:* [ड्राइवर अपनी व्हाट्सएप Live Location इसी चैट पर भेज रहा है]\n\nकृपया तैयार रहें!";
+
+    String whatsappUrl = "https://wa.me/$custPhone?text=${Uri.encodeComponent(message)}";
+    final Uri uri = Uri.parse(whatsappUrl);
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ WhatsApp नहीं खुल सका!')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    var tempo = ViziagDatabase.tempoDriverProfile;
+    var orders = ViziagDatabase.fetchedCustomerOrders;
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(12.0),
       child: ListView(
         children: [
-          const Text('🚚 टेम्पो ड्राइवर एवं जीपीएस डैशबोर्ड', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const Text('यहाँ ड्राइवर अपनी गाड़ी नंबर, नाम और लाइव जीपीएस लोकेशन अपडेट कर सकते हैं।', style: TextStyle(fontSize: 11, color: Colors.grey)),
-          const SizedBox(height: 15),
-
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.blue)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('🟢 एक्टिव स्टेटस: ${tempo['isAvailable'] ? "Online (Duty पर)" : "Offline"}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-                const SizedBox(height: 4),
-                SwitchListTile(
-                  title: const Text('डिफ़ॉल्ट ड्यूटी स्टेटस (On/Off Duty)', style: TextStyle(fontSize: 12)),
-                  value: tempo['isAvailable'],
-                  onChanged: (val) {
-                    setState(() => tempo['isAvailable'] = val);
-                  },
-                ),
-              ],
-            ),
-          ),
+          const Text('🚚 टेम्पो ड्राइवर डैशबोर्ड & आर्डर मैनेजर', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text('यहाँ से ड्राइवर सभी ग्राहकों के ऑर्डर फेच करके उन्हें व्हाट्सएप और लोकेशन भेज सकता है।', style: TextStyle(fontSize: 11, color: Colors.grey)),
           const SizedBox(height: 12),
 
-          TextField(controller: _driverNameCtrl, decoration: const InputDecoration(labelText: 'ड्राइवर का नाम (Driver Name)', border: OutlineInputBorder(), isDense: true)),
-          const SizedBox(height: 10),
-          TextField(controller: _driverPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'मोबाइल नंबर (Phone Number)', border: OutlineInputBorder(), isDense: true)),
-          const SizedBox(height: 10),
-          TextField(controller: _vehicleNumCtrl, decoration: const InputDecoration(labelText: 'गाड़ी नंबर (Vehicle Number e.g. HR-51-AB-1234)', border: OutlineInputBorder(), isDense: true)),
-          const SizedBox(height: 10),
-          TextField(controller: _vehicleModelCtrl, decoration: const InputDecoration(labelText: 'गाड़ी मॉडल (Vehicle Model)', border: OutlineInputBorder(), isDense: true)),
-          const SizedBox(height: 10),
-          TextField(controller: _locationNameCtrl, decoration: const InputDecoration(labelText: 'वर्तमान स्थान (Current Area Name)', border: OutlineInputBorder(), isDense: true)),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: TextField(controller: _latCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Latitude (GPS)', border: OutlineInputBorder(), isDense: true))),
-              const SizedBox(width: 8),
-              Expanded(child: TextField(controller: _lngCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Longitude (GPS)', border: OutlineInputBorder(), isDense: true))),
-            ],
+          // 📥 Fetch Orders Button
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade800, foregroundColor: Colors.white),
+              onPressed: _isFetchingOrders ? null : _fetchCustomerOrdersFromFirebase,
+              icon: const Icon(Icons.download_done),
+              label: Text(_isFetchingOrders ? 'Fetching Orders...' : '📥 Fetch All Customer Orders from Firebase 🚀', style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
           ),
           const SizedBox(height: 15),
-          _isSaving
-              ? const Center(child: CircularProgressIndicator())
-              : ElevatedButton.styleFrom != null
-                  ? ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
-                      onPressed: _saveTempoDetailsToCloud,
-                      child: const Text('सेव करें और लाइव GPS सिंक करें 🚀'),
-                    )
-                  : Container(),
+
+          const Text('📦 फेच किए गए ग्राहकों के ऑर्डर्स (Active Orders List):', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+
+          orders.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(40.0),
+                    child: Text('कोई आर्डर फेच नहीं हुआ है। ऊपर दिए गए बटन पर क्लिक करें।', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: orders.length,
+                  itemBuilder: (context, index) {
+                    var order = orders[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      elevation: 2,
+                      child: Padding(
+                        padding: const EdgeInsets.all(10.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('👤 ${order['customerName']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                Text('📞 ${order['customerPhone']}', style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text('📍 पता: ${order['customerAddress']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                            const SizedBox(height: 6),
+                            const Divider(height: 1),
+                            const SizedBox(height: 6),
+                            Text('🛒 कुल राशि: ₹${order['grandTotal'] ?? 0}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 36,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+                                onPressed: () => _sendLocationAndOrderToCustomer(order),
+                                icon: const Icon(Icons.chat, size: 16),
+                                label: const Text('WhatsApp पर आर्डर और Live Location भेजें 📍', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ],
       ),
     );
@@ -844,7 +883,7 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
 }
 
 // ==========================================
-// 🔐 VENDOR LOGIN & PORTAL
+// VENDOR LOGIN & PORTAL
 // ==========================================
 class VendorAuthAndPortalView extends StatefulWidget {
   const VendorAuthAndPortalView({super.key});
@@ -1120,28 +1159,6 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
     }
   }
 
-  Future<void> _deleteProduct(int index, Map<String, dynamic> prod) async {
-    String? firebaseKey = prod['firebaseKey'];
-    try {
-      if (firebaseKey != null) {
-        await http.delete(Uri.parse('${ViziagDatabase.firebaseRestUrl}/products/$firebaseKey.json'));
-      }
-      setState(() {
-        ViziagDatabase.productInventory.removeAt(index);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ Item Deleted Successfully!')));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting: $e')));
-    }
-  }
-
-  void _toggleStockStatus(int index) {
-    setState(() {
-      bool currentStatus = ViziagDatabase.productInventory[index]['inStock'] ?? true;
-      ViziagDatabase.productInventory[index]['inStock'] = !currentStatus;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     bool isShopOpen = activeShop['isOpen'] ?? true;
@@ -1307,7 +1324,7 @@ class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
 }
 
 // ==========================================
-// WHATSAPP CHECKOUT CART
+// WHATSAPP CHECKOUT CART (FIREBASE ORDER PUSH)
 // ==========================================
 class CartAndWhatsAppCheckoutView extends StatefulWidget {
   const CartAndWhatsAppCheckoutView({super.key});
@@ -1317,23 +1334,50 @@ class CartAndWhatsAppCheckoutView extends StatefulWidget {
 }
 
 class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutView> {
+  bool _isPlacingOrder = false;
+
   Future<void> _sendOrderToWhatsApp() async {
     if (ViziagDatabase.cartItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your cart is empty!')));
       return;
     }
 
+    setState(() => _isPlacingOrder = true);
+
+    double grandTotal = ViziagDatabase.cartItems.fold(0, (sum, item) => sum + ((item['price'] as double) * (item['qty'] as double)));
+
+    // 1. ऑर्डर को फायरबेस में सेव करें ताकि ड्राइवर "Fetch Orders" से उसे उठा सके
+    var orderData = {
+      'orderId': 'ord_${DateTime.now().millisecondsSinceEpoch}',
+      'customerName': ViziagDatabase.currentCustomerName,
+      'customerPhone': ViziagDatabase.currentUserPhone,
+      'customerAddress': ViziagDatabase.currentDeliveryAddress,
+      'items': ViziagDatabase.cartItems,
+      'grandTotal': grandTotal,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await http.post(
+        Uri.parse('${ViziagDatabase.firebaseRestUrl}/orders.json'),
+        body: json.encode(orderData),
+      );
+    } catch (e) {
+      debugPrint("Order sync error: $e");
+    }
+
+    setState(() => _isPlacingOrder = false);
+
+    // 2. व्हाट्सएप पर मैसेज भेजना
     String vendorPhone = ViziagDatabase.mandisList[0]['shops'][0]['whatsappNumber'] ?? '919971968060';
     String message = "🛍️ *New Order from Viziag Mart*\n\n👤 *Customer:* ${ViziagDatabase.currentCustomerName}\n📞 *Phone:* ${ViziagDatabase.currentUserPhone}\n📍 *Address:* ${ViziagDatabase.currentDeliveryAddress}\n\n";
 
-    double grandTotal = 0;
     for (int i = 0; i < ViziagDatabase.cartItems.length; i++) {
       var item = ViziagDatabase.cartItems[i];
       double itemTotal = (item['price'] as double) * (item['qty'] as double);
-      grandTotal += itemTotal;
       message += "${i + 1}. ${item['name']} - ${item['qty']} ${item['unit']} = *₹${itemTotal.toStringAsFixed(0)}*\n";
     }
-    message += "\n💰 *Grand Total: ₹${grandTotal.toStringAsFixed(0)}*";
+    message += "\n💰 *Grand Total: ₹${grandTotal.toStringAsFixed(0)}*\n\nभाई, ऑर्डर पैक कर देना और टेम्पो रवाना होने पर Live Location भेजना!";
 
     String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(message)}";
     final Uri uri = Uri.parse(whatsappUrl);
@@ -1399,12 +1443,14 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                   SizedBox(
                     width: double.infinity,
                     height: 48,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
-                      onPressed: _sendOrderToWhatsApp,
-                      icon: const Icon(Icons.chat),
-                      label: Text('Send Order to WhatsApp (₹${grandTotal.toStringAsFixed(0)}) 🚀', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ),
+                    child: _isPlacingOrder
+                        ? const Center(child: CircularProgressIndicator())
+                        : ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+                            onPressed: _sendOrderToWhatsApp,
+                            icon: const Icon(Icons.chat),
+                            label: Text('Send Order to WhatsApp (₹${grandTotal.toStringAsFixed(0)}) 🚀', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ),
                   ),
                 ],
               ),
