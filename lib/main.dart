@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:json';
+import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -44,7 +44,6 @@ class ViziagDatabase {
   static String currentCustomerName = "Tarun Kumar";
   static String currentDeliveryAddress = "Sector 15A Ajronda Sabji Mandi, Faridabad";
   
-  // टेम्पो / डिलीवरी पार्टनर डेटा मॉडल (ओरिजिनल जीपीएस इंटीग्रेशन के साथ)
   static Map<String, dynamic> tempoDriverProfile = {
     'driverName': 'राजेश कुमार',
     'driverPhone': '9876543210',
@@ -83,7 +82,6 @@ class ViziagDatabase {
 
   static List<Map<String, dynamic>> productInventory = [];
   static List<Map<String, dynamic>> cartItems = [];
-  static List<Map<String, dynamic>> fetchedCustomerOrders = [];
 }
 
 // ==========================================
@@ -264,7 +262,7 @@ Widget buildShopOrProdImage(String? path, double height, double width, IconData 
 }
 
 // ==========================================
-// STEP 1: MULTI-MANDI & SHOP DIRECTORY VIEW
+// MANDI DIRECTORY VIEW
 // ==========================================
 class MandiDirectoryView extends StatelessWidget {
   const MandiDirectoryView({super.key});
@@ -402,32 +400,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     }
   }
 
-  Future<void> _launchRouteMap() async {
-    var tempo = ViziagDatabase.tempoDriverProfile;
-    double currentLat = tempo['latitude'] ?? 0.0;
-    double currentLng = tempo['longitude'] ?? 0.0;
-    double destLat = tempo['destLatitude'] ?? 0.0;
-    double destLng = tempo['destLongitude'] ?? 0.0;
-
-    if (currentLat == 0.0 || currentLng == 0.0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ लाइव जीपीएस लोकेशन अभी उपलब्ध नहीं है!')));
-      return;
-    }
-
-    String mapUrl = "https://www.google.com/maps/dir/?api=1&origin=$currentLat,$currentLng&destination=$destLat,$destLng&travelmode=driving";
-    final Uri uri = Uri.parse(mapUrl);
-
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ मैप्स खोलने में असमर्थ!')));
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
-  }
-
   void _addToCart(Map<String, dynamic> prod, double qty) {
     var shop = widget.selectedShop ?? ViziagDatabase.mandisList[0]['shops'][0];
     if (shop['isOpen'] == false) {
@@ -471,8 +443,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
       return matchesCategory;
     }).toList();
 
-    var tempo = ViziagDatabase.tempoDriverProfile;
-
     return Scaffold(
       appBar: widget.selectedShop != null
           ? AppBar(title: Text(shop['shopName'], style: const TextStyle(fontSize: 14)), backgroundColor: const Color(0xFF1A1A1A), foregroundColor: Colors.white)
@@ -480,38 +450,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
       body: ListView(
         padding: const EdgeInsets.all(8),
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [Colors.blue.shade900, Colors.blue.shade600]),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.local_shipping, color: Colors.white, size: 36),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('🚚 टेम्पो रूट स्टेटस', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                      Text('गाड़ी: ${tempo['vehicleNumber']} (${tempo['driverName']})', style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                      Text('कहाँ से: ${tempo['startLocationName']}', style: const TextStyle(color: Colors.white60, fontSize: 9)),
-                      Text('डेस्टिनेशन: ${tempo['destinationName']}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.blue.shade900, minimumSize: const Size(60, 30)),
-                  onPressed: _launchRouteMap,
-                  icon: const Icon(Icons.map, size: 14),
-                  label: const Text('Live Route', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             color: Colors.white,
@@ -655,7 +593,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 }
 
 // ==========================================
-// 🚚 TEMPO DRIVER DASHBOARD (ORIGINAL GPS & ROUTE SETUP)
+// 🚚 TEMPO DRIVER DASHBOARD (CLEAN & ACCEPT BUTTONS)
 // ==========================================
 class TempoDriverDashboardView extends StatefulWidget {
   const TempoDriverDashboardView({super.key});
@@ -668,46 +606,80 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
   bool _isUpdatingGps = false;
   Timer? _locationTimer;
   bool _isAutoTrackingActive = false;
+  bool _isLoadingOrders = false;
+  List<Map<String, dynamic>> _incomingOrders = [];
 
-  final TextEditingController _startLocationCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['startLocationName']);
-  final TextEditingController _destLocationCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['destinationName']);
+  @override
+  void initState() {
+    super.initState();
+    _fetchOrdersFromCloud();
+  }
 
   @override
   void dispose() {
     _locationTimer?.cancel(); 
-    _startLocationCtrl.dispose();
-    _destLocationCtrl.dispose();
     super.dispose();
   }
 
-  // जियोकोडिंग के जरिए एड्रेस से सटीक Lat/Lng निकालने का ओरिजिनल मेथड
-  Future<void> _saveDriverRouteDestination() async {
-    String startAddr = _startLocationCtrl.text.trim();
-    String destAddr = _destLocationCtrl.text.trim();
-
-    setState(() {
-      ViziagDatabase.tempoDriverProfile['startLocationName'] = startAddr;
-      ViziagDatabase.tempoDriverProfile['destinationName'] = destAddr;
-    });
-
+  Future<void> _fetchOrdersFromCloud() async {
+    setState(() => _isLoadingOrders = true);
     try {
-      // जियोलोकेटर से करंट जीपीएस लोकेशन उठाएं
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      ViziagDatabase.tempoDriverProfile['latitude'] = position.latitude;
-      ViziagDatabase.tempoDriverProfile['longitude'] = position.longitude;
-      
-      // डेस्टिनेशन कोऑर्डिनेट्स के लिए जियोकोडिंग या करंट पोजीशन का उपयोग
-      // यहाँ पर डेस्टिनेशन के लिए भी लाइव जीपीएस या ओरिजिनल लोकेशन सेट की जा रही है
-      ViziagDatabase.tempoDriverProfile['destLatitude'] = position.latitude + 0.01; 
-      ViziagDatabase.tempoDriverProfile['destLongitude'] = position.longitude + 0.01;
+      final response = await http.get(Uri.parse('${ViziagDatabase.firebaseRestUrl}/orders.json'));
+      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
+        Map<String, dynamic> data = json.decode(response.body);
+        List<Map<String, dynamic>> list = [];
+        data.forEach((key, val) {
+          var item = Map<String, dynamic>.from(val);
+          item['firebaseKey'] = key;
+          item['isAcceptedByTempo'] = item['isAcceptedByTempo'] ?? false;
+          list.add(item);
+        });
+        setState(() {
+          _incomingOrders = list.reversed.toList();
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching orders: $e");
+    } finally {
+      setState(() => _isLoadingOrders = false);
+    }
+  }
+
+  Future<void> _acceptSingleOrder(String orderKey) async {
+    try {
+      await http.patch(
+        Uri.parse('${ViziagDatabase.firebaseRestUrl}/orders/$orderKey.json'),
+        body: json.encode({'isAcceptedByTempo': true}),
+      );
+      _fetchOrdersFromCloud();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Order Accepted by Tempo Driver!'), backgroundColor: Colors.green));
+    } catch (e) {
+      debugPrint("Error accepting order: $e");
+    }
+  }
+
+  Future<void> _startRouteAndGps() async {
+    setState(() => _isUpdatingGps = true);
+    try {
+      await _updateLiveGpsToCloud();
+      setState(() {
+        _isAutoTrackingActive = true;
+      });
+
+      _locationTimer?.cancel();
+      _locationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+        _updateLiveGpsToCloud();
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🎯 ओरिजिनल जीपीएस कोऑर्डिनेट्स के साथ रूट सेव हो गया!'), backgroundColor: Colors.green),
+        const SnackBar(content: Text('🟢 टेम्पो सफर शुरू हो गया और जीपीएस ट्रैकिंग चालू हो गई!'), backgroundColor: Colors.green),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('⚠️ जीपीएस फेच करने में असफल: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('⚠️ एरर: $e'), backgroundColor: Colors.red),
       );
+    } finally {
+      setState(() => _isUpdatingGps = false);
     }
   }
 
@@ -748,139 +720,74 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
     }
   }
 
-  void _toggleAutoTracking() {
-    if (_isAutoTrackingActive) {
-      _locationTimer?.cancel();
-      setState(() => _isAutoTrackingActive = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🛑 सफर रोक दिया गया।'), backgroundColor: Colors.red));
-    } else {
-      setState(() => _isAutoTrackingActive = true);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🟢 सफर शुरू! लाइव GPS ट्रैकिंग चालू हो गई।'), backgroundColor: Colors.green));
-
-      _updateLiveGpsToCloud();
-      _locationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-        _updateLiveGpsToCloud(); 
-      });
-    }
-  }
-
-  Future<void> _manualSyncGps() async {
-    setState(() => _isUpdatingGps = true);
-    await _updateLiveGpsToCloud();
-    setState(() => _isUpdatingGps = false);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 GPS लोकेशन क्लाउड पर सिंक हो गई!'), backgroundColor: Colors.green));
-  }
-
-  Future<void> _openLiveRouteMap() async {
-    var tempo = ViziagDatabase.tempoDriverProfile;
-    double currentLat = tempo['latitude'] ?? 0.0;
-    double currentLng = tempo['longitude'] ?? 0.0;
-    double destLat = tempo['destLatitude'] ?? 0.0;
-    double destLng = tempo['destLongitude'] ?? 0.0;
-
-    if (currentLat == 0.0 || currentLng == 0.0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ कृपया पहले GPS सिंक करें या रूट सेव करें!')));
-      return;
-    }
-
-    String mapUrl = "https://www.google.com/maps/dir/?api=1&origin=$currentLat,$currentLng&destination=$destLat,$destLng&travelmode=driving";
-    final Uri uri = Uri.parse(mapUrl);
-
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: ListView(
         children: [
-          const Text('🚚 टेम्पो ड्राइवर डैशबोर्ड & लाइव जीपीएस', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const Text('ड्राइवर यहाँ से सफर शुरू करेगा और नीचे डेस्टिनेशन सेट करेगा।', style: TextStyle(fontSize: 11, color: Colors.grey)),
-          const SizedBox(height: 12),
-
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _isAutoTrackingActive ? Colors.red : Colors.green.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: _toggleAutoTracking,
-              child: Text(
-                _isAutoTrackingActive ? '🔴 सफर रोकें (Stop Auto GPS Loop)' : '🟢 सफर शुरू करें (Start Auto GPS Loop)',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange.shade800,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: _isUpdatingGps ? null : _manualSyncGps,
-              icon: const Icon(Icons.gps_fixed, size: 16),
-              label: const Text('📍 वन-टच मैनुअल जीपीएस सिंक करें', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.orange.shade300),
-              boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 4)],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('🎯 टेम्पो डेस्टिनेशन और रूट सेट करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _startLocationCtrl,
-                  decoration: const InputDecoration(labelText: 'कहाँ से (Starting Point / Mandi)', border: OutlineInputBorder(), isDense: true),
+          // टॉप पर सिर्फ दो साफ सुथरे बटन: Fetch Orders और Start Route
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: _isLoadingOrders ? null : _fetchOrdersFromCloud,
+                  icon: const Icon(Icons.download, size: 16),
+                  label: Text(_isLoadingOrders ? 'Loading...' : 'Fetch Orders', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _destLocationCtrl,
-                  decoration: const InputDecoration(labelText: 'कहाँ तक (Destination / Customer Address)', border: OutlineInputBorder(), isDense: true),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.styleFrom(
+                  backgroundColor: _isAutoTrackingActive ? Colors.green.shade800 : const Color(0xFFFF5722),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ).onPressed(_isUpdatingGps ? null : _startRouteAndGps),
+                child: Text(
+                  _isAutoTrackingActive ? '🟢 Route Active' : '🚀 Start Route',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
-                        onPressed: _saveDriverRouteDestination,
-                        child: const Text('रूट सेव करें', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          const Text('📦 इनकमिंग ऑर्डर्स (Incoming Orders)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+
+          _isLoadingOrders 
+              ? const Center(child: Padding(padding: EdgeInsets.all(20.0), child: CircularProgressIndicator()))
+              : _incomingOrders.isEmpty
+                  ? const Card(child: Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text('कोई नया आर्डर उपलब्ध नहीं है'))))
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _incomingOrders.length,
+                      itemBuilder: (context, index) {
+                        var ord = _incomingOrders[index];
+                        bool accepted = ord['isAcceptedByTempo'] ?? false;
+                        return Card(
+                          color: accepted ? Colors.green.shade50 : Colors.white,
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          child: ListTile(
+                            title: Text('${ord['customerName']} (₹${ord['grandTotal']?.toInt()})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            subtitle: Text('पता: ${ord['customerAddress']}\nमोबाइल: ${ord['customerPhone']}', style: const TextStyle(fontSize: 11)),
+                            trailing: accepted
+                                ? const Chip(label: Text('Accepted', style: TextStyle(color: Colors.white, fontSize: 9)), backgroundColor: Colors.green)
+                                : ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white, minimumSize: const Size(60, 30)),
+                                    onPressed: () => _acceptSingleOrder(ord['firebaseKey']),
+                                    child: const Text('Accept', style: TextStyle(fontSize: 10)),
+                                  ),
+                          ),
+                        );
+                      },
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700, foregroundColor: Colors.white),
-                        onPressed: _openLiveRouteMap,
-                        icon: const Icon(Icons.map, size: 14),
-                        label: const Text('मैप पर रूट देखें', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -1009,25 +916,19 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
         ),
       );
     }
-    return const ShopRegisterAndUpdateView();
+    return const VendorPortalDashboardView();
   }
 }
 
-class ShopRegisterAndUpdateView extends StatefulWidget {
-  const ShopRegisterAndUpdateView({super.key});
+class VendorPortalDashboardView extends StatefulWidget {
+  const VendorPortalDashboardView({super.key});
 
   @override
-  State<ShopRegisterAndUpdateView> createState() => _ShopRegisterAndUpdateViewState();
+  State<VendorPortalDashboardView> createState() => _VendorPortalDashboardViewState();
 }
 
-class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
+class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   Map<String, dynamic> get activeShop => ViziagDatabase.mandisList[0]['shops'][0];
-
-  late final TextEditingController _shopNameCtrl = TextEditingController(text: activeShop['shopName']);
-  late final TextEditingController _ownerNameCtrl = TextEditingController(text: activeShop['ownerName']);
-  late final TextEditingController _shopWhatsappCtrl = TextEditingController(text: activeShop['whatsappNumber']);
-  late final TextEditingController _shopAddressCtrl = TextEditingController(text: activeShop['address']);
-  late final TextEditingController _shopBioCtrl = TextEditingController(text: activeShop['bio']);
 
   final TextEditingController _prodNameCtrl = TextEditingController();
   final TextEditingController _priceCtrl = TextEditingController();
@@ -1038,16 +939,47 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
   bool _isUploadingToCloud = false;
   String? _pickedProdImagePath;
   final ImagePicker _picker = ImagePicker();
+  List<Map<String, dynamic>> _vendorOrders = [];
+  bool _isLoadingOrders = false;
 
-  Future<void> _saveShopDetailsToCloud() async {
-    setState(() {
-      activeShop['shopName'] = _shopNameCtrl.text.trim();
-      activeShop['ownerName'] = _ownerNameCtrl.text.trim();
-      activeShop['whatsappNumber'] = _shopWhatsappCtrl.text.trim();
-      activeShop['address'] = _shopAddressCtrl.text.trim();
-      activeShop['bio'] = _shopBioCtrl.text.trim();
-    });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Shop details saved!'), backgroundColor: Colors.green));
+  @override
+  void initState() {
+    super.initState();
+    _fetchVendorOrders();
+  }
+
+  Future<void> _fetchVendorOrders() async {
+    setState(() => _isLoadingOrders = true);
+    try {
+      final response = await http.get(Uri.parse('${ViziagDatabase.firebaseRestUrl}/orders.json'));
+      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
+        Map<String, dynamic> data = json.decode(response.body);
+        List<Map<String, dynamic>> list = [];
+        data.forEach((key, val) {
+          var item = Map<String, dynamic>.from(val);
+          item['firebaseKey'] = key;
+          list.add(item);
+        });
+        setState(() {
+          _vendorOrders = list.reversed.toList();
+        });
+      }
+    } catch (e) {
+      debugPrint("Error: $e");
+    } finally {
+      setState(() => _isLoadingOrders = false);
+    }
+  }
+
+  Future<void> _acceptOrder(String orderKey) async {
+    try {
+      await http.patch(
+        Uri.parse('${ViziagDatabase.firebaseRestUrl}/orders/$orderKey.json'),
+        body: json.encode({'status': 'Accepted by Vendor'}),
+      );
+      _fetchVendorOrders();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Order Accepted!'), backgroundColor: Colors.green));
+    } catch (_) {}
   }
 
   Future<void> _pickProductImage() async {
@@ -1097,28 +1029,42 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
 
   @override
   Widget build(BuildContext context) {
-    bool isShopOpen = activeShop['isOpen'] ?? true;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('🛠️ Vendor Control Panel', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 10),
-        SwitchListTile(
-          title: const Text('Shop Status (Open/Closed)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-          value: isShopOpen,
-          activeColor: Colors.green,
-          onChanged: (val) => setState(() => activeShop['isOpen'] = val),
-        ),
-        TextField(controller: _shopNameCtrl, decoration: const InputDecoration(labelText: 'Shop Name', border: OutlineInputBorder(), isDense: true)),
+        const Text('📋 Vendor Orders Dashboard', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFFF5722))),
+        const Text('ग्राहकों के लाइव आर्डर यहाँ देखें और स्वीकार करें।', style: TextStyle(fontSize: 11, color: Colors.grey)),
         const SizedBox(height: 8),
-        TextField(controller: _ownerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name', border: OutlineInputBorder(), isDense: true)),
-        const SizedBox(height: 8),
-        TextField(controller: _shopWhatsappCtrl, decoration: const InputDecoration(labelText: 'WhatsApp Number', border: OutlineInputBorder(), isDense: true)),
-        const SizedBox(height: 8),
-        TextField(controller: _shopAddressCtrl, decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder(), isDense: true)),
-        const SizedBox(height: 8),
-        ElevatedButton(onPressed: _saveShopDetailsToCloud, child: const Text('Save Shop Profile')),
-        const Divider(height: 25),
+
+        _isLoadingOrders 
+            ? const Center(child: CircularProgressIndicator())
+            : _vendorOrders.isEmpty
+                ? const Card(child: Padding(padding: EdgeInsets.all(12), child: Center(child: Text('कोई आर्डर नहीं मिला'))))
+                : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _vendorOrders.length,
+                    itemBuilder: (context, index) {
+                      var ord = _vendorOrders[index];
+                      String status = ord['status'] ?? 'Pending';
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        child: ListTile(
+                          title: Text('${ord['customerName']} - ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          subtitle: Text('पता: ${ord['customerAddress']}\nस्थिति: $status', style: const TextStyle(fontSize: 11)),
+                          trailing: status == 'Pending' 
+                              ? ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(60, 30)),
+                                  onPressed: () => _acceptOrder(ord['firebaseKey']),
+                                  child: const Text('Accept', style: TextStyle(fontSize: 10)),
+                                )
+                              : const Chip(label: Text('Accepted', style: TextStyle(fontSize: 9, color: Colors.white)), backgroundColor: Colors.blue),
+                        ),
+                      );
+                    },
+                  ),
+
+        const Divider(height: 30, thickness: 2),
         const Text('📦 Add New Item', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         TextField(controller: _prodNameCtrl, decoration: const InputDecoration(labelText: 'Item Name', border: OutlineInputBorder(), isDense: true)),
@@ -1134,7 +1080,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
 }
 
 // ==========================================
-// 👤 USER PROFILE & TEMPO PROFILE VIEW
+// USER PROFILE & TEMPO PROFILE VIEW
 // ==========================================
 class UserAndTempoProfileView extends StatefulWidget {
   const UserAndTempoProfileView({super.key});
@@ -1162,7 +1108,7 @@ class _UserAndTempoProfileViewState extends State<UserAndTempoProfileView> {
       ViziagDatabase.tempoDriverProfile['driverPhone'] = _driverPhoneCtrl.text.trim();
       ViziagDatabase.tempoDriverProfile['vehicleNumber'] = _vehicleNumCtrl.text.trim();
     });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Customer & Tempo Profiles Saved Successfully!'), backgroundColor: Colors.green));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Profiles Saved Successfully!'), backgroundColor: Colors.green));
   }
 
   @override
@@ -1182,14 +1128,12 @@ class _UserAndTempoProfileViewState extends State<UserAndTempoProfileView> {
           const Divider(height: 30, thickness: 2),
 
           const Text('🚚 Tempo Driver & Vehicle Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
-          const SizedBox(height: 4),
-          const Text('यहाँ से टेम्पो ड्राइवर और गाड़ी की जानकारी सेट करें।', style: TextStyle(fontSize: 11, color: Colors.grey)),
           const SizedBox(height: 10),
-          TextField(controller: _driverNameCtrl, decoration: const InputDecoration(labelText: 'Driver Name (ड्राइवर का नाम)', border: OutlineInputBorder(), isDense: true)),
+          TextField(controller: _driverNameCtrl, decoration: const InputDecoration(labelText: 'Driver Name', border: OutlineInputBorder(), isDense: true)),
           const SizedBox(height: 8),
-          TextField(controller: _driverPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Driver Mobile Number', border: OutlineInputBorder(), isDense: true)),
+          TextField(controller: _driverPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Driver Mobile', border: OutlineInputBorder(), isDense: true)),
           const SizedBox(height: 8),
-          TextField(controller: _vehicleNumCtrl, decoration: const InputDecoration(labelText: 'Vehicle Number (जैसे: HR-51-AB-1234)', border: OutlineInputBorder(), isDense: true)),
+          TextField(controller: _vehicleNumCtrl, decoration: const InputDecoration(labelText: 'Vehicle Number', border: OutlineInputBorder(), isDense: true)),
           
           const SizedBox(height: 20),
           SizedBox(
@@ -1233,6 +1177,8 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       'items': ViziagDatabase.cartItems,
       'grandTotal': grandTotal,
       'timestamp': DateTime.now().toIso8601String(),
+      'status': 'Pending',
+      'isAcceptedByTempo': false,
     };
 
     try {
