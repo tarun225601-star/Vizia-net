@@ -228,7 +228,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
                   ),
               ],
             ),
-            label: 'Cart',
+            label: 'Cart & Orders',
           ),
         ],
       ),
@@ -593,7 +593,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 }
 
 // ==========================================
-// 🚚 TEMPO DRIVER DASHBOARD (CLEAN & ACCEPT BUTTONS)
+// 🚚 TEMPO DRIVER DASHBOARD
 // ==========================================
 class TempoDriverDashboardView extends StatefulWidget {
   const TempoDriverDashboardView({super.key});
@@ -1153,7 +1153,7 @@ class _UserAndTempoProfileViewState extends State<UserAndTempoProfileView> {
 }
 
 // ==========================================
-// WHATSAPP CHECKOUT CART
+// WHATSAPP CHECKOUT CART & LIVE ORDERS TRACKING
 // ==========================================
 class CartAndWhatsAppCheckoutView extends StatefulWidget {
   const CartAndWhatsAppCheckoutView({super.key});
@@ -1164,6 +1164,63 @@ class CartAndWhatsAppCheckoutView extends StatefulWidget {
 
 class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutView> {
   bool _isPlacingOrder = false;
+  bool _isLoadingUserOrders = false;
+  List<Map<String, dynamic>> _userOrdersList = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserOrders();
+  }
+
+  Future<void> _fetchUserOrders() async {
+    setState(() => _isLoadingUserOrders = true);
+    try {
+      final response = await http.get(Uri.parse('${ViziagDatabase.firebaseRestUrl}/orders.json'));
+      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
+        Map<String, dynamic> data = json.decode(response.body);
+        List<Map<String, dynamic>> list = [];
+        data.forEach((key, val) {
+          var item = Map<String, dynamic>.from(val);
+          item['firebaseKey'] = key;
+          // Filter only orders belonging to current user phone
+          if (item['customerPhone'] == ViziagDatabase.currentUserPhone) {
+            list.add(item);
+          }
+        });
+        setState(() {
+          _userOrdersList = list.reversed.toList();
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching user orders: $e");
+    } finally {
+      setState(() => _isLoadingUserOrders = false);
+    }
+  }
+
+  Future<void> _openLiveTrackingMap() async {
+    try {
+      final response = await http.get(Uri.parse('${ViziagDatabase.firebaseRestUrl}/tempo_location.json'));
+      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
+        var data = json.decode(response.body);
+        double lat = data['latitude'] ?? 0.0;
+        double lng = data['longitude'] ?? 0.0;
+        
+        if (lat != 0.0 && lng != 0.0) {
+          String mapUrl = "https://www.google.com/maps/search/?api=1&query=$lat,$lng";
+          final Uri uri = Uri.parse(mapUrl);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            return;
+          }
+        }
+      }
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Tempo live GPS location not active yet!')));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
 
   Future<void> _sendOrderToWhatsApp() async {
     if (ViziagDatabase.cartItems.isEmpty) return;
@@ -1191,6 +1248,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     } catch (_) {}
 
     setState(() => _isPlacingOrder = false);
+    _fetchUserOrders(); // Refresh user orders list
 
     String vendorPhone = ViziagDatabase.mandisList[0]['shops'][0]['whatsappNumber'] ?? '919971968060';
     String message = "🛍️ *New Order from Viziag Mart*\n\n👤 *Customer:* ${ViziagDatabase.currentCustomerName}\n📍 *Address:* ${ViziagDatabase.currentDeliveryAddress}\n\n";
@@ -1215,31 +1273,33 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
 
     return Padding(
       padding: const EdgeInsets.all(12.0),
-      child: Column(
+      child: ListView(
         children: [
-          const Text('🛒 Your Shopping Cart', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Expanded(
-            child: cart.isEmpty
-                ? const Center(child: Text('Cart is empty'))
-                : ListView.builder(
-                    itemCount: cart.length,
-                    itemBuilder: (context, index) {
-                      var item = cart[index];
-                      return Card(
-                        child: ListTile(
-                          title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('Qty: ${item['qty']} ${item['unit']} • ₹${item['price']} each'),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => setState(() => ViziagDatabase.cartItems.removeAt(index)),
-                          ),
+          const Text('🛒 Your Shopping Cart', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          cart.isEmpty
+              ? const Card(child: Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text('Cart is empty'))))
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: cart.length,
+                  itemBuilder: (context, index) {
+                    var item = cart[index];
+                    return Card(
+                      child: ListTile(
+                        title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        subtitle: Text('Qty: ${item['qty']} ${item['unit']} • ₹${item['price']} each', style: const TextStyle(fontSize: 11)),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                          onPressed: () => setState(() => ViziagDatabase.cartItems.removeAt(index)),
                         ),
-                      );
-                    },
-                  ),
-          ),
-          if (cart.isNotEmpty)
+                      ),
+                    );
+                  },
+                ),
+
+          if (cart.isNotEmpty) ...[
+            const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
@@ -1248,26 +1308,105 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Grand Total:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      Text('₹${grandTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+                      const Text('Grand Total:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                      Text('₹${grandTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
-                    height: 48,
+                    height: 42,
                     child: _isPlacingOrder
                         ? const Center(child: CircularProgressIndicator())
                         : ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
                             onPressed: _sendOrderToWhatsApp,
-                            icon: const Icon(Icons.chat),
-                            label: const Text('Send Order to WhatsApp 🚀', style: TextStyle(fontWeight: FontWeight.bold)),
+                            icon: const Icon(Icons.chat, size: 18),
+                            label: const Text('Send Order to WhatsApp 🚀', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                           ),
                   ),
                 ],
               ),
             ),
+          ],
+
+          const Divider(height: 30, thickness: 2),
+
+          Row(
+            children: [
+              const Text('📦 Your Orders & Live Tracking', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFF5722))),
+              const Spacer(),
+              IconButton(
+                onPressed: _fetchUserOrders,
+                icon: const Icon(Icons.sync, size: 18),
+                tooltip: 'Refresh Orders',
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          _isLoadingUserOrders
+              ? const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator()))
+              : _userOrdersList.isEmpty
+                  ? const Card(child: Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text('आपने अभी तक कोई आर्डर नहीं दिया है'))))
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _userOrdersList.length,
+                      itemBuilder: (context, index) {
+                        var ord = _userOrdersList[index];
+                        bool acceptedByTempo = ord['isAcceptedByTempo'] ?? false;
+                        String status = ord['status'] ?? 'Pending';
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          child: Padding(
+                            padding: const EdgeInsets.all(10.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text('Order ID: ${ord['orderId']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                    const Spacer(),
+                                    Chip(
+                                      label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 9)),
+                                      backgroundColor: status == 'Pending' ? Colors.orange : Colors.green,
+                                      padding: EdgeInsets.zero,
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text('Total Amount: ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green)),
+                                Text('Delivery Address: ${ord['customerAddress']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 32,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: acceptedByTempo ? Colors.blue.shade700 : Colors.grey,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    onPressed: acceptedByTempo ? _openLiveTrackingMap : () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('⚠️ Tempo driver has not accepted/started route for this order yet!')),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.map, size: 14),
+                                    label: Text(
+                                      acceptedByTempo ? '📍 Track Live on Map' : '⏳ Waiting for Tempo Start',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
         ],
       ),
     );
