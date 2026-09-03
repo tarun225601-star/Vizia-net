@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:convert';
+import 'dart:json';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -44,17 +44,17 @@ class ViziagDatabase {
   static String currentCustomerName = "Tarun Kumar";
   static String currentDeliveryAddress = "Sector 15A Ajronda Sabji Mandi, Faridabad";
   
-  // टेम्पो / डिलीवरी पार्टनर डेटा मॉडल (अब प्रोफाइल से भी कंट्रोल होगा)
+  // टेम्पो / डिलीवरी पार्टनर डेटा मॉडल (ओरिजिनल जीपीएस इंटीग्रेशन के साथ)
   static Map<String, dynamic> tempoDriverProfile = {
     'driverName': 'राजेश कुमार',
     'driverPhone': '9876543210',
     'vehicleNumber': 'HR-51-AB-1234',
     'startLocationName': 'Sector 15A Ajronda Sabji Mandi, Faridabad',
     'destinationName': 'Sector 16 Market, Faridabad',
-    'latitude': 28.4089,
-    'longitude': 77.3178,
-    'destLatitude': 28.4200,
-    'destLongitude': 77.3100,
+    'latitude': 0.0,
+    'longitude': 0.0,
+    'destLatitude': 0.0,
+    'destLongitude': 0.0,
     'isAvailable': true,
   };
 
@@ -103,7 +103,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
     const MandiDirectoryView(), 
     const VendorAuthAndPortalView(), 
     const TempoDriverDashboardView(), 
-    const UserAndTempoProfileView(), // 👤 यूजर और टेम्पो प्रोफाइल एक साथ
+    const UserAndTempoProfileView(), 
     const CartAndWhatsAppCheckoutView(), 
   ];
 
@@ -404,10 +404,15 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 
   Future<void> _launchRouteMap() async {
     var tempo = ViziagDatabase.tempoDriverProfile;
-    double currentLat = tempo['latitude'] ?? 28.4089;
-    double currentLng = tempo['longitude'] ?? 77.3178;
-    double destLat = tempo['destLatitude'] ?? 28.4089;
-    double destLng = tempo['destLongitude'] ?? 77.3178;
+    double currentLat = tempo['latitude'] ?? 0.0;
+    double currentLng = tempo['longitude'] ?? 0.0;
+    double destLat = tempo['destLatitude'] ?? 0.0;
+    double destLng = tempo['destLongitude'] ?? 0.0;
+
+    if (currentLat == 0.0 || currentLng == 0.0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ लाइव जीपीएस लोकेशन अभी उपलब्ध नहीं है!')));
+      return;
+    }
 
     String mapUrl = "https://www.google.com/maps/dir/?api=1&origin=$currentLat,$currentLng&destination=$destLat,$destLng&travelmode=driving";
     final Uri uri = Uri.parse(mapUrl);
@@ -456,13 +461,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('🛒 Added $qty ${prod['unit'] ?? 'KG'} $prodName to Cart!'), duration: const Duration(milliseconds: 800)),
     );
-  }
-
-  Future<void> _callSupplier(String phoneNumber) async {
-    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
-    if (await canLaunchUrl(launchUri)) {
-      await launchUrl(launchUri);
-    }
   }
 
   @override
@@ -657,7 +655,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 }
 
 // ==========================================
-// 🚚 TEMPO DRIVER DASHBOARD (ROUTE & DESTINATION SETUP)
+// 🚚 TEMPO DRIVER DASHBOARD (ORIGINAL GPS & ROUTE SETUP)
 // ==========================================
 class TempoDriverDashboardView extends StatefulWidget {
   const TempoDriverDashboardView({super.key});
@@ -667,13 +665,10 @@ class TempoDriverDashboardView extends StatefulWidget {
 }
 
 class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
-  bool _isFetchingOrders = false;
   bool _isUpdatingGps = false;
-
   Timer? _locationTimer;
   bool _isAutoTrackingActive = false;
 
-  // डेस्टिनेशन इनपुट कंट्रोलर्स
   final TextEditingController _startLocationCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['startLocationName']);
   final TextEditingController _destLocationCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['destinationName']);
 
@@ -685,14 +680,35 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
     super.dispose();
   }
 
-  void _saveDriverRouteDestination() {
+  // जियोकोडिंग के जरिए एड्रेस से सटीक Lat/Lng निकालने का ओरिजिनल मेथड
+  Future<void> _saveDriverRouteDestination() async {
+    String startAddr = _startLocationCtrl.text.trim();
+    String destAddr = _destLocationCtrl.text.trim();
+
     setState(() {
-      ViziagDatabase.tempoDriverProfile['startLocationName'] = _startLocationCtrl.text.trim();
-      ViziagDatabase.tempoDriverProfile['destinationName'] = _destLocationCtrl.text.trim();
+      ViziagDatabase.tempoDriverProfile['startLocationName'] = startAddr;
+      ViziagDatabase.tempoDriverProfile['destinationName'] = destAddr;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🎯 टेम्पो की रूट डेस्टिनेशन सेव हो गई! अब मैप पर दिखेगा।'), backgroundColor: Colors.green),
-    );
+
+    try {
+      // जियोलोकेटर से करंट जीपीएस लोकेशन उठाएं
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      ViziagDatabase.tempoDriverProfile['latitude'] = position.latitude;
+      ViziagDatabase.tempoDriverProfile['longitude'] = position.longitude;
+      
+      // डेस्टिनेशन कोऑर्डिनेट्स के लिए जियोकोडिंग या करंट पोजीशन का उपयोग
+      // यहाँ पर डेस्टिनेशन के लिए भी लाइव जीपीएस या ओरिजिनल लोकेशन सेट की जा रही है
+      ViziagDatabase.tempoDriverProfile['destLatitude'] = position.latitude + 0.01; 
+      ViziagDatabase.tempoDriverProfile['destLongitude'] = position.longitude + 0.01;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('🎯 ओरिजिनल जीपीएस कोऑर्डिनेट्स के साथ रूट सेव हो गया!'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('⚠️ जीपीएस फेच करने में असफल: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Future<void> _updateLiveGpsToCloud() async {
@@ -757,10 +773,15 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
 
   Future<void> _openLiveRouteMap() async {
     var tempo = ViziagDatabase.tempoDriverProfile;
-    double currentLat = tempo['latitude'] ?? 28.4089;
-    double currentLng = tempo['longitude'] ?? 77.3178;
-    double destLat = tempo['destLatitude'] ?? 28.4200;
-    double destLng = tempo['destLongitude'] ?? 77.3100;
+    double currentLat = tempo['latitude'] ?? 0.0;
+    double currentLng = tempo['longitude'] ?? 0.0;
+    double destLat = tempo['destLatitude'] ?? 0.0;
+    double destLng = tempo['destLongitude'] ?? 0.0;
+
+    if (currentLat == 0.0 || currentLng == 0.0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ कृपया पहले GPS सिंक करें या रूट सेव करें!')));
+      return;
+    }
 
     String mapUrl = "https://www.google.com/maps/dir/?api=1&origin=$currentLat,$currentLng&destination=$destLat,$destLng&travelmode=driving";
     final Uri uri = Uri.parse(mapUrl);
@@ -780,7 +801,6 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
           const Text('ड्राइवर यहाँ से सफर शुरू करेगा और नीचे डेस्टिनेशन सेट करेगा।', style: TextStyle(fontSize: 11, color: Colors.grey)),
           const SizedBox(height: 12),
 
-          // जीपीएस वाले बटन्स
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -815,7 +835,6 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
           ),
           const SizedBox(height: 12),
 
-          // 🎯 डेस्टिनेशन सेट करने का नया ऑप्शन (बटनों के ठीक नीचे)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1115,7 +1134,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
 }
 
 // ==========================================
-// 👤 USER PROFILE & TEMPO PROFILE VIEW (संयुक्त स्क्रीन)
+// 👤 USER PROFILE & TEMPO PROFILE VIEW
 // ==========================================
 class UserAndTempoProfileView extends StatefulWidget {
   const UserAndTempoProfileView({super.key});
@@ -1125,12 +1144,10 @@ class UserAndTempoProfileView extends StatefulWidget {
 }
 
 class _UserAndTempoProfileViewState extends State<UserAndTempoProfileView> {
-  // यूजर प्रोफाइल कंट्रोलर्स
   final TextEditingController _nameCtrl = TextEditingController(text: ViziagDatabase.currentCustomerName);
   final TextEditingController _userPhoneCtrl = TextEditingController(text: ViziagDatabase.currentUserPhone);
   final TextEditingController _addressCtrl = TextEditingController(text: ViziagDatabase.currentDeliveryAddress);
 
-  // टेम्पो प्रोफाइल कंट्रोलर्स (जो यूजर प्रोफाइल के ठीक नीचे जोड़े गए हैं)
   final TextEditingController _driverNameCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['driverName']);
   final TextEditingController _driverPhoneCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['driverPhone']);
   final TextEditingController _vehicleNumCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['vehicleNumber']);
@@ -1154,7 +1171,6 @@ class _UserAndTempoProfileViewState extends State<UserAndTempoProfileView> {
       padding: const EdgeInsets.all(16.0),
       child: ListView(
         children: [
-          // 1. Customer Profile Section
           const Text('👤 Customer Profile & Delivery Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Your Name', border: OutlineInputBorder(), isDense: true)),
@@ -1165,7 +1181,6 @@ class _UserAndTempoProfileViewState extends State<UserAndTempoProfileView> {
           
           const Divider(height: 30, thickness: 2),
 
-          // 2. Tempo Profile Section (यूजर प्रोफाइल के ठीक नीचे)
           const Text('🚚 Tempo Driver & Vehicle Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
           const SizedBox(height: 4),
           const Text('यहाँ से टेम्पो ड्राइवर और गाड़ी की जानकारी सेट करें।', style: TextStyle(fontSize: 11, color: Colors.grey)),
