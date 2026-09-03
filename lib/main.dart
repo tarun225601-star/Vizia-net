@@ -1,4 +1,4 @@
-import 'dart:io';
+                     import 'dart:io';
 import 'dart:convert';
 import 'dart:async'; // ⏱️ बैकग्राउंड जीपीएस लूप (Timer) के लिए जरूरी
 import 'package:flutter/foundation.dart';
@@ -112,7 +112,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
   final List<Widget> _tabScreens = [
     const MandiDirectoryView(), 
     const VendorAuthAndPortalView(), 
-    const TempoDriverDashboardView(), // 🚚 अपडेटेड टेम्पो ड्राइवर डैशबोर्ड (ऑटोमैटिक क्लाउड जीपीएस लूप के साथ)
+    const TempoDriverDashboardView(), 
     const UserLoginAndAddressView(),
     const CartAndWhatsAppCheckoutView(), 
   ];
@@ -368,7 +368,7 @@ class MandiShopsScreen extends StatelessWidget {
 }
 
 // ==========================================
-// MARKETPLACE BUYER VIEW (IN-APP LIVE GPS TRACKING)
+// MARKETPLACE BUYER VIEW (DIRECT GOOGLE MAPS LAUNCHER)
 // ==========================================
 class MarketplaceBuyerView extends StatefulWidget {
   final Map<String, dynamic>? selectedShop;
@@ -412,8 +412,8 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     }
   }
 
-  // 🛰️ फायरबेस से टेम्पो की लाइव लोकेशन फेच करके इन-ऐप दिखाना
-  Future<void> _fetchAndShowLiveTempoTracking() async {
+  // 🗺️ सीधा 'Track GPS' दबाते ही Google Maps पर टेम्पो की लोकेशन खोलना
+  Future<void> _launchLiveTempoMapDirectly() async {
     try {
       final response = await http.get(Uri.parse('${ViziagDatabase.firebaseRestUrl}/tempo_location.json'));
       if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
@@ -429,45 +429,21 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     }
 
     var tempo = ViziagDatabase.tempoDriverProfile;
-    if (!mounted) return;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('🚚 Live Tempo GPS Tracking'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Driver: ${tempo['driverName']}'),
-            Text('Phone: ${tempo['driverPhone']}'),
-            Text('Vehicle: ${tempo['vehicleModel']} [${tempo['vehicleNumber']}]'),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              color: Colors.grey.shade100,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('📍 Current Coordinates:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade900)),
-                  Text('Latitude: ${tempo['latitude']}'),
-                  Text('Longitude: ${tempo['longitude']}'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Text('📍 गाड़ी आपके ऑर्डर के लिए क्लाउड लाइव जीपीएस से ट्रैक हो रही है।', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => launchUrl(Uri(scheme: 'tel', path: tempo['driverPhone'])),
-            child: const Text('Call Driver 📞'),
-          ),
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-        ],
-      ),
-    );
+    double lat = tempo['latitude'] ?? 28.4089;
+    double lng = tempo['longitude'] ?? 77.3178;
+
+    String mapUrl = "https://www.google.com/maps/search/?api=1&query=$lat,$lng";
+    final Uri uri = Uri.parse(mapUrl);
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ मैप्स खोलने में असमर्थ!')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   void _addToCart(Map<String, dynamic> prod, double qty) {
@@ -551,10 +527,11 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                     ],
                   ),
                 ),
-                ElevatedButton(
+                ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.blue.shade900, minimumSize: const Size(60, 30)),
-                  onPressed: _fetchAndShowLiveTempoTracking, // 📍 खरीदार यहीं क्लिक करके इन-ऐप जीपीएस लाइव देखेगा
-                  child: const Text('Track GPS', style: TextStyle(fontSize: 10)),
+                  onPressed: _launchLiveTempoMapDirectly,
+                  icon: const Icon(Icons.map, size: 14),
+                  label: const Text('Track Map', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -764,7 +741,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 }
 
 // ==========================================
-// 🚚 TEMPO DRIVER DASHBOARD (CLOUD GPS AUTO SYNC)
+// 🚚 TEMPO DRIVER DASHBOARD (CLOUD GPS AUTO SYNC & ORDER LIST WITH TRACK BUTTON)
 // ==========================================
 class TempoDriverDashboardView extends StatefulWidget {
   const TempoDriverDashboardView({super.key});
@@ -777,17 +754,15 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
   bool _isFetchingOrders = false;
   bool _isUpdatingGps = false;
 
-  // ⏱️ ऑटोमैटिक बैकग्राउंड जीपीएस लूप (Timer) के लिए वेरिएबल्स
   Timer? _locationTimer;
   bool _isAutoTrackingActive = false;
 
   @override
   void dispose() {
-    _locationTimer?.cancel(); // स्क्रीन बंद होने पर ऑटो-लूप बंद हो जाएगा
+    _locationTimer?.cancel(); 
     super.dispose();
   }
 
-  // 📥 फायरबेस से ग्राहकों के सारे ऑर्डर फेच करना
   Future<void> _fetchCustomerOrdersFromFirebase() async {
     setState(() => _isFetchingOrders = true);
     try {
@@ -818,23 +793,17 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
     }
   }
 
-  // 🛰️ ड्राइवर फोन के GPS से रियल लोकेशन निकालकर सीधे Firebase पर सिंक करेगा (वन-टच या ऑटो लूप)
   Future<void> _updateLiveGpsToCloud() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        return;
-      }
+      if (!serviceEnabled) return;
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return;
-        }
+        if (permission == LocationPermission.denied) return;
       }
 
-      // करंट कोऑर्डिनेट्स फेच करना
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       
       var gpsPayload = {
@@ -846,7 +815,6 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
         'vehicleNumber': ViziagDatabase.tempoDriverProfile['vehicleNumber'],
       };
 
-      // फायरबेस पर डायरेक्ट लाइव लोकेशन सिंक (Put/Patch)
       final response = await http.put(
         Uri.parse('${ViziagDatabase.firebaseRestUrl}/tempo_location.json'),
         body: json.encode(gpsPayload),
@@ -863,7 +831,6 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
     }
   }
 
-  // 🚀 ऑटोमैटिक बैकग्राउंड ट्रैकिंग टॉगल फंक्शन (हर 30 सेकंड में ऑटो सिंक)
   void _toggleAutoTracking() {
     if (_isAutoTrackingActive) {
       _locationTimer?.cancel();
@@ -877,24 +844,53 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
         const SnackBar(content: Text('🚀 ऑटो-ट्रैकिंग शुरू! अब लोकेशन हर 30 सेकंड में अपने आप क्लाउड पर जाएगी।'), backgroundColor: Colors.green),
       );
 
-      // तुरंत पहली बार लोकेशन भेजें
       _updateLiveGpsToCloud();
-
-      // हर 30 सेकंड में ऑटोमैटिक जीपीएस क्लाउड पर अपडेट होगा
       _locationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
         _updateLiveGpsToCloud(); 
       });
     }
   }
 
-  // 👆 मैन्युअल वन-टच जीपीएस सिंक बटन के लिए
   Future<void> _manualSyncGps() async {
     setState(() => _isUpdatingGps = true);
     await _updateLiveGpsToCloud();
     setState(() => _isUpdatingGps = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🚀 Live GPS Location Cloud पर सिंक हो गई! ग्राहक अब ऐप में देख सकते हैं।'), backgroundColor: Colors.green),
+      const SnackBar(content: Text('🚀 Live GPS Location Cloud पर सिंक हो गई!'), backgroundColor: Colors.green),
     );
+  }
+
+  // 🗺️ ऑर्डर लिस्ट के अंदर से ट्रैक बटन दबाने पर Google Maps खोलना
+  Future<void> _trackSpecificOrderOnMap() async {
+    try {
+      final response = await http.get(Uri.parse('${ViziagDatabase.firebaseRestUrl}/tempo_location.json'));
+      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
+        var cloudData = json.decode(response.body);
+        setState(() {
+          ViziagDatabase.tempoDriverProfile['latitude'] = cloudData['latitude'] ?? ViziagDatabase.tempoDriverProfile['latitude'];
+          ViziagDatabase.tempoDriverProfile['longitude'] = cloudData['longitude'] ?? ViziagDatabase.tempoDriverProfile['longitude'];
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching tempo location: $e");
+    }
+
+    var tempo = ViziagDatabase.tempoDriverProfile;
+    double lat = tempo['latitude'] ?? 28.4089;
+    double lng = tempo['longitude'] ?? 77.3178;
+
+    String mapUrl = "https://www.google.com/maps/search/?api=1&query=$lat,$lng";
+    final Uri uri = Uri.parse(mapUrl);
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ मैप्स खोलने में असमर्थ!')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   @override
@@ -909,7 +905,6 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
           const Text('ड्राइवर यहाँ से आर्डर फेच करेगा और अपनी लाइव जीपीएस लोकेशन सीधे क्लाउड पर अपडेट करेगा।', style: TextStyle(fontSize: 11, color: Colors.grey)),
           const SizedBox(height: 12),
 
-          // 🚀 1. बड़ा ऑटोमैटिक बैकग्राउंड GPS लूप स्टार्ट/स्टॉप बटन (बिना झंझट वाला)
           SizedBox(
             width: double.infinity,
             height: 55,
@@ -928,7 +923,6 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
           ),
           const SizedBox(height: 8),
 
-          // 🛰️ 2. मैन्युअल जीपीएस अपडेट बटन
           SizedBox(
             width: double.infinity,
             height: 45,
@@ -941,7 +935,6 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
           ),
           const SizedBox(height: 10),
 
-          // 📥 3. फेच ऑर्डर्स बटन
           SizedBox(
             width: double.infinity,
             height: 44,
@@ -990,7 +983,24 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
                             const SizedBox(height: 6),
                             const Divider(height: 1),
                             const SizedBox(height: 6),
-                            Text('🛒 कुल राशि: ₹${order['grandTotal'] ?? 0}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('🛒 कुल राशि: ₹${order['grandTotal'] ?? 0}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
+                                // 🗺️ ऑर्डर लिस्ट के अंदर जोड़ा गया डायरेक्ट ट्रैक बटन!
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue.shade700,
+                                    foregroundColor: Colors.white,
+                                    minimumSize: const Size(80, 30),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  ),
+                                  onPressed: _trackSpecificOrderOnMap,
+                                  icon: const Icon(Icons.map, size: 14),
+                                  label: const Text('Track Order', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -1579,3 +1589,4 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     );
   }
 }
+       
