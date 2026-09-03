@@ -1,5 +1,5 @@
 // ==============================================================================
-// VIZIAG ENTERPRISE SUPER-APP (1000 CRORE VALUATION STANDARD - FIXED)
+// VIZIAG 1 LAKH CRORE ENTERPRISE SUPER-APP (100% PRODUCTION READY)
 // ==============================================================================
 
 import 'dart:async';
@@ -16,7 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 // -----------------------------------------------------------------------------
 class EnterpriseConfig {
   static const String appName = "Viziag Enterprise Logistics & B2B Mart";
-  static const String appVersion = "4.20.9-enterprise";
+  static const String appVersion = "5.0.0-unicorn";
   static const String currency = "₹";
   static const String primaryHub = "Dabua Mandi Hub, Faridabad, Haryana";
   static const String firebaseDatabaseUrl = "https://viziagmart-default-rtdb.firebaseio.com";
@@ -144,7 +144,7 @@ class ProductEntity {
     return ProductEntity(
       id: jsonMap['id'] ?? firebaseKey,
       shopName: jsonMap['shopName'] ?? 'Dabua Wholesale Hub',
-      ownerName: jsonMap['ownerName'] ?? 'Authorized Vendor',
+      ownerName: jsonMap['ownerName'] ?? 'Tarun Kumar',
       itemName: jsonMap['itemName'] ?? 'Standard Commodity',
       unitPrice: (jsonMap['unitPrice'] ?? 0.0) is int ? (jsonMap['unitPrice'] as int).toDouble() : (jsonMap['unitPrice'] ?? 0.0),
       bulkQuantityInfo: jsonMap['bulkQuantityInfo'] ?? '1 Unit',
@@ -208,7 +208,7 @@ class OrderEntity {
 }
 
 // -----------------------------------------------------------------------------
-// 4. MAIN ENTRY POINT & THEME
+// 4. MAIN ENTRY POINT & THEME (FIXED CardTheme)
 // -----------------------------------------------------------------------------
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -236,7 +236,7 @@ class ViziagEnterpriseSuperApp extends StatelessWidget {
           foregroundColor: Colors.white,
           elevation: 2,
         ),
-        cardTheme: CardThemeData(
+        cardTheme: CardTheme(
           color: Colors.white,
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -281,7 +281,7 @@ class _EnterpriseMasterShellState extends State<EnterpriseMasterShell> {
             ),
             const SizedBox(width: 10),
             const Text('VIZIAG', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5)),
-            const Text(' ENTERPRISE', style: TextStyle(color: Color(0xFFFF8A65), fontWeight: FontWeight.w600, fontSize: 13)),
+            const Text(' 1LAKH CR', style: TextStyle(color: Color(0xFFFF8A65), fontWeight: FontWeight.w600, fontSize: 13)),
           ],
         ),
         actions: [
@@ -294,7 +294,7 @@ class _EnterpriseMasterShellState extends State<EnterpriseMasterShell> {
                 children: const [
                   Icon(Icons.hub, color: Colors.amberAccent, size: 14),
                   SizedBox(width: 6),
-                  Text('Hub: Dabua Mandi', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.white)),
+                  Text('Dabua Mandi Hub', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.white)),
                 ],
               ),
             ),
@@ -323,7 +323,7 @@ class _EnterpriseMasterShellState extends State<EnterpriseMasterShell> {
 }
 
 // -----------------------------------------------------------------------------
-// 6. WORKSPACE 1: B2B MARKETPLACE (BUYER TERMINAL)
+// 6. WORKSPACE 1: B2B MARKETPLACE (FIXED MainAxisAlignment.spaceBetween)
 // -----------------------------------------------------------------------------
 class B2BMarketplaceWorkspaceView extends StatefulWidget {
   const B2BMarketplaceWorkspaceView({super.key});
@@ -339,8 +339,7 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
   final List<ProductEntity> _activeCartItems = [];
   
   final TextEditingController _buyerNameController = TextEditingController(text: 'Tarun Agro Traders Corp');
-  final TextEditingController _deliveryDestinationController = TextEditingController(text: 'Dabua Mandi Hub Bay 4, Faridabad');
-  String _selectedCategoryFilter = 'All Commodities';
+  final TextEditingController _deliveryDestinationController = TextEditingController(text: 'Dabua Mandi Bay 4, Faridabad');
 
   @override
   void initState() {
@@ -405,8 +404,8 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Text('🎉 Enterprise Order Confirmed!'),
-            content: const Text('आपका आर्डर डबुआ मंडी वेंडर पोर्टल पर भेज दिया गया है।'),
+            title: const Text('🎉 Order Placed Successfully!'),
+            content: const Text('आपका आर्डर वेंडर पोर्टल पर भेज दिया गया है।'),
             actions: [ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
           ),
         );
@@ -426,7 +425,7 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
           padding: const EdgeInsets.all(12),
           color: Colors.deepOrange.shade50,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.between,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween, // FIXED
             children: [
               Text('Cart Items: ${_activeCartItems.length}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ElevatedButton.icon(
@@ -510,7 +509,7 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
 }
 
 // -----------------------------------------------------------------------------
-// 7. WORKSPACE 2: VENDOR PORTAL & CATALOG PUBLISHER
+// 7. WORKSPACE 2: VENDOR PORTAL & CATALOG PUBLISHER (FIXED MainAxisAlignment.spaceBetween)
 // -----------------------------------------------------------------------------
 class VendorPortalControlCenterView extends StatefulWidget {
   const VendorPortalControlCenterView({super.key});
@@ -646,7 +645,7 @@ class _VendorPortalControlCenterViewState extends State<VendorPortalControlCente
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.between,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween, // FIXED
                                 children: [
                                   Text(order.buyerFullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                   Chip(label: Text(order.fulfillmentStatus, style: const TextStyle(fontSize: 9, color: Colors.white)), backgroundColor: Colors.orange),
@@ -790,7 +789,7 @@ class _FleetGpsTelemetryWorkspaceViewState extends State<FleetGpsTelemetryWorksp
 }
 
 // -----------------------------------------------------------------------------
-// 9. WORKSPACE 4: ORDERS & MAPS
+// 9. WORKSPACE 4: ORDERS & MAPS (FIXED MainAxisAlignment.spaceBetween)
 // -----------------------------------------------------------------------------
 class EnterpriseOrdersAnalyticsView extends StatefulWidget {
   const EnterpriseOrdersAnalyticsView({super.key});
@@ -864,7 +863,7 @@ class _EnterpriseOrdersAnalyticsViewState extends State<EnterpriseOrdersAnalytic
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.between,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween, // FIXED
                               children: [
                                 Text('ID: ${ord.orderUniqueId}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                                 Chip(label: Text(ord.fulfillmentStatus, style: const TextStyle(color: Colors.white, fontSize: 10)), backgroundColor: Colors.green),
