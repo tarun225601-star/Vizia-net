@@ -85,7 +85,7 @@ class ViziagDatabase {
 }
 
 // ==========================================
-// MAIN HUB SCREEN
+// MAIN HUB SCREEN WITH INDEXED STACK
 // ==========================================
 class ViziagMainHubScreen extends StatefulWidget {
   const ViziagMainHubScreen({super.key});
@@ -97,6 +97,7 @@ class ViziagMainHubScreen extends StatefulWidget {
 class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
   int _selectedTabIndex = 0;
 
+  // Using IndexedStack so all tabs remain alive in background (GPS and States won't reset)
   final List<Widget> _tabScreens = [
     const MandiDirectoryView(), 
     const VendorAuthAndPortalView(), 
@@ -192,7 +193,10 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
           ),
         ),
       ),
-      body: _tabScreens[_selectedTabIndex > 4 ? 4 : _selectedTabIndex],
+      body: IndexedStack(
+        index: _selectedTabIndex > 4 ? 4 : _selectedTabIndex,
+        children: _tabScreens,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedTabIndex > 3 ? 3 : _selectedTabIndex,
         selectedItemColor: const Color(0xFFFF5722),
@@ -647,12 +651,17 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
 
   Future<void> _acceptSingleOrder(String orderKey) async {
     try {
+      String timeNow = "${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} (${DateTime.now().day}/${DateTime.now().month})";
       await http.patch(
         Uri.parse('${ViziagDatabase.firebaseRestUrl}/orders/$orderKey.json'),
-        body: json.encode({'isAcceptedByTempo': true}),
+        body: json.encode({
+          'isAcceptedByTempo': true,
+          'tempoAcceptedTime': timeNow,
+          'status': 'Out for Delivery 🚚'
+        }),
       );
       _fetchOrdersFromCloud();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Order Accepted by Tempo Driver!'), backgroundColor: Colors.green));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Order Accepted & Route Started by Tempo!'), backgroundColor: Colors.green));
     } catch (e) {
       debugPrint("Error accepting order: $e");
     }
@@ -778,7 +787,7 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
                           margin: const EdgeInsets.symmetric(vertical: 4),
                           child: ListTile(
                             title: Text('${ord['customerName']} (₹${ord['grandTotal']?.toInt()})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            subtitle: Text('पता: ${ord['customerAddress']}\nमोबाइल: ${ord['customerPhone']}', style: const TextStyle(fontSize: 11)),
+                            subtitle: Text('आर्डर समय: ${ord['orderTime'] ?? 'N/A'}\nपता: ${ord['customerAddress']}', style: const TextStyle(fontSize: 11)),
                             trailing: accepted
                                 ? const Chip(label: Text('Accepted', style: TextStyle(color: Colors.white, fontSize: 9)), backgroundColor: Colors.green)
                                 : ElevatedButton(
@@ -975,9 +984,10 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
 
   Future<void> _acceptOrder(String orderKey) async {
     try {
+      String timeNow = "${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} (${DateTime.now().day}/${DateTime.now().month})";
       await http.patch(
         Uri.parse('${ViziagDatabase.firebaseRestUrl}/orders/$orderKey.json'),
-        body: json.encode({'status': 'Accepted by Vendor'}),
+        body: json.encode({'status': 'Accepted by Vendor', 'vendorAcceptedTime': timeNow}),
       );
       _fetchVendorOrders();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Order Accepted!'), backgroundColor: Colors.green));
@@ -1053,7 +1063,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         child: ListTile(
                           title: Text('${ord['customerName']} - ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          subtitle: Text('पता: ${ord['customerAddress']}\nस्थिति: $status', style: const TextStyle(fontSize: 11)),
+                          subtitle: Text('आर्डर समय: ${ord['orderTime'] ?? 'N/A'}\nपता: ${ord['customerAddress']}\nस्थिति: $status', style: const TextStyle(fontSize: 11)),
                           trailing: status == 'Pending' 
                               ? ElevatedButton(
                                   style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(60, 30)),
@@ -1183,7 +1193,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
         data.forEach((key, val) {
           var item = Map<String, dynamic>.from(val);
           item['firebaseKey'] = key;
-          // Filter only orders belonging to current user phone
           if (item['customerPhone'] == ViziagDatabase.currentUserPhone) {
             list.add(item);
           }
@@ -1227,6 +1236,9 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     setState(() => _isPlacingOrder = true);
 
     double grandTotal = ViziagDatabase.cartItems.fold(0, (sum, item) => sum + ((item['price'] as double) * (item['qty'] as double)));
+    
+    // Creating precise order timestamps
+    String formattedTime = "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')} | ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
 
     var orderData = {
       'orderId': 'ord_${DateTime.now().millisecondsSinceEpoch}',
@@ -1235,8 +1247,8 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       'customerAddress': ViziagDatabase.currentDeliveryAddress,
       'items': ViziagDatabase.cartItems,
       'grandTotal': grandTotal,
-      'timestamp': DateTime.now().toIso8601String(),
-      'status': 'Pending',
+      'orderTime': formattedTime,
+      'status': 'Pending ⏳',
       'isAcceptedByTempo': false,
     };
 
@@ -1248,10 +1260,10 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     } catch (_) {}
 
     setState(() => _isPlacingOrder = false);
-    _fetchUserOrders(); // Refresh user orders list
+    _fetchUserOrders();
 
     String vendorPhone = ViziagDatabase.mandisList[0]['shops'][0]['whatsappNumber'] ?? '919971968060';
-    String message = "🛍️ *New Order from Viziag Mart*\n\n👤 *Customer:* ${ViziagDatabase.currentCustomerName}\n📍 *Address:* ${ViziagDatabase.currentDeliveryAddress}\n\n";
+    String message = "🛍️ *New Order from Viziag Mart*\n⏱️ *Time:* $formattedTime\n\n👤 *Customer:* ${ViziagDatabase.currentCustomerName}\n📍 *Address:* ${ViziagDatabase.currentDeliveryAddress}\n\n";
 
     for (int i = 0; i < ViziagDatabase.cartItems.length; i++) {
       var item = ViziagDatabase.cartItems[i];
@@ -1334,7 +1346,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
 
           Row(
             children: [
-              const Text('📦 Your Orders & Live Tracking', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFF5722))),
+              const Text('📦 Your Orders & Timeline & Live Tracking', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF5722))),
               const Spacer(),
               IconButton(
                 onPressed: _fetchUserOrders,
@@ -1356,7 +1368,9 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                       itemBuilder: (context, index) {
                         var ord = _userOrdersList[index];
                         bool acceptedByTempo = ord['isAcceptedByTempo'] ?? false;
-                        String status = ord['status'] ?? 'Pending';
+                        String status = ord['status'] ?? 'Pending ⏳';
+                        String orderTime = ord['orderTime'] ?? 'N/A';
+                        String tempoAcceptedTime = ord['tempoAcceptedTime'] ?? 'Pending';
 
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4),
@@ -1371,7 +1385,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                                     const Spacer(),
                                     Chip(
                                       label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 9)),
-                                      backgroundColor: status == 'Pending' ? Colors.orange : Colors.green,
+                                      backgroundColor: status.contains('Pending') ? Colors.orange : Colors.green,
                                       padding: EdgeInsets.zero,
                                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     ),
@@ -1379,7 +1393,11 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                                 ),
                                 const SizedBox(height: 4),
                                 Text('Total Amount: ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green)),
-                                Text('Delivery Address: ${ord['customerAddress']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                const SizedBox(height: 2),
+                                // Displaying exact timing information requested
+                                Text('🕒 आर्डर किया गया (Ordered At): $orderTime', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87)),
+                                Text('🚚 टेम्पो द्वारा स्वीकार (Accepted At): $tempoAcceptedTime', style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
+                                Text('📍 पता: ${ord['customerAddress']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                                 const SizedBox(height: 8),
                                 SizedBox(
                                   width: double.infinity,
