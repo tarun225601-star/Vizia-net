@@ -1,10 +1,11 @@
-                         import 'dart:io';
+import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart'; // 📍 जीपीएस लोकेशन के लिए जरूरी पैकेज
 
 void main() {
   runApp(const ViziagMartEnterpriseApp());
@@ -91,7 +92,7 @@ class ViziagDatabase {
 
   static List<Map<String, dynamic>> productInventory = [];
   static List<Map<String, dynamic>> cartItems = [];
-  static List<Map<String, dynamic>> fetchedCustomerOrders = []; // 📥 ड्राइवर के लिए फेच किए गए ऑर्डर्स
+  static List<Map<String, dynamic>> fetchedCustomerOrders = [];
 }
 
 // ==========================================
@@ -110,7 +111,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
   final List<Widget> _tabScreens = [
     const MandiDirectoryView(), 
     const VendorAuthAndPortalView(), 
-    const TempoDriverDashboardView(), // 🚚 टेम्पो ड्राइवर डैशबोर्ड और "Fetch Orders" सिस्टम
+    const TempoDriverDashboardView(), // 🚚 अपडेटेड टेम्पो ड्राइवर डैशबोर्ड (क्लाउड जीपीएस सिंक के साथ)
     const UserLoginAndAddressView(),
     const CartAndWhatsAppCheckoutView(), 
   ];
@@ -210,9 +211,9 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
         type: BottomNavigationBarType.fixed,
         onTap: (index) {
           if (index == 3) {
-            setState(() => _selectedTabIndex = 4); // Cart tab
+            setState(() => _selectedTabIndex = 4); 
           } else if (index == 2) {
-            setState(() => _selectedTabIndex = 3); // Profile tab
+            setState(() => _selectedTabIndex = 3); 
           } else {
             setState(() => _selectedTabIndex = index);
           }
@@ -366,7 +367,7 @@ class MandiShopsScreen extends StatelessWidget {
 }
 
 // ==========================================
-// MARKETPLACE BUYER VIEW
+// MARKETPLACE BUYER VIEW (IN-APP LIVE GPS TRACKING)
 // ==========================================
 class MarketplaceBuyerView extends StatefulWidget {
   final Map<String, dynamic>? selectedShop;
@@ -408,6 +409,64 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     } finally {
       setState(() => _isLoadingCloud = false);
     }
+  }
+
+  // 🛰️ फायरबेस से टेम्पो की लाइव लोकेशन फेच करके इन-ऐप दिखाना
+  Future<void> _fetchAndShowLiveTempoTracking() async {
+    try {
+      final response = await http.get(Uri.parse('${ViziagDatabase.firebaseRestUrl}/tempo_location.json'));
+      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
+        var cloudData = json.decode(response.body);
+        setState(() {
+          ViziagDatabase.tempoDriverProfile['latitude'] = cloudData['latitude'] ?? ViziagDatabase.tempoDriverProfile['latitude'];
+          ViziagDatabase.tempoDriverProfile['longitude'] = cloudData['longitude'] ?? ViziagDatabase.tempoDriverProfile['longitude'];
+          ViziagDatabase.tempoDriverProfile['currentLocationName'] = cloudData['locationName'] ?? 'Live GPS Updated';
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching tempo location: $e");
+    }
+
+    var tempo = ViziagDatabase.tempoDriverProfile;
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('🚚 Live Tempo GPS Tracking'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Driver: ${tempo['driverName']}'),
+            Text('Phone: ${tempo['driverPhone']}'),
+            Text('Vehicle: ${tempo['vehicleModel']} [${tempo['vehicleNumber']}]'),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              color: Colors.grey.shade100,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('📍 Current Coordinates:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade900)),
+                  Text('Latitude: ${tempo['latitude']}'),
+                  Text('Longitude: ${tempo['longitude']}'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text('📍 गाड़ी आपके ऑर्डर के लिए क्लाउड लाइव जीपीएस से ट्रैक हो रही है।', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => launchUrl(Uri(scheme: 'tel', path: tempo['driverPhone'])),
+            child: const Text('Call Driver 📞'),
+          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        ],
+      ),
+    );
   }
 
   void _addToCart(Map<String, dynamic> prod, double qty) {
@@ -485,7 +544,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('🚚 लाइव टेम्पो/डिलीवरी स्टेटस', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                      const Text('🚚 लाइव टेम्पो/जीपीएस स्टेटस', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                       Text('ड्राइवर: ${tempo['driverName']} (${tempo['vehicleNumber']})', style: const TextStyle(color: Colors.white70, fontSize: 10)),
                       Text('लोकेशन: ${tempo['currentLocationName']}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                     ],
@@ -493,34 +552,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.blue.shade900, minimumSize: const Size(60, 30)),
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('🚚 Live Tempo GPS Tracking'),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Driver: ${tempo['driverName']}'),
-                            Text('Phone: ${tempo['driverPhone']}'),
-                            Text('Vehicle: ${tempo['vehicleModel']} [${tempo['vehicleNumber']}]'),
-                            const SizedBox(height: 8),
-                            Text('Current GPS Location:\nLat: ${tempo['latitude']}, Lng: ${tempo['longitude']}'),
-                            const SizedBox(height: 10),
-                            const Text('📍 गाड़ी आपके ऑर्डर के लिए रास्ते में है।', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => launchUrl(Uri(scheme: 'tel', path: tempo['driverPhone'])),
-                            child: const Text('Call Driver 📞'),
-                          ),
-                          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-                        ],
-                      ),
-                    );
-                  },
+                  onPressed: _fetchAndShowLiveTempoTracking, // 📍 खरीदार यहीं क्लिक करके इन-ऐप जीपीएस लाइव देखेगा
                   child: const Text('Track GPS', style: TextStyle(fontSize: 10)),
                 ),
               ],
@@ -731,7 +763,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 }
 
 // ==========================================
-// 🚚 TEMPO DRIVER DASHBOARD & FETCH ORDERS SYSTEM
+// 🚚 TEMPO DRIVER DASHBOARD (CLOUD GPS LIVE SYNC)
 // ==========================================
 class TempoDriverDashboardView extends StatefulWidget {
   const TempoDriverDashboardView({super.key});
@@ -742,6 +774,7 @@ class TempoDriverDashboardView extends StatefulWidget {
 
 class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
   bool _isFetchingOrders = false;
+  bool _isUpdatingGps = false;
 
   // 📥 फायरबेस से ग्राहकों के सारे ऑर्डर फेच करना
   Future<void> _fetchCustomerOrdersFromFirebase() async {
@@ -774,26 +807,58 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
     }
   }
 
-  // 📲 ड्राइवर द्वारा व्हाट्सएप पर ग्राहक को ऑर्डर और लाइव लोकेशन भेजना
-  Future<void> _sendLocationAndOrderToCustomer(Map<String, dynamic> order) async {
-    String custPhone = order['customerPhone'] ?? '9971968060';
-    String custName = order['customerName'] ?? 'ग्राहक';
-    String custAddress = order['customerAddress'] ?? '';
-
-    // व्हाट्सएप मैसेज फॉर्मेट
-    String message = "🚚 *Viziag Mart Tempo Dispatch*\n\nनमस्ते $custName जी,\nआपका माल टेम्पो में लोड हो चुका है और ड्राइवर आपके पते पर रवाना हो रहा है।\n\n📍 *डिलिवरी पता:* $custAddress\n\n📍 *अपनी 8 घंटे की Live Location देखने के लिए यहाँ क्लिक करें:* [ड्राइवर अपनी व्हाट्सएप Live Location इसी चैट पर भेज रहा है]\n\nकृपया तैयार रहें!";
-
-    String whatsappUrl = "https://wa.me/$custPhone?text=${Uri.encodeComponent(message)}";
-    final Uri uri = Uri.parse(whatsappUrl);
-
+  // 🛰️ ड्राइवर फोन के GPS से रियल लोकेशन निकालकर सीधे Firebase पर सिंक करेगा (नो व्हाट्सएप)
+  Future<void> _updateLiveGpsToCloud() async {
+    setState(() => _isUpdatingGps = true);
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ WhatsApp नहीं खुल सका!')));
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ कृपया फोन का जीपीएस (Location) चालू करें!')));
+        setState(() => _isUpdatingGps = false);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ जीपीएस की अनुमति (Permission) आवश्यक है!')));
+          setState(() => _isUpdatingGps = false);
+          return;
+        }
+      }
+
+      // करंट कोऑर्डिनेट्स फेच करना
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      
+      var gpsPayload = {
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'locationName': 'Faridabad Live Transit',
+        'updatedAt': DateTime.now().toIso8601String(),
+        'driverName': ViziagDatabase.tempoDriverProfile['driverName'],
+        'vehicleNumber': ViziagDatabase.tempoDriverProfile['vehicleNumber'],
+      };
+
+      // फायरबेस पर डायरेक्ट लाइव लोकेशन सिंक (Put/Patch)
+      final response = await http.put(
+        Uri.parse('${ViziagDatabase.firebaseRestUrl}/tempo_location.json'),
+        body: json.encode(gpsPayload),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          ViziagDatabase.tempoDriverProfile['latitude'] = position.latitude;
+          ViziagDatabase.tempoDriverProfile['longitude'] = position.longitude;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('🚀 Live GPS Location Cloud पर सिंक हो गई! ग्राहक अब ऐप में देख सकते हैं।'), backgroundColor: Colors.green),
+        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('GPS Sync Error: $e')));
+    } finally {
+      setState(() => _isUpdatingGps = false);
     }
   }
 
@@ -805,14 +870,27 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
       padding: const EdgeInsets.all(12.0),
       child: ListView(
         children: [
-          const Text('🚚 टेम्पो ड्राइवर डैशबोर्ड & आर्डर मैनेजर', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const Text('यहाँ से ड्राइवर सभी ग्राहकों के ऑर्डर फेच करके उन्हें व्हाट्सएप और लोकेशन भेज सकता है।', style: TextStyle(fontSize: 11, color: Colors.grey)),
+          const Text('🚚 टेम्पो ड्राइवर डैशबोर्ड & लाइव जीपीएस', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text('ड्राइवर यहाँ से आर्डर फेच करेगा और अपनी लाइव जीपीएस लोकेशन सीधे क्लाउड पर अपडेट करेगा।', style: TextStyle(fontSize: 11, color: Colors.grey)),
           const SizedBox(height: 12),
+
+          // 🛰️ Live GPS Update Button (replaces WhatsApp location)
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white),
+              onPressed: _isUpdatingGps ? null : _updateLiveGpsToCloud,
+              icon: const Icon(Icons.gps_fixed),
+              label: Text(_isUpdatingGps ? 'Syncing GPS...' : '🛰️ Update & Sync Live GPS to Cloud 📍', style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(height: 10),
 
           // 📥 Fetch Orders Button
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 44,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade800, foregroundColor: Colors.white),
               onPressed: _isFetchingOrders ? null : _fetchCustomerOrdersFromFirebase,
@@ -859,17 +937,6 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
                             const Divider(height: 1),
                             const SizedBox(height: 6),
                             Text('🛒 कुल राशि: ₹${order['grandTotal'] ?? 0}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 36,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
-                                onPressed: () => _sendLocationAndOrderToCustomer(order),
-                                icon: const Icon(Icons.chat, size: 16),
-                                label: const Text('WhatsApp पर आर्डर और Live Location भेजें 📍', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -1346,7 +1413,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
 
     double grandTotal = ViziagDatabase.cartItems.fold(0, (sum, item) => sum + ((item['price'] as double) * (item['qty'] as double)));
 
-    // 1. ऑर्डर को फायरबेस में सेव करें ताकि ड्राइवर "Fetch Orders" से उसे उठा सके
     var orderData = {
       'orderId': 'ord_${DateTime.now().millisecondsSinceEpoch}',
       'customerName': ViziagDatabase.currentCustomerName,
@@ -1368,7 +1434,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
 
     setState(() => _isPlacingOrder = false);
 
-    // 2. व्हाट्सएप पर मैसेज भेजना
     String vendorPhone = ViziagDatabase.mandisList[0]['shops'][0]['whatsappNumber'] ?? '919971968060';
     String message = "🛍️ *New Order from Viziag Mart*\n\n👤 *Customer:* ${ViziagDatabase.currentCustomerName}\n📞 *Phone:* ${ViziagDatabase.currentUserPhone}\n📍 *Address:* ${ViziagDatabase.currentDeliveryAddress}\n\n";
 
@@ -1377,7 +1442,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       double itemTotal = (item['price'] as double) * (item['qty'] as double);
       message += "${i + 1}. ${item['name']} - ${item['qty']} ${item['unit']} = *₹${itemTotal.toStringAsFixed(0)}*\n";
     }
-    message += "\n💰 *Grand Total: ₹${grandTotal.toStringAsFixed(0)}*\n\nभाई, ऑर्डर पैक कर देना और टेम्पो रवाना होने पर Live Location भेजना!";
+    message += "\n💰 *Grand Total: ₹${grandTotal.toStringAsFixed(0)}*\n\nभाई, ऑर्डर पैक कर देना। ड्राइवर ने जीपीएस लोकेशन ऐप पर लाइव कर दी है!";
 
     String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(message)}";
     final Uri uri = Uri.parse(whatsappUrl);
