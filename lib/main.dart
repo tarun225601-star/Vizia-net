@@ -726,7 +726,6 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
       padding: const EdgeInsets.all(12.0),
       child: ListView(
         children: [
-          // टॉप पर सिर्फ दो साफ सुथरे बटन: Fetch Orders और Start Route
           Row(
             children: [
               Expanded(
@@ -743,14 +742,17 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: ElevatedButton.styleFrom(
-                  backgroundColor: _isAutoTrackingActive ? Colors.green.shade800 : const Color(0xFFFF5722),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ).onPressed(_isUpdatingGps ? null : _startRouteAndGps),
-                child: Text(
-                  _isAutoTrackingActive ? '🟢 Route Active' : '🚀 Start Route',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isAutoTrackingActive ? Colors.green.shade800 : const Color(0xFFFF5722),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: _isUpdatingGps ? null : _startRouteAndGps,
+                  child: Text(
+                    _isAutoTrackingActive ? '🟢 Route Active' : '🚀 Start Route',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
@@ -934,8 +936,8 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   final TextEditingController _priceCtrl = TextEditingController();
   final TextEditingController _stockCtrl = TextEditingController();
 
-  String _selectedUnit = 'KG';
-  String _selectedCategory = 'Fruit';
+  final String _selectedUnit = 'KG';
+  final String _selectedCategory = 'Fruit';
   bool _isUploadingToCloud = false;
   String? _pickedProdImagePath;
   final ImagePicker _picker = ImagePicker();
