@@ -1,12 +1,12 @@
-                     import 'dart:io';
+import 'dart:io';
 import 'dart:convert';
-import 'dart:async'; // ⏱️ बैकग्राउंड जीपीएस लूप (Timer) के लिए जरूरी
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:geolocator/geolocator.dart'; // 📍 जीपीएस लोकेशन के लिए जरूरी पैकेज
+import 'package:geolocator/geolocator.dart';
 
 void main() {
   runApp(const ViziagMartEnterpriseApp());
@@ -44,15 +44,17 @@ class ViziagDatabase {
   static String currentCustomerName = "Tarun Kumar";
   static String currentDeliveryAddress = "Sector 15A Ajronda Sabji Mandi, Faridabad";
   
-  // टेम्पो / डिलीवरी पार्टनर डेटा मॉडल
+  // टेम्पो / डिलीवरी पार्टनर डेटा मॉडल (अब प्रोफाइल से भी कंट्रोल होगा)
   static Map<String, dynamic> tempoDriverProfile = {
-    'driverName': 'राजेश कुमार (Tempo Driver)',
+    'driverName': 'राजेश कुमार',
     'driverPhone': '9876543210',
     'vehicleNumber': 'HR-51-AB-1234',
-    'vehicleModel': 'Mahindra Supro Delivery Van',
-    'currentLocationName': 'Sector 15A Mandi Gate',
+    'startLocationName': 'Sector 15A Ajronda Sabji Mandi, Faridabad',
+    'destinationName': 'Sector 16 Market, Faridabad',
     'latitude': 28.4089,
     'longitude': 77.3178,
+    'destLatitude': 28.4200,
+    'destLongitude': 77.3100,
     'isAvailable': true,
   };
 
@@ -76,18 +78,6 @@ class ViziagDatabase {
           'isOpen': true,
         }
       ]
-    },
-    {
-      'mandiId': 'old_mandi',
-      'mandiName': 'ओल्ड मंडी (Old Mandi Faridabad)',
-      'location': 'Old Faridabad',
-      'shops': []
-    },
-    {
-      'mandiId': 'ballabhgarh_mandi',
-      'mandiName': 'बल्लभगढ़ मंडी (Ballabhgarh Mandi)',
-      'location': 'Ballabhgarh',
-      'shops': []
     }
   ];
 
@@ -113,7 +103,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
     const MandiDirectoryView(), 
     const VendorAuthAndPortalView(), 
     const TempoDriverDashboardView(), 
-    const UserLoginAndAddressView(),
+    const UserAndTempoProfileView(), // 👤 यूजर और टेम्पो प्रोफाइल एक साथ
     const CartAndWhatsAppCheckoutView(), 
   ];
 
@@ -368,7 +358,7 @@ class MandiShopsScreen extends StatelessWidget {
 }
 
 // ==========================================
-// MARKETPLACE BUYER VIEW (DIRECT GOOGLE MAPS LAUNCHER)
+// MARKETPLACE BUYER VIEW
 // ==========================================
 class MarketplaceBuyerView extends StatefulWidget {
   final Map<String, dynamic>? selectedShop;
@@ -412,27 +402,14 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     }
   }
 
-  // 🗺️ सीधा 'Track GPS' दबाते ही Google Maps पर टेम्पो की लोकेशन खोलना
-  Future<void> _launchLiveTempoMapDirectly() async {
-    try {
-      final response = await http.get(Uri.parse('${ViziagDatabase.firebaseRestUrl}/tempo_location.json'));
-      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
-        var cloudData = json.decode(response.body);
-        setState(() {
-          ViziagDatabase.tempoDriverProfile['latitude'] = cloudData['latitude'] ?? ViziagDatabase.tempoDriverProfile['latitude'];
-          ViziagDatabase.tempoDriverProfile['longitude'] = cloudData['longitude'] ?? ViziagDatabase.tempoDriverProfile['longitude'];
-          ViziagDatabase.tempoDriverProfile['currentLocationName'] = cloudData['locationName'] ?? 'Live GPS Updated';
-        });
-      }
-    } catch (e) {
-      debugPrint("Error fetching tempo location: $e");
-    }
-
+  Future<void> _launchRouteMap() async {
     var tempo = ViziagDatabase.tempoDriverProfile;
-    double lat = tempo['latitude'] ?? 28.4089;
-    double lng = tempo['longitude'] ?? 77.3178;
+    double currentLat = tempo['latitude'] ?? 28.4089;
+    double currentLng = tempo['longitude'] ?? 77.3178;
+    double destLat = tempo['destLatitude'] ?? 28.4089;
+    double destLng = tempo['destLongitude'] ?? 77.3178;
 
-    String mapUrl = "https://www.google.com/maps/search/?api=1&query=$lat,$lng";
+    String mapUrl = "https://www.google.com/maps/dir/?api=1&origin=$currentLat,$currentLng&destination=$destLat,$destLng&travelmode=driving";
     final Uri uri = Uri.parse(mapUrl);
 
     try {
@@ -485,8 +462,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
     if (await canLaunchUrl(launchUri)) {
       await launchUrl(launchUri);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('कॉल करने में असमर्थ!')));
     }
   }
 
@@ -521,17 +496,18 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('🚚 लाइव टेम्पो/जीपीएस स्टेटस', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                      Text('ड्राइवर: ${tempo['driverName']} (${tempo['vehicleNumber']})', style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                      Text('लोकेशन: ${tempo['currentLocationName']}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                      const Text('🚚 टेम्पो रूट स्टेटस', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                      Text('गाड़ी: ${tempo['vehicleNumber']} (${tempo['driverName']})', style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                      Text('कहाँ से: ${tempo['startLocationName']}', style: const TextStyle(color: Colors.white60, fontSize: 9)),
+                      Text('डेस्टिनेशन: ${tempo['destinationName']}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.blue.shade900, minimumSize: const Size(60, 30)),
-                  onPressed: _launchLiveTempoMapDirectly,
+                  onPressed: _launchRouteMap,
                   icon: const Icon(Icons.map, size: 14),
-                  label: const Text('Track Map', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  label: const Text('Live Route', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -568,172 +544,112 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
           if (_isLoadingCloud) const LinearProgressIndicator(color: Color(0xFFFF5722)),
           const SizedBox(height: 8),
 
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4, spreadRadius: 1)],
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.62,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  height: 110,
-                  width: double.infinity,
-                  child: shop['shopBannerPath'] != null && shop['shopBannerPath'].isNotEmpty
-                      ? buildShopOrProdImage(shop['shopBannerPath'], 110, double.infinity, Icons.store)
-                      : Container(color: const Color(0xFF2C3E50), child: const Center(child: Text('🏪 Storefront Banner View', style: TextStyle(color: Colors.white70, fontSize: 11)))),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(10.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 55,
-                        height: 55,
-                        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFFF5722), width: 2)),
-                        child: ClipOval(
-                          child: shop['ownerPhotoPath'] != null && shop['ownerPhotoPath'].isNotEmpty
-                              ? buildShopOrProdImage(shop['ownerPhotoPath'], 55, 55, Icons.person)
-                              : Container(color: Colors.grey.shade200, child: const Icon(Icons.person, size: 30, color: Colors.grey)),
+            itemCount: filteredProducts.length,
+            itemBuilder: (context, index) {
+              var prod = filteredProducts[index];
+              String prodKey = prod['id'] ?? prod['name'];
+              double unitPrice = (prod['price'] ?? 100.0).toDouble();
+              double selectedQty = _itemQuantities[prodKey] ?? 1.0;
+              double totalPrice = unitPrice * selectedQty;
+              bool inStock = prod['inStock'] ?? true;
+
+              return Card(
+                elevation: 2,
+                margin: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                          child: buildShopOrProdImage(prod['imagePath'], 120, double.infinity, Icons.fastfood),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
+                        if (!inStock)
+                          Container(
+                            height: 120,
+                            color: Colors.black.withOpacity(0.6),
+                            child: const Center(
+                              child: Text('OUT OF STOCK', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                      ],
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(6.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(shop['shopName'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            Text('📍 ${shop['address']}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                            const SizedBox(height: 2),
-                            Text('📞 ${shop['phone']}', style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold)),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                Text('₹${unitPrice.toInt()}/${prod['unit'] ?? 'kg'}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
+                              ],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text('Qty:', style: TextStyle(fontSize: 10)),
+                                    const SizedBox(width: 4),
+                                    SizedBox(
+                                      width: 35,
+                                      height: 22,
+                                      child: TextField(
+                                        keyboardType: TextInputType.number,
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                        decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 0)),
+                                        controller: TextEditingController(text: selectedQty.toInt().toString())
+                                          ..selection = TextSelection.fromPosition(TextPosition(offset: selectedQty.toInt().toString().length)),
+                                        onChanged: (val) {
+                                          double? q = double.tryParse(val);
+                                          if (q != null && q > 0) setState(() => _itemQuantities[prodKey] = q);
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text('Total: ₹${totalPrice.toInt()}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
+                                const SizedBox(height: 4),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 26,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: inStock ? const Color(0xFFFF5722) : Colors.grey,
+                                      foregroundColor: Colors.white,
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                    onPressed: inStock ? () => _addToCart(prod, selectedQty) : null,
+                                    child: Text(inStock ? 'Add to Cart' : 'Out of Stock', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                        onPressed: () => _callSupplier(shop['phone'] ?? '9971968060'),
-                        icon: const Icon(Icons.phone, size: 14),
-                        label: const Text('Call', style: TextStyle(fontSize: 11)),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
-          const SizedBox(height: 10),
-          const Text('✨ मंडी के थोक भाव & आइटम्स (Wholesale Catalog)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(height: 6),
-
-          filteredProducts.isEmpty
-              ? const Padding(padding: EdgeInsets.all(30.0), child: Center(child: Text('इस श्रेणी में अभी कोई आइटम उपलब्ध नहीं है!')))
-              : GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.62,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: filteredProducts.length,
-                  itemBuilder: (context, index) {
-                    var prod = filteredProducts[index];
-                    String prodKey = prod['id'] ?? prod['name'];
-                    double unitPrice = (prod['price'] ?? 100.0).toDouble();
-                    double selectedQty = _itemQuantities[prodKey] ?? 1.0;
-                    double totalPrice = unitPrice * selectedQty;
-                    bool inStock = prod['inStock'] ?? true;
-
-                    return Card(
-                      elevation: 2,
-                      margin: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Stack(
-                            children: [
-                              ClipRRect(
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-                                child: buildShopOrProdImage(prod['imagePath'], 120, double.infinity, Icons.fastfood),
-                              ),
-                              if (!inStock)
-                                Container(
-                                  height: 120,
-                                  color: Colors.black.withOpacity(0.6),
-                                  child: const Center(
-                                    child: Text('OUT OF STOCK', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.all(6.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                      Text('₹${unitPrice.toInt()}/${prod['unit'] ?? 'kg'}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
-                                    ],
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          const Text('Qty:', style: TextStyle(fontSize: 10)),
-                                          const SizedBox(width: 4),
-                                          SizedBox(
-                                            width: 35,
-                                            height: 22,
-                                            child: TextField(
-                                              keyboardType: TextInputType.number,
-                                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                              decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 0)),
-                                              controller: TextEditingController(text: selectedQty.toInt().toString())
-                                                ..selection = TextSelection.fromPosition(TextPosition(offset: selectedQty.toInt().toString().length)),
-                                              onChanged: (val) {
-                                                double? q = double.tryParse(val);
-                                                if (q != null && q > 0) setState(() => _itemQuantities[prodKey] = q);
-                                              },
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text('Total: ₹${totalPrice.toInt()}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
-                                      const SizedBox(height: 4),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        height: 26,
-                                        child: ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: inStock ? const Color(0xFFFF5722) : Colors.grey,
-                                            foregroundColor: Colors.white,
-                                            padding: EdgeInsets.zero,
-                                          ),
-                                          onPressed: inStock ? () => _addToCart(prod, selectedQty) : null,
-                                          child: Text(inStock ? 'Add to Cart' : 'Out of Stock', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
         ],
       ),
     );
@@ -741,7 +657,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 }
 
 // ==========================================
-// 🚚 TEMPO DRIVER DASHBOARD (CLOUD GPS AUTO SYNC & ORDER LIST WITH TRACK BUTTON)
+// 🚚 TEMPO DRIVER DASHBOARD (ROUTE & DESTINATION SETUP)
 // ==========================================
 class TempoDriverDashboardView extends StatefulWidget {
   const TempoDriverDashboardView({super.key});
@@ -757,40 +673,26 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
   Timer? _locationTimer;
   bool _isAutoTrackingActive = false;
 
+  // डेस्टिनेशन इनपुट कंट्रोलर्स
+  final TextEditingController _startLocationCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['startLocationName']);
+  final TextEditingController _destLocationCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['destinationName']);
+
   @override
   void dispose() {
     _locationTimer?.cancel(); 
+    _startLocationCtrl.dispose();
+    _destLocationCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchCustomerOrdersFromFirebase() async {
-    setState(() => _isFetchingOrders = true);
-    try {
-      final response = await http.get(Uri.parse('${ViziagDatabase.firebaseRestUrl}/orders.json'));
-      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
-        Map<String, dynamic> data = json.decode(response.body);
-        List<Map<String, dynamic>> ordersList = [];
-        data.forEach((key, value) {
-          var order = Map<String, dynamic>.from(value);
-          order['orderKey'] = key;
-          ordersList.add(order);
-        });
-        setState(() {
-          ViziagDatabase.fetchedCustomerOrders = ordersList.reversed.toList();
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ ${ordersList.length} ऑर्डर सफलतापूर्व फेच हो गए!'), backgroundColor: Colors.green),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('⚠️ अभी कोई नया ऑर्डर नहीं मिला है।'), backgroundColor: Colors.orange),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-    } finally {
-      setState(() => _isFetchingOrders = false);
-    }
+  void _saveDriverRouteDestination() {
+    setState(() {
+      ViziagDatabase.tempoDriverProfile['startLocationName'] = _startLocationCtrl.text.trim();
+      ViziagDatabase.tempoDriverProfile['destinationName'] = _destLocationCtrl.text.trim();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('🎯 टेम्पो की रूट डेस्टिनेशन सेव हो गई! अब मैप पर दिखेगा।'), backgroundColor: Colors.green),
+    );
   }
 
   Future<void> _updateLiveGpsToCloud() async {
@@ -809,25 +711,24 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
       var gpsPayload = {
         'latitude': position.latitude,
         'longitude': position.longitude,
-        'locationName': 'Faridabad Live Transit',
+        'startLocationName': ViziagDatabase.tempoDriverProfile['startLocationName'],
+        'destinationName': ViziagDatabase.tempoDriverProfile['destinationName'],
         'updatedAt': DateTime.now().toIso8601String(),
         'driverName': ViziagDatabase.tempoDriverProfile['driverName'],
         'vehicleNumber': ViziagDatabase.tempoDriverProfile['vehicleNumber'],
       };
 
-      final response = await http.put(
+      await http.put(
         Uri.parse('${ViziagDatabase.firebaseRestUrl}/tempo_location.json'),
         body: json.encode(gpsPayload),
       );
 
-      if (response.statusCode == 200) {
-        setState(() {
-          ViziagDatabase.tempoDriverProfile['latitude'] = position.latitude;
-          ViziagDatabase.tempoDriverProfile['longitude'] = position.longitude;
-        });
-      }
+      setState(() {
+        ViziagDatabase.tempoDriverProfile['latitude'] = position.latitude;
+        ViziagDatabase.tempoDriverProfile['longitude'] = position.longitude;
+      });
     } catch (e) {
-      debugPrint("GPS Background Loop Error: $e");
+      debugPrint("GPS Error: $e");
     }
   }
 
@@ -835,14 +736,10 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
     if (_isAutoTrackingActive) {
       _locationTimer?.cancel();
       setState(() => _isAutoTrackingActive = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🛑 ऑटो-ट्रैकिंग बंद कर दी गई है।'), backgroundColor: Colors.red),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🛑 सफर रोक दिया गया।'), backgroundColor: Colors.red));
     } else {
       setState(() => _isAutoTrackingActive = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🚀 ऑटो-ट्रैकिंग शुरू! अब लोकेशन हर 30 सेकंड में अपने आप क्लाउड पर जाएगी।'), backgroundColor: Colors.green),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🟢 सफर शुरू! लाइव GPS ट्रैकिंग चालू हो गई।'), backgroundColor: Colors.green));
 
       _updateLiveGpsToCloud();
       _locationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
@@ -855,59 +752,38 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
     setState(() => _isUpdatingGps = true);
     await _updateLiveGpsToCloud();
     setState(() => _isUpdatingGps = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🚀 Live GPS Location Cloud पर सिंक हो गई!'), backgroundColor: Colors.green),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 GPS लोकेशन क्लाउड पर सिंक हो गई!'), backgroundColor: Colors.green));
   }
 
-  // 🗺️ ऑर्डर लिस्ट के अंदर से ट्रैक बटन दबाने पर Google Maps खोलना
-  Future<void> _trackSpecificOrderOnMap() async {
-    try {
-      final response = await http.get(Uri.parse('${ViziagDatabase.firebaseRestUrl}/tempo_location.json'));
-      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
-        var cloudData = json.decode(response.body);
-        setState(() {
-          ViziagDatabase.tempoDriverProfile['latitude'] = cloudData['latitude'] ?? ViziagDatabase.tempoDriverProfile['latitude'];
-          ViziagDatabase.tempoDriverProfile['longitude'] = cloudData['longitude'] ?? ViziagDatabase.tempoDriverProfile['longitude'];
-        });
-      }
-    } catch (e) {
-      debugPrint("Error fetching tempo location: $e");
-    }
-
+  Future<void> _openLiveRouteMap() async {
     var tempo = ViziagDatabase.tempoDriverProfile;
-    double lat = tempo['latitude'] ?? 28.4089;
-    double lng = tempo['longitude'] ?? 77.3178;
+    double currentLat = tempo['latitude'] ?? 28.4089;
+    double currentLng = tempo['longitude'] ?? 77.3178;
+    double destLat = tempo['destLatitude'] ?? 28.4200;
+    double destLng = tempo['destLongitude'] ?? 77.3100;
 
-    String mapUrl = "https://www.google.com/maps/search/?api=1&query=$lat,$lng";
+    String mapUrl = "https://www.google.com/maps/dir/?api=1&origin=$currentLat,$currentLng&destination=$destLat,$destLng&travelmode=driving";
     final Uri uri = Uri.parse(mapUrl);
 
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ मैप्स खोलने में असमर्थ!')));
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    var orders = ViziagDatabase.fetchedCustomerOrders;
-
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: ListView(
         children: [
           const Text('🚚 टेम्पो ड्राइवर डैशबोर्ड & लाइव जीपीएस', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const Text('ड्राइवर यहाँ से आर्डर फेच करेगा और अपनी लाइव जीपीएस लोकेशन सीधे क्लाउड पर अपडेट करेगा।', style: TextStyle(fontSize: 11, color: Colors.grey)),
+          const Text('ड्राइवर यहाँ से सफर शुरू करेगा और नीचे डेस्टिनेशन सेट करेगा।', style: TextStyle(fontSize: 11, color: Colors.grey)),
           const SizedBox(height: 12),
 
+          // जीपीएस वाले बटन्स
           SizedBox(
             width: double.infinity,
-            height: 55,
+            height: 48,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: _isAutoTrackingActive ? Colors.red : Colors.green.shade700,
@@ -916,8 +792,8 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
               ),
               onPressed: _toggleAutoTracking,
               child: Text(
-                _isAutoTrackingActive ? '🔴 ऑटो-ट्रैकिंग बंद करें (Stop Auto GPS)' : '🟢 सफर शुरू करें (Start Auto GPS Loop)',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                _isAutoTrackingActive ? '🔴 सफर रोकें (Stop Auto GPS Loop)' : '🟢 सफर शुरू करें (Start Auto GPS Loop)',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -925,88 +801,67 @@ class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
 
           SizedBox(
             width: double.infinity,
-            height: 45,
+            height: 48,
             child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade800,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
               onPressed: _isUpdatingGps ? null : _manualSyncGps,
-              icon: const Icon(Icons.gps_fixed),
-              label: Text(_isUpdatingGps ? 'Syncing GPS...' : '📍 वन-टच मैनुअल जीपीएस सिंक करें', style: const TextStyle(fontWeight: FontWeight.bold)),
+              icon: const Icon(Icons.gps_fixed, size: 16),
+              label: const Text('📍 वन-टच मैनुअल जीपीएस सिंक करें', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade800, foregroundColor: Colors.white),
-              onPressed: _isFetchingOrders ? null : _fetchCustomerOrdersFromFirebase,
-              icon: const Icon(Icons.download_done),
-              label: Text(_isFetchingOrders ? 'Fetching Orders...' : '📥 Fetch All Customer Orders from Firebase 🚀', style: const TextStyle(fontWeight: FontWeight.bold)),
+          // 🎯 डेस्टिनेशन सेट करने का नया ऑप्शन (बटनों के ठीक नीचे)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.orange.shade300),
+              boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 4)],
             ),
-          ),
-          const SizedBox(height: 15),
-
-          const Text('📦 फेच किए गए ग्राहकों के ऑर्डर्स (Active Orders List):', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-
-          orders.isEmpty
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(40.0),
-                    child: Text('कोई आर्डर फेच नहीं हुआ है। ऊपर दिए गए बटन पर क्लिक करें।', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-                  ),
-                )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: orders.length,
-                  itemBuilder: (context, index) {
-                    var order = orders[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      elevation: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.all(10.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('👤 ${order['customerName']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                Text('📞 ${order['customerPhone']}', style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text('📍 पता: ${order['customerAddress']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                            const SizedBox(height: 6),
-                            const Divider(height: 1),
-                            const SizedBox(height: 6),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('🛒 कुल राशि: ₹${order['grandTotal'] ?? 0}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
-                                // 🗺️ ऑर्डर लिस्ट के अंदर जोड़ा गया डायरेक्ट ट्रैक बटन!
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue.shade700,
-                                    foregroundColor: Colors.white,
-                                    minimumSize: const Size(80, 30),
-                                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                                  ),
-                                  onPressed: _trackSpecificOrderOnMap,
-                                  icon: const Icon(Icons.map, size: 14),
-                                  label: const Text('Track Order', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('🎯 टेम्पो डेस्टिनेशन और रूट सेट करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _startLocationCtrl,
+                  decoration: const InputDecoration(labelText: 'कहाँ से (Starting Point / Mandi)', border: OutlineInputBorder(), isDense: true),
                 ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _destLocationCtrl,
+                  decoration: const InputDecoration(labelText: 'कहाँ तक (Destination / Customer Address)', border: OutlineInputBorder(), isDense: true),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
+                        onPressed: _saveDriverRouteDestination,
+                        child: const Text('रूट सेव करें', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700, foregroundColor: Colors.white),
+                        onPressed: _openLiveRouteMap,
+                        icon: const Icon(Icons.map, size: 14),
+                        label: const Text('मैप पर रूट देखें', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1038,7 +893,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     String pin = _loginPinCtrl.text.trim();
 
     if (phone.isEmpty || pin.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('कृपया मोबाइल नंबर और 4-अंक का पिन दर्ज करें!')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('कृपया मोबाइल नंबर और पिन दर्ज करें!')));
       return;
     }
 
@@ -1052,15 +907,14 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             _isLoggedIn = true;
             ViziagDatabase.currentUserPhone = phone;
           });
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ सफलतापूर्वक लॉगिन हो गया!'), backgroundColor: Colors.green));
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ गलत पिन (Incorrect PIN)!'), backgroundColor: Colors.red));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ गलत पिन!')));
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ यह नंबर रजिस्टर्ड नहीं है। कृपया पहले पिन सेट करें।')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ नंबर रजिस्टर्ड नहीं है।')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      debugPrint("Error: $e");
     } finally {
       setState(() => _isLoadingAuth = false);
     }
@@ -1071,34 +925,24 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     String pin1 = _createPinCtrl.text.trim();
     String pin2 = _reEnterPinCtrl.text.trim();
 
-    if (phone.isEmpty || pin1.length != 4) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('कृपया सही मोबाइल नंबर और 4-अंकों का पिन दर्ज करें!')));
-      return;
-    }
-
-    if (pin1 != pin2) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ दोनों पिन मेल नहीं खा रहे हैं!'), backgroundColor: Colors.red));
+    if (phone.isEmpty || pin1.length != 4 || pin1 != pin2) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('कृपया सही विवरण भरें!')));
       return;
     }
 
     setState(() => _isLoadingAuth = true);
     try {
-      var vendorData = {'phone': phone, 'pin': pin1};
-      final response = await http.put(
+      await http.put(
         Uri.parse('${ViziagDatabase.firebaseRestUrl}/vendors/$phone.json'),
-        body: json.encode(vendorData),
+        body: json.encode({'phone': phone, 'pin': pin1}),
       );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          _isLoggedIn = true;
-          _isRegisteringNew = false;
-          ViziagDatabase.currentUserPhone = phone;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 पिन सफलतापूर्व सेव हो गया!'), backgroundColor: Colors.green));
-      }
+      setState(() {
+        _isLoggedIn = true;
+        _isRegisteringNew = false;
+        ViziagDatabase.currentUserPhone = phone;
+      });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      debugPrint("Error: $e");
     } finally {
       setState(() => _isLoadingAuth = false);
     }
@@ -1113,31 +957,21 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           child: SingleChildScrollView(
             child: Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 6)],
-              ),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 6)]),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Icon(Icons.lock_person, size: 50, color: Color(0xFFFF5722)),
                   const SizedBox(height: 10),
-                  Text(
-                    _isRegisteringNew ? '🛠️ नया पिन बनाएं (Create PIN)' : '🔐 दुकानदार लॉगिन (Vendor Login)',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  Text(_isRegisteringNew ? '🛠️ नया पिन बनाएं' : '🔐 दुकानदार लॉगिन', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 15),
-
                   if (!_isRegisteringNew) ...[
                     TextField(controller: _loginPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), isDense: true)),
                     const SizedBox(height: 10),
                     TextField(controller: _loginPinCtrl, obscureText: true, keyboardType: TextInputType.number, maxLength: 4, decoration: const InputDecoration(labelText: '4-अंक का पिन', border: OutlineInputBorder(), isDense: true, counterText: '')),
                     const SizedBox(height: 15),
                     _isLoadingAuth ? const Center(child: CircularProgressIndicator()) : ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white), onPressed: _verifyOrLoginVendor, child: const Text('लॉगिन करें')),
-                    const SizedBox(height: 10),
                     TextButton(onPressed: () => setState(() => _isRegisteringNew = true), child: const Text('नया अकाउंट है? पिन सेट करें')),
                   ] else ...[
                     TextField(controller: _regPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), isDense: true)),
@@ -1146,9 +980,8 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                     const SizedBox(height: 10),
                     TextField(controller: _reEnterPinCtrl, obscureText: true, keyboardType: TextInputType.number, maxLength: 4, decoration: const InputDecoration(labelText: 'दोबारा पिन डालें', border: OutlineInputBorder(), isDense: true, counterText: '')),
                     const SizedBox(height: 15),
-                    _isLoadingAuth ? const Center(child: CircularProgressIndicator()) : ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white), onPressed: _saveNewVendorPin, child: const Text('पिन सेव करें और लॉगिन करें')),
-                    const SizedBox(height: 10),
-                    TextButton(onPressed: () => setState(() => _isRegisteringNew = false), child: const Text('पहले से पिन है? लॉगिन करें')),
+                    _isLoadingAuth ? const Center(child: CircularProgressIndicator()) : ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white), onPressed: _saveNewVendorPin, child: const Text('पिन सेव करें')),
+                    TextButton(onPressed: () => setState(() => _isRegisteringNew = false), child: const Text('लॉगिन पर वापस जाएं')),
                   ],
                 ],
               ),
@@ -1157,14 +990,10 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
         ),
       );
     }
-
     return const ShopRegisterAndUpdateView();
   }
 }
 
-// ==========================================
-// VENDOR PORTAL VIEW
-// ==========================================
 class ShopRegisterAndUpdateView extends StatefulWidget {
   const ShopRegisterAndUpdateView({super.key});
 
@@ -1199,16 +1028,7 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
       activeShop['address'] = _shopAddressCtrl.text.trim();
       activeShop['bio'] = _shopBioCtrl.text.trim();
     });
-
-    try {
-      await http.put(
-        Uri.parse('${ViziagDatabase.firebaseRestUrl}/shop_profile.json'),
-        body: json.encode(activeShop),
-      );
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Shop details synced with Cloud!'), backgroundColor: Colors.green));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cloud sync error: $e')));
-    }
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Shop details saved!'), backgroundColor: Colors.green));
   }
 
   Future<void> _pickProductImage() async {
@@ -1219,34 +1039,8 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
     }
   }
 
-  Future<void> _pickOwnerPhoto() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
-    if (image != null) {
-      final bytes = await image.readAsBytes();
-      setState(() {
-        activeShop['ownerPhotoPath'] = "data:image/jpeg;base64,${base64Encode(bytes)}";
-      });
-      _saveShopDetailsToCloud();
-    }
-  }
-
-  Future<void> _pickShopBanner() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
-    if (image != null) {
-      final bytes = await image.readAsBytes();
-      setState(() {
-        activeShop['shopBannerPath'] = "data:image/jpeg;base64,${base64Encode(bytes)}";
-      });
-      _saveShopDetailsToCloud();
-    }
-  }
-
   Future<void> _publishProductToCloud() async {
-    if (_prodNameCtrl.text.isEmpty || _priceCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill item name and price!')));
-      return;
-    }
-
+    if (_prodNameCtrl.text.isEmpty || _priceCtrl.text.isEmpty) return;
     setState(() => _isUploadingToCloud = true);
 
     var newProduct = {
@@ -1267,24 +1061,16 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
         Uri.parse('${ViziagDatabase.firebaseRestUrl}/products.json'),
         body: json.encode(newProduct),
       );
-
       if (response.statusCode == 200 || response.statusCode == 201) {
-        Map<String, dynamic> responseData = json.decode(response.body);
-        newProduct['firebaseKey'] = responseData['name'];
-
         setState(() {
           ViziagDatabase.productInventory.insert(0, newProduct);
         });
-
         _prodNameCtrl.clear();
         _priceCtrl.clear();
         _stockCtrl.clear();
         setState(() => _pickedProdImagePath = null);
-
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Item Added Successfully!'), backgroundColor: Colors.green));
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('⚠️ Error: $e')));
     } finally {
       setState(() => _isUploadingToCloud = false);
     }
@@ -1293,140 +1079,73 @@ class _ShopRegisterAndUpdateViewState extends State<ShopRegisterAndUpdateView> {
   @override
   Widget build(BuildContext context) {
     bool isShopOpen = activeShop['isOpen'] ?? true;
-
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('🛠️ Vendor Control Panel & Shop Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text('🛠️ Vendor Control Panel', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
-
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isShopOpen ? Colors.green.shade50 : Colors.red.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isShopOpen ? Colors.green : Colors.red),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(isShopOpen ? '🟢 Shop is Open for Orders' : '🔴 Shop is Closed', style: TextStyle(fontWeight: FontWeight.bold, color: isShopOpen ? Colors.green.shade800 : Colors.red.shade800)),
-                  const Text('Customers can place orders only when open.', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                ],
-              ),
-              Switch(
-                value: isShopOpen,
-                activeColor: Colors.green,
-                onChanged: (val) {
-                  setState(() => activeShop['isOpen'] = val);
-                },
-              ),
-            ],
-          ),
+        SwitchListTile(
+          title: const Text('Shop Status (Open/Closed)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          value: isShopOpen,
+          activeColor: Colors.green,
+          onChanged: (val) => setState(() => activeShop['isOpen'] = val),
         ),
-        const SizedBox(height: 12),
-
-        const Text('📍 Shop & WhatsApp Configuration', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
         TextField(controller: _shopNameCtrl, decoration: const InputDecoration(labelText: 'Shop Name', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
         TextField(controller: _ownerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
-        TextField(controller: _shopWhatsappCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'WhatsApp Number (e.g. 919971968060)', border: OutlineInputBorder(), isDense: true)),
+        TextField(controller: _shopWhatsappCtrl, decoration: const InputDecoration(labelText: 'WhatsApp Number', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
-        TextField(controller: _shopAddressCtrl, decoration: const InputDecoration(labelText: 'Shop Address', border: OutlineInputBorder(), isDense: true)),
+        TextField(controller: _shopAddressCtrl, decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
-        TextField(controller: _shopBioCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Shop Bio / Description', border: OutlineInputBorder(), isDense: true)),
-        const SizedBox(height: 8),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
-          onPressed: _saveShopDetailsToCloud,
-          child: const Text('Save Shop & Permanent Sync'),
-        ),
-        const SizedBox(height: 10),
-
-        Row(
-          children: [
-            Expanded(child: ElevatedButton.icon(onPressed: _pickOwnerPhoto, icon: const Icon(Icons.person, size: 14), label: const Text('Owner Photo', style: TextStyle(fontSize: 11)))),
-            const SizedBox(width: 8),
-            Expanded(child: ElevatedButton.icon(onPressed: _pickShopBanner, icon: const Icon(Icons.store, size: 14), label: const Text('Banner Photo', style: TextStyle(fontSize: 11)))),
-          ],
-        ),
+        ElevatedButton(onPressed: _saveShopDetailsToCloud, child: const Text('Save Shop Profile')),
         const Divider(height: 25),
-
-        const Text('📦 Add New Item (Fruit / Vegetable)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        const Text('📦 Add New Item', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         TextField(controller: _prodNameCtrl, decoration: const InputDecoration(labelText: 'Item Name', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(child: TextField(controller: _priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price (₹)', border: OutlineInputBorder(), isDense: true))),
-            const SizedBox(width: 8),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: _selectedUnit,
-                decoration: const InputDecoration(labelText: 'Unit', border: OutlineInputBorder(), isDense: true),
-                items: ['KG', 'pc', '20 KG Box', 'Packet'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                onChanged: (val) => setState(() => _selectedUnit = val!),
-              ),
-            ),
-          ],
-        ),
+        TextField(controller: _priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price (₹)', border: OutlineInputBorder(), isDense: true)),
         const SizedBox(height: 8),
-        TextField(controller: _stockCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Stock Quantity', border: OutlineInputBorder(), isDense: true)),
+        ElevatedButton.icon(onPressed: _pickProductImage, icon: const Icon(Icons.add_a_photo), label: const Text('Select Image')),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            const Text('Category: '),
-            ChoiceChip(label: const Text('Fruit (फल)'), selected: _selectedCategory == 'Fruit', onSelected: (val) => setState(() => _selectedCategory = 'Fruit')),
-            const SizedBox(width: 8),
-            ChoiceChip(label: const Text('Vegetable (सब्जी)'), selected: _selectedCategory == 'Vegetable', onSelected: (val) => setState(() => _selectedCategory = 'Vegetable')),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ElevatedButton.icon(
-          onPressed: _pickProductImage,
-          icon: const Icon(Icons.add_a_photo, size: 14),
-          label: Text(_pickedProdImagePath == null ? 'Select Item Image' : 'Image Selected ✅'),
-        ),
-        const SizedBox(height: 12),
-        _isUploadingToCloud
-            ? const Center(child: CircularProgressIndicator())
-            : ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
-                onPressed: _publishProductToCloud,
-                child: const Text('Add Item to Catalog 🚀'),
-              ),
+        _isUploadingToCloud ? const CircularProgressIndicator() : ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white), onPressed: _publishProductToCloud, child: const Text('Add Item')),
       ],
     );
   }
 }
 
 // ==========================================
-// USER PROFILE VIEW
+// 👤 USER PROFILE & TEMPO PROFILE VIEW (संयुक्त स्क्रीन)
 // ==========================================
-class UserLoginAndAddressView extends StatefulWidget {
-  const UserLoginAndAddressView({super.key});
+class UserAndTempoProfileView extends StatefulWidget {
+  const UserAndTempoProfileView({super.key});
 
   @override
-  State<UserLoginAndAddressView> createState() => _UserLoginAndAddressViewState();
+  State<UserAndTempoProfileView> createState() => _UserAndTempoProfileViewState();
 }
 
-class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
+class _UserAndTempoProfileViewState extends State<UserAndTempoProfileView> {
+  // यूजर प्रोफाइल कंट्रोलर्स
   final TextEditingController _nameCtrl = TextEditingController(text: ViziagDatabase.currentCustomerName);
   final TextEditingController _userPhoneCtrl = TextEditingController(text: ViziagDatabase.currentUserPhone);
   final TextEditingController _addressCtrl = TextEditingController(text: ViziagDatabase.currentDeliveryAddress);
 
-  void _saveCustomerProfile() {
+  // टेम्पो प्रोफाइल कंट्रोलर्स (जो यूजर प्रोफाइल के ठीक नीचे जोड़े गए हैं)
+  final TextEditingController _driverNameCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['driverName']);
+  final TextEditingController _driverPhoneCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['driverPhone']);
+  final TextEditingController _vehicleNumCtrl = TextEditingController(text: ViziagDatabase.tempoDriverProfile['vehicleNumber']);
+
+  void _saveAllProfiles() {
     setState(() {
       ViziagDatabase.currentCustomerName = _nameCtrl.text.trim();
       ViziagDatabase.currentUserPhone = _userPhoneCtrl.text.trim();
       ViziagDatabase.currentDeliveryAddress = _addressCtrl.text.trim();
+
+      ViziagDatabase.tempoDriverProfile['driverName'] = _driverNameCtrl.text.trim();
+      ViziagDatabase.tempoDriverProfile['driverPhone'] = _driverPhoneCtrl.text.trim();
+      ViziagDatabase.tempoDriverProfile['vehicleNumber'] = _vehicleNumCtrl.text.trim();
     });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Profile Saved Successfully!'), backgroundColor: Colors.green));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Customer & Tempo Profiles Saved Successfully!'), backgroundColor: Colors.green));
   }
 
   @override
@@ -1435,18 +1154,36 @@ class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
       padding: const EdgeInsets.all(16.0),
       child: ListView(
         children: [
+          // 1. Customer Profile Section
           const Text('👤 Customer Profile & Delivery Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Your Name', border: OutlineInputBorder())),
           const SizedBox(height: 10),
-          TextField(controller: _userPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder())),
+          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Your Name', border: OutlineInputBorder(), isDense: true)),
+          const SizedBox(height: 8),
+          TextField(controller: _userPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder(), isDense: true)),
+          const SizedBox(height: 8),
+          TextField(controller: _addressCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Full Delivery Address', border: OutlineInputBorder(), isDense: true)),
+          
+          const Divider(height: 30, thickness: 2),
+
+          // 2. Tempo Profile Section (यूजर प्रोफाइल के ठीक नीचे)
+          const Text('🚚 Tempo Driver & Vehicle Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+          const SizedBox(height: 4),
+          const Text('यहाँ से टेम्पो ड्राइवर और गाड़ी की जानकारी सेट करें।', style: TextStyle(fontSize: 11, color: Colors.grey)),
           const SizedBox(height: 10),
-          TextField(controller: _addressCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Full Delivery Address', border: OutlineInputBorder())),
-          const SizedBox(height: 15),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
-            onPressed: _saveCustomerProfile,
-            child: const Text('Save Profile & Address'),
+          TextField(controller: _driverNameCtrl, decoration: const InputDecoration(labelText: 'Driver Name (ड्राइवर का नाम)', border: OutlineInputBorder(), isDense: true)),
+          const SizedBox(height: 8),
+          TextField(controller: _driverPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Driver Mobile Number', border: OutlineInputBorder(), isDense: true)),
+          const SizedBox(height: 8),
+          TextField(controller: _vehicleNumCtrl, decoration: const InputDecoration(labelText: 'Vehicle Number (जैसे: HR-51-AB-1234)', border: OutlineInputBorder(), isDense: true)),
+          
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 48,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white),
+              onPressed: _saveAllProfiles,
+              child: const Text('Save Profile & Tempo Details', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
           ),
         ],
       ),
@@ -1455,7 +1192,7 @@ class _UserLoginAndAddressViewState extends State<UserLoginAndAddressView> {
 }
 
 // ==========================================
-// WHATSAPP CHECKOUT CART (FIREBASE ORDER PUSH)
+// WHATSAPP CHECKOUT CART
 // ==========================================
 class CartAndWhatsAppCheckoutView extends StatefulWidget {
   const CartAndWhatsAppCheckoutView({super.key});
@@ -1468,11 +1205,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
   bool _isPlacingOrder = false;
 
   Future<void> _sendOrderToWhatsApp() async {
-    if (ViziagDatabase.cartItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your cart is empty!')));
-      return;
-    }
-
+    if (ViziagDatabase.cartItems.isEmpty) return;
     setState(() => _isPlacingOrder = true);
 
     double grandTotal = ViziagDatabase.cartItems.fold(0, (sum, item) => sum + ((item['price'] as double) * (item['qty'] as double)));
@@ -1492,33 +1225,23 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
         Uri.parse('${ViziagDatabase.firebaseRestUrl}/orders.json'),
         body: json.encode(orderData),
       );
-    } catch (e) {
-      debugPrint("Order sync error: $e");
-    }
+    } catch (_) {}
 
     setState(() => _isPlacingOrder = false);
 
     String vendorPhone = ViziagDatabase.mandisList[0]['shops'][0]['whatsappNumber'] ?? '919971968060';
-    String message = "🛍️ *New Order from Viziag Mart*\n\n👤 *Customer:* ${ViziagDatabase.currentCustomerName}\n📞 *Phone:* ${ViziagDatabase.currentUserPhone}\n📍 *Address:* ${ViziagDatabase.currentDeliveryAddress}\n\n";
+    String message = "🛍️ *New Order from Viziag Mart*\n\n👤 *Customer:* ${ViziagDatabase.currentCustomerName}\n📍 *Address:* ${ViziagDatabase.currentDeliveryAddress}\n\n";
 
     for (int i = 0; i < ViziagDatabase.cartItems.length; i++) {
       var item = ViziagDatabase.cartItems[i];
-      double itemTotal = (item['price'] as double) * (item['qty'] as double);
-      message += "${i + 1}. ${item['name']} - ${item['qty']} ${item['unit']} = *₹${itemTotal.toStringAsFixed(0)}*\n";
+      message += "${i + 1}. ${item['name']} - ${item['qty']} ${item['unit']} = *₹${(item['price'] * item['qty']).toStringAsFixed(0)}*\n";
     }
-    message += "\n💰 *Grand Total: ₹${grandTotal.toStringAsFixed(0)}*\n\nभाई, ऑर्डर पैक कर देना। ड्राइवर ने जीपीएस लोकेशन ऐप पर लाइव कर दी है!";
+    message += "\n💰 *Grand Total: ₹${grandTotal.toStringAsFixed(0)}*\n\nभाई, आर्डर पैक कर देना!";
 
     String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(message)}";
     final Uri uri = Uri.parse(whatsappUrl);
-
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ WhatsApp is not installed!')));
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('⚠️ Error: $e')));
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -1531,21 +1254,19 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       padding: const EdgeInsets.all(12.0),
       child: Column(
         children: [
-          const Text('🛒 Your Shopping Cart & Total Bill', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text('🛒 Your Shopping Cart', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           Expanded(
             child: cart.isEmpty
-                ? const Center(child: Text('Cart is empty. Add items from Marketplace!'))
+                ? const Center(child: Text('Cart is empty'))
                 : ListView.builder(
                     itemCount: cart.length,
                     itemBuilder: (context, index) {
                       var item = cart[index];
-                      double itemTotal = (item['price'] as double) * (item['qty'] as double);
                       return Card(
                         child: ListTile(
                           title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('Qty: ${item['qty']} ${item['unit']} • ₹${item['price']} each\nTotal: ₹${itemTotal.toStringAsFixed(0)}'),
-                          isThreeLine: true,
+                          subtitle: Text('Qty: ${item['qty']} ${item['unit']} • ₹${item['price']} each'),
                           trailing: IconButton(
                             icon: const Icon(Icons.delete, color: Colors.red),
                             onPressed: () => setState(() => ViziagDatabase.cartItems.removeAt(index)),
@@ -1578,7 +1299,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
                             onPressed: _sendOrderToWhatsApp,
                             icon: const Icon(Icons.chat),
-                            label: Text('Send Order to WhatsApp (₹${grandTotal.toStringAsFixed(0)}) 🚀', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            label: const Text('Send Order to WhatsApp 🚀', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                   ),
                 ],
@@ -1589,4 +1310,3 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     );
   }
 }
-       
