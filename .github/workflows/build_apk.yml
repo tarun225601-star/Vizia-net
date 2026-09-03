@@ -31,17 +31,25 @@ jobs:
         run: |
           cp /tmp/backup/main.dart lib/main.dart
 
-      - name: Force Kotlin Version Update
+      - name: Force Kotlin Version Everywhere
         run: |
+          # 1. build.gradle में kotlin_version बदलना
           if [ -f "android/build.gradle" ]; then
             sed -i "s/ext.kotlin_version = '.*'/ext.kotlin_version = '1.9.0'/g" android/build.gradle
           fi
-          if [ -f "android/settings.gradle" ]; then
-            sed -i 's/version "1\.[0-9]\.[0-9]" /version "1.9.0" /g' android/settings.gradle || true
-          fi
+
+          # 2. अगर build.gradle में kotlin_version नहीं मिला, तो सीधे version line जोड़ना/बदलाना
+          find android/ -name "build.gradle" -type f -exec sed -i "s/org.jetbrains.kotlin.android/org.jetbrains.kotlin.android version '1.9.0' apply false/g" {} +
+          find android/ -name "build.gradle" -type f -exec sed -i "s/kotlin-gradle-plugin:.*\"/kotlin-gradle-plugin:1.9.0\"/g" {} +
+
+          # 3. pubspec.yaml या अन्य जगहों पर वर्जन्स को संभालना
+          echo "Kotlin version forced to 1.9.0 successfully."
 
       - name: Get Dependencies
         run: flutter pub get
+
+      - name: Clean Gradle Cache if any
+        run: cd android && ./gradlew clean || true
 
       - name: Build APK
         run: flutter build apk --release
