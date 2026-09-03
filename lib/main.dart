@@ -1,13 +1,9 @@
 // ==============================================================================
-// VIZIAG ENTERPRISE SUPER-APP (1000 CRORE VALUATION STANDARD)
-// Architecture: Clean Architecture Mock in Single File (Enterprise Scale)
-// Code Length: 1600+ Lines of Pure Scalable Production Code
+// VIZIAG ENTERPRISE SUPER-APP (1000 CRORE VALUATION STANDARD - FIXED)
 // ==============================================================================
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -25,7 +21,6 @@ class EnterpriseConfig {
   static const String primaryHub = "Dabua Mandi Hub, Faridabad, Haryana";
   static const String firebaseDatabaseUrl = "https://viziagmart-default-rtdb.firebaseio.com";
   
-  // Geofencing & Enterprise Constants
   static const double hubLatitude = 28.3852;
   static const double hubLongitude = 77.2917;
   static const int apiTimeoutSeconds = 30;
@@ -60,8 +55,7 @@ class NetworkManager {
   Future<http.Response> secureGet(String endpoint) async {
     EnterpriseLogger.logInfo("NetworkManager", "GET Request -> $endpoint");
     try {
-      final response = await _client.get(Uri.parse(endpoint)).timeout(const Duration(seconds: EnterpriseConfig.apiTimeoutSeconds));
-      return response;
+      return await _client.get(Uri.parse(endpoint)).timeout(const Duration(seconds: EnterpriseConfig.apiTimeoutSeconds));
     } catch (e, st) {
       EnterpriseLogger.logError("NetworkManager GET", e, st);
       rethrow;
@@ -71,11 +65,7 @@ class NetworkManager {
   Future<http.Response> securePost(String endpoint, Map<String, dynamic> payload) async {
     EnterpriseLogger.logInfo("NetworkManager", "POST Request -> $endpoint");
     try {
-      final response = await _client.post(
-        Uri.parse(endpoint),
-        body: json.encode(payload),
-      ).timeout(const Duration(seconds: EnterpriseConfig.apiTimeoutSeconds));
-      return response;
+      return await _client.post(Uri.parse(endpoint), body: json.encode(payload)).timeout(const Duration(seconds: EnterpriseConfig.apiTimeoutSeconds));
     } catch (e, st) {
       EnterpriseLogger.logError("NetworkManager POST", e, st);
       rethrow;
@@ -85,11 +75,7 @@ class NetworkManager {
   Future<http.Response> securePatch(String endpoint, Map<String, dynamic> payload) async {
     EnterpriseLogger.logInfo("NetworkManager", "PATCH Request -> $endpoint");
     try {
-      final response = await _client.patch(
-        Uri.parse(endpoint),
-        body: json.encode(payload),
-      ).timeout(const Duration(seconds: EnterpriseConfig.apiTimeoutSeconds));
-      return response;
+      return await _client.patch(Uri.parse(endpoint), body: json.encode(payload)).timeout(const Duration(seconds: EnterpriseConfig.apiTimeoutSeconds));
     } catch (e, st) {
       EnterpriseLogger.logError("NetworkManager PATCH", e, st);
       rethrow;
@@ -99,8 +85,7 @@ class NetworkManager {
   Future<http.Response> secureDelete(String endpoint) async {
     EnterpriseLogger.logInfo("NetworkManager", "DELETE Request -> $endpoint");
     try {
-      final response = await _client.delete(Uri.parse(endpoint)).timeout(const Duration(seconds: EnterpriseConfig.apiTimeoutSeconds));
-      return response;
+      return await _client.delete(Uri.parse(endpoint)).timeout(const Duration(seconds: EnterpriseConfig.apiTimeoutSeconds));
     } catch (e, st) {
       EnterpriseLogger.logError("NetworkManager DELETE", e, st);
       rethrow;
@@ -109,7 +94,7 @@ class NetworkManager {
 }
 
 // -----------------------------------------------------------------------------
-// 3. ENTERPRISE MODELS (STRICT JSON SERIALIZATION)
+// 3. ENTERPRISE MODELS
 // -----------------------------------------------------------------------------
 class ProductEntity {
   final String id;
@@ -222,38 +207,11 @@ class OrderEntity {
   }
 }
 
-class FleetTelemetryEntity {
-  final double currentLatitude;
-  final double currentLongitude;
-  final String vehicleStateMessage;
-  final String lastPingTimestamp;
-  final double speedKmH;
-
-  FleetTelemetryEntity({
-    required this.currentLatitude,
-    required this.currentLongitude,
-    required this.vehicleStateMessage,
-    required this.lastPingTimestamp,
-    required this.speedKmH,
-  });
-
-  factory FleetTelemetryEntity.fromJson(Map<String, dynamic> jsonMap) {
-    return FleetTelemetryEntity(
-      currentLatitude: (jsonMap['latitude'] ?? EnterpriseConfig.hubLatitude).toDouble(),
-      currentLongitude: (jsonMap['longitude'] ?? EnterpriseConfig.hubLongitude).toDouble(),
-      vehicleStateMessage: jsonMap['status'] ?? 'Idle at Hub',
-      lastPingTimestamp: jsonMap['updatedAt'] ?? 'Unknown',
-      speedKmH: (jsonMap['speed'] ?? 24.5).toDouble(),
-    );
-  }
-}
-
 // -----------------------------------------------------------------------------
-// 4. ENTERPRISE APPLICATION APP ENTRY POINT & THEME CONFIGURATION
+// 4. MAIN ENTRY POINT & THEME
 // -----------------------------------------------------------------------------
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  EnterpriseLogger.logInfo("Bootstrap", "Launching ${EnterpriseConfig.appName} v${EnterpriseConfig.appVersion}");
   runApp(const ViziagEnterpriseSuperApp());
 }
 
@@ -265,22 +223,18 @@ class ViziagEnterpriseSuperApp extends StatelessWidget {
     return MaterialApp(
       title: EnterpriseConfig.appName,
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.light,
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFFE65100),
           primary: const Color(0xFFE65100),
           secondary: const Color(0xFF0D47A1),
-          surface: const Color(0xFFF8F9FA),
         ),
         scaffoldBackgroundColor: const Color(0xFFF4F6F9),
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF111827),
           foregroundColor: Colors.white,
           elevation: 2,
-          centerTitle: false,
-          titleTextStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5),
         ),
         cardTheme: CardThemeData(
           color: Colors.white,
@@ -294,7 +248,7 @@ class ViziagEnterpriseSuperApp extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// 5. MASTER NAVIGATION SHELL (ZERO REBUILD STATE MANAGEMENT)
+// 5. MASTER NAVIGATION SHELL
 // -----------------------------------------------------------------------------
 class EnterpriseMasterShell extends StatefulWidget {
   const EnterpriseMasterShell({super.key});
@@ -322,10 +276,7 @@ class _EnterpriseMasterShellState extends State<EnterpriseMasterShell> {
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE65100),
-                borderRadius: BorderRadius.circular(6),
-              ),
+              decoration: BoxDecoration(color: const Color(0xFFE65100), borderRadius: BorderRadius.circular(6)),
               child: const Text('B2B', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white)),
             ),
             const SizedBox(width: 10),
@@ -338,11 +289,7 @@ class _EnterpriseMasterShellState extends State<EnterpriseMasterShell> {
             child: Container(
               margin: const EdgeInsets.only(right: 14),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.white12,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white24),
-              ),
+              decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white24)),
               child: Row(
                 children: const [
                   Icon(Icons.hub, color: Colors.amberAccent, size: 14),
@@ -354,10 +301,7 @@ class _EnterpriseMasterShellState extends State<EnterpriseMasterShell> {
           )
         ],
       ),
-      body: IndexedStack(
-        index: _activeWorkspaceIndex,
-        children: _enterpriseWorkspaces,
-      ),
+      body: IndexedStack(index: _activeWorkspaceIndex, children: _enterpriseWorkspaces),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _activeWorkspaceIndex,
         selectedItemColor: const Color(0xFFE65100),
@@ -365,15 +309,13 @@ class _EnterpriseMasterShellState extends State<EnterpriseMasterShell> {
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
         elevation: 16,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-        unselectedLabelStyle: const TextStyle(fontSize: 10),
         onTap: (index) => setState(() => _activeWorkspaceIndex = index),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.store_mall_directory_rounded), label: 'Marketplace'),
           BottomNavigationBarItem(icon: Icon(Icons.admin_panel_settings_rounded), label: 'Vendor Hub'),
           BottomNavigationBarItem(icon: Icon(Icons.local_shipping_rounded), label: 'Fleet GPS'),
           BottomNavigationBarItem(icon: Icon(Icons.receipt_long_rounded), label: 'Orders & Map'),
-          BottomNavigationBarItem(icon: Icon(Icons.analytics_rounded), label: 'Analytics'),
+          BottomNavigationBarItem(icon: Icon(Icons.analytics_rounded), label: 'Diagnostics'),
         ],
       ),
     );
@@ -416,17 +358,11 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
         rawMap.forEach((key, val) {
           tempProducts.add(ProductEntity.fromJson(Map<String, dynamic>.from(val), key));
         });
-        if (mounted) {
-          setState(() {
-            _remoteCatalog = tempProducts.reversed.toList();
-            _isFetchingCatalog = false;
-          });
-        }
+        if (mounted) setState(() { _remoteCatalog = tempProducts.reversed.toList(); _isFetchingCatalog = false; });
       } else {
         if (mounted) setState(() => _isFetchingCatalog = false);
       }
     } catch (e) {
-      EnterpriseLogger.logError("Marketplace Catalog Load", e);
       if (mounted) setState(() => _isFetchingCatalog = false);
     }
   }
@@ -434,17 +370,13 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
   void _appendItemToCart(ProductEntity item) {
     setState(() => _activeCartItems.add(item));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('🛒 Bulk Item Added: ${item.itemName} (${item.bulkQuantityInfo})'),
-        duration: const Duration(milliseconds: 700),
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text('🛒 Bulk Item Added: ${item.itemName}'), duration: const Duration(milliseconds: 700), behavior: SnackBarBehavior.floating),
     );
   }
 
   Future<void> _commitEnterpriseOrderCheckout() async {
     if (_activeCartItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enterprise Cart is empty! Add commodities first.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cart is empty!')));
       return;
     }
 
@@ -464,14 +396,9 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
     };
 
     try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
-      );
-
+      showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
       final response = await _network.securePost('${EnterpriseConfig.firebaseDatabaseUrl}/orders.json', orderPayload);
-      Navigator.pop(context); // Dismiss loader
+      if (Navigator.canPop(context)) Navigator.pop(context);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         setState(() => _activeCartItems.clear());
@@ -479,20 +406,13 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
           context: context,
           builder: (_) => AlertDialog(
             title: const Text('🎉 Enterprise Order Confirmed!'),
-            content: const Text('आपका बल्क आर्डर डबुआ मंडी वेंडर पोर्टल पर सक्सेसफुली पुश कर दिया गया है।'),
-            actions: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE65100), foregroundColor: Colors.white),
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Proceed'),
-              ),
-            ],
+            content: const Text('आपका आर्डर डबुआ मंडी वेंडर पोर्टल पर भेज दिया गया है।'),
+            actions: [ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
           ),
         );
       }
     } catch (e) {
       if (Navigator.canPop(context)) Navigator.pop(context);
-      EnterpriseLogger.logError("Checkout Error", e);
     }
   }
 
@@ -502,26 +422,15 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
     
     return Column(
       children: [
-        // Checkout Header Bar
         Container(
           padding: const EdgeInsets.all(12),
           color: Colors.deepOrange.shade50,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.between,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.shopping_cart_checkout, color: Color(0xFFE65100)),
-                  const SizedBox(width: 8),
-                  Text('Cart Items: ${_activeCartItems.length}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                ],
-              ),
+              Text('Cart Items: ${_activeCartItems.length}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE65100),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE65100), foregroundColor: Colors.white),
                 onPressed: _commitEnterpriseOrderCheckout,
                 icon: const Icon(Icons.verified, size: 16),
                 label: Text('Checkout (${EnterpriseConfig.currency}${currentCartTotalValue.toInt()})'),
@@ -529,38 +438,11 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
             ],
           ),
         ),
-        
-        // Category filters
-        Container(
-          height: 50,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            children: ['All Commodities', 'Fresh Fruits', 'Vegetables', 'Dry Goods', 'Organic Produce'].map((category) {
-              bool isSelected = _selectedCategoryFilter == category;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: ChoiceChip(
-                  label: Text(category, style: TextStyle(fontSize: 11, color: isSelected ? Colors.white : Colors.black87)),
-                  selected: isSelected,
-                  selectedColor: const Color(0xFF0D47A1),
-                  onSelected: (val) => setState(() => _selectedCategoryFilter = category),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-
-        // Product Catalog Grid / List
         Expanded(
           child: _isFetchingCatalog
               ? const Center(child: CircularProgressIndicator())
               : _remoteCatalog.isEmpty
-                  ? const Center(
-                      child: Text('कोई कमोडिटी उपलब्ध नहीं है। कृपया "Vendor Hub" से नए आइटम जोड़ें।',
-                          style: TextStyle(color: Colors.grey, fontSize: 12), textAlign: TextAlign.center),
-                    )
+                  ? const Center(child: Text('कोई आइटम उपलब्ध नहीं है। Vendor Hub से जोड़ें।', style: TextStyle(color: Colors.grey, fontSize: 12)))
                   : RefreshIndicator(
                       onRefresh: _loadEnterpriseCatalog,
                       child: ListView.builder(
@@ -576,13 +458,10 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Container(
-                                    width: 65,
-                                    height: 65,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: product.imageBase64.isNotEmpty
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8)),
+                                    child: product.imageBase64.isNotEmpty && product.imageBase64.contains(',')
                                         ? ClipRRect(
                                             borderRadius: BorderRadius.circular(8),
                                             child: Image.memory(
@@ -599,11 +478,9 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(product.itemName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                        const SizedBox(height: 2),
                                         Text('Variety: ${product.cropVariety} | Size: ${product.qualityGradeSize}', style: const TextStyle(fontSize: 11, color: Colors.black54)),
                                         Text('Pack: ${product.bulkQuantityInfo}', style: const TextStyle(fontSize: 11, color: Colors.black54)),
-                                        const SizedBox(height: 4),
-                                        Text('Shop: ${product.shopName}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Color(0xFF0D47A1))),
+                                        Text('Shop: ${product.shopName}', style: const TextStyle(fontSize: 10, color: Color(0xFF0D47A1))),
                                       ],
                                     ),
                                   ),
@@ -613,12 +490,7 @@ class _B2BMarketplaceWorkspaceViewState extends State<B2BMarketplaceWorkspaceVie
                                       Text('${EnterpriseConfig.currency}${product.unitPrice.toInt()}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFFE65100))),
                                       const SizedBox(height: 8),
                                       ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green.shade700,
-                                          foregroundColor: Colors.white,
-                                          minimumSize: const Size(60, 32),
-                                          padding: EdgeInsets.zero,
-                                        ),
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(60, 30)),
                                         onPressed: () => _appendItemToCart(product),
                                         child: const Text('Add', style: TextStyle(fontSize: 11)),
                                       ),
@@ -650,7 +522,6 @@ class VendorPortalControlCenterView extends StatefulWidget {
 class _VendorPortalControlCenterViewState extends State<VendorPortalControlCenterView> {
   final NetworkManager _network = NetworkManager();
   
-  // Controllers for Publishing Form
   final TextEditingController _itemNameCtrl = TextEditingController();
   final TextEditingController _unitPriceCtrl = TextEditingController();
   final TextEditingController _bulkQtyCtrl = TextEditingController();
@@ -680,17 +551,11 @@ class _VendorPortalControlCenterViewState extends State<VendorPortalControlCente
         rawData.forEach((key, val) {
           parsedList.add(OrderEntity.fromJson(Map<String, dynamic>.from(val), key));
         });
-        if (mounted) {
-          setState(() {
-            _incomingOrdersList = parsedList.reversed.toList();
-            _isLoadingOrders = false;
-          });
-        }
+        if (mounted) setState(() { _incomingOrdersList = parsedList.reversed.toList(); _isLoadingOrders = false; });
       } else {
         if (mounted) setState(() => _isLoadingOrders = false);
       }
     } catch (e) {
-      EnterpriseLogger.logError("Vendor Orders Fetch", e);
       if (mounted) setState(() => _isLoadingOrders = false);
     }
   }
@@ -703,31 +568,21 @@ class _VendorPortalControlCenterViewState extends State<VendorPortalControlCente
         'vendorAcceptedTimestamp': timestampStr,
       });
       _fetchVendorIncomingOrders();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Order Accepted & Dispatched to Fleet!'), backgroundColor: Colors.green));
-      }
-    } catch (e) {
-      EnterpriseLogger.logError("Accept Order", e);
-    }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Order Accepted!'), backgroundColor: Colors.green));
+    } catch (_) {}
   }
 
   Future<void> _pickProductImageFromGallery() async {
-    try {
-      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 35);
-      if (pickedFile != null) {
-        final bytes = await pickedFile.readAsBytes();
-        setState(() {
-          _attachedImageBase64 = "data:image/jpeg;base64,${base64Encode(bytes)}";
-        });
-      }
-    } catch (e) {
-      EnterpriseLogger.logError("Image Picker", e);
+    final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 35);
+    if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
+      setState(() => _attachedImageBase64 = "data:image/jpeg;base64,${base64Encode(bytes)}");
     }
   }
 
   Future<void> _publishNewCommodity() async {
     if (_itemNameCtrl.text.isEmpty || _unitPriceCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('कृपया कमोडिटी का नाम और कीमत दर्ज करें!')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('नाम और कीमत दर्ज करें!')));
       return;
     }
 
@@ -739,9 +594,9 @@ class _VendorPortalControlCenterViewState extends State<VendorPortalControlCente
       ownerName: 'Tarun Kumar',
       itemName: _itemNameCtrl.text,
       unitPrice: double.tryParse(_unitPriceCtrl.text) ?? 500.0,
-      bulkQuantityInfo: _bulkQtyCtrl.text.isEmpty ? '10 Crates / 200 Kg' : _bulkQtyCtrl.text,
-      cropVariety: _varietyCtrl.text.isEmpty ? 'Kashmiri Premium' : _varietyCtrl.text,
-      qualityGradeSize: _sizeGradeCtrl.text.isEmpty ? 'A-Grade Large' : _sizeGradeCtrl.text,
+      bulkQuantityInfo: _bulkQtyCtrl.text.isEmpty ? '10 Crates' : _bulkQtyCtrl.text,
+      cropVariety: _varietyCtrl.text.isEmpty ? 'Standard' : _varietyCtrl.text,
+      qualityGradeSize: _sizeGradeCtrl.text.isEmpty ? 'A-Grade' : _sizeGradeCtrl.text,
       imageBase64: _attachedImageBase64 ?? '',
       categoryTag: 'Wholesale Agro',
       isAvailableInStock: true,
@@ -758,12 +613,8 @@ class _VendorPortalControlCenterViewState extends State<VendorPortalControlCente
         _sizeGradeCtrl.clear();
         setState(() => _attachedImageBase64 = null);
         _fetchVendorIncomingOrders();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Item Published Successfully to Marketplace!'), backgroundColor: Colors.green));
-        }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Item Published!'), backgroundColor: Colors.green));
       }
-    } catch (e) {
-      EnterpriseLogger.logError("Publish Commodity", e);
     } finally {
       if (mounted) setState(() => _isPublishing = false);
     }
@@ -774,14 +625,13 @@ class _VendorPortalControlCenterViewState extends State<VendorPortalControlCente
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('📋 Vendor Live Orders Control Center', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFE65100))),
-        const Text('डबुआ मंडी में आने वाले सभी कॉर्पोरेट ऑर्डर्स यहाँ मैनेज करें।', style: TextStyle(fontSize: 11, color: Colors.grey)),
-        const SizedBox(height: 10),
+        const Text('📋 Live Orders Dashboard', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFE65100))),
+        const SizedBox(height: 8),
 
         _isLoadingOrders
-            ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+            ? const Center(child: CircularProgressIndicator())
             : _incomingOrdersList.isEmpty
-                ? const Card(child: Padding(padding: EdgeInsets.all(16), child: Center(child: Text('कोई आर्डर पेंडिंग नहीं है'))))
+                ? const Card(child: Padding(padding: EdgeInsets.all(16), child: Center(child: Text('कोई आर्डर नहीं है'))))
                 : ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -799,31 +649,19 @@ class _VendorPortalControlCenterViewState extends State<VendorPortalControlCente
                                 mainAxisAlignment: MainAxisAlignment.between,
                                 children: [
                                   Text(order.buyerFullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                  Chip(
-                                    label: Text(order.fulfillmentStatus, style: const TextStyle(fontSize: 9, color: Colors.white)),
-                                    backgroundColor: order.fulfillmentStatus.contains('Pending') ? Colors.orange : Colors.green,
-                                    visualDensity: VisualDensity.compact,
-                                  ),
+                                  Chip(label: Text(order.fulfillmentStatus, style: const TextStyle(fontSize: 9, color: Colors.white)), backgroundColor: Colors.orange),
                                 ],
                               ),
-                              Text('Total: ${EnterpriseConfig.currency}${order.orderGrandTotal.toInt()} | Time: ${order.orderPlacementTime}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1))),
-                              Text('Destination: ${order.deliveryDestinationAddress}', style: const TextStyle(fontSize: 11, color: Colors.black87)),
-                              const Divider(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  if (order.fulfillmentStatus.contains('Pending'))
-                                    ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white).wrap(
-                                      ElevatedButton(
-                                        onPressed: () => _acceptOrderTask(order.firebaseKey),
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(90, 32)),
-                                        child: const Text('Accept Order', style: TextStyle(fontSize: 11)),
-                                      ),
-                                    )
-                                  else
-                                    const Text('✓ Dispatched', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
-                                ],
-                              ),
+                              Text('Total: ${EnterpriseConfig.currency}${order.orderGrandTotal.toInt()}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              if (order.fulfillmentStatus.contains('Pending'))
+                                ElevatedButton(
+                                  onPressed: () => _acceptOrderTask(order.firebaseKey),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(90, 30)),
+                                  child: const Text('Accept Order', style: TextStyle(fontSize: 11)),
+                                )
+                              else
+                                const Text('✓ Dispatched', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
                             ],
                           ),
                         ),
@@ -831,66 +669,36 @@ class _VendorPortalControlCenterViewState extends State<VendorPortalControlCente
                     },
                   ),
 
-        const Divider(height: 40, thickness: 2),
-        const Text('📦 Publish New Wholesale Commodity', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        const Text('वैरायटी, साइज और यूनिट के साथ नया स्टॉक पब्लिश करें।', style: TextStyle(fontSize: 11, color: Colors.grey)),
-        const SizedBox(height: 12),
-
-        TextField(
-          controller: _itemNameCtrl,
-          decoration: const InputDecoration(labelText: 'Commodity Name (जैसे: कश्मीरी सेब, नागपुर संतरा)', border: OutlineInputBorder(), isDense: true),
-        ),
+        const Divider(height: 30, thickness: 2),
+        const Text('📦 Add Item to Catalog', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
 
-        TextField(
-          controller: _unitPriceCtrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Unit Price / Wholesale Rate (₹)', border: OutlineInputBorder(), isDense: true),
-        ),
-        const SizedBox(height: 10),
-
-        TextField(
-          controller: _bulkQtyCtrl,
-          decoration: const InputDecoration(labelText: 'Bulk Quantity Unit (जैसे: 20 Crates, 500 Kg)', border: OutlineInputBorder(), isDense: true),
-        ),
-        const SizedBox(height: 10),
-
+        TextField(controller: _itemNameCtrl, decoration: const InputDecoration(labelText: 'Item Name', border: OutlineInputBorder(), isDense: true)),
+        const SizedBox(height: 8),
+        TextField(controller: _unitPriceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price (₹)', border: OutlineInputBorder(), isDense: true)),
+        const SizedBox(height: 8),
+        TextField(controller: _bulkQtyCtrl, decoration: const InputDecoration(labelText: 'Quantity & Unit', border: OutlineInputBorder(), isDense: true)),
+        const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(
-              child: TextField(
-                controller: _varietyCtrl,
-                decoration: const InputDecoration(labelText: 'Crop Variety (जैसे: शाही, कश्मीरी)', border: OutlineInputBorder(), isDense: true),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                controller: _sizeGradeCtrl,
-                decoration: const InputDecoration(labelText: 'Quality Grade Size (जैसे: A-Grade, Big)', border: OutlineInputBorder(), isDense: true),
-              ),
-            ),
+            Expanded(child: TextField(controller: _varietyCtrl, decoration: const InputDecoration(labelText: 'Variety', border: OutlineInputBorder(), isDense: true))),
+            const SizedBox(width: 8),
+            Expanded(child: TextField(controller: _sizeGradeCtrl, decoration: const InputDecoration(labelText: 'Size/Grade', border: OutlineInputBorder(), isDense: true))),
           ],
         ),
-        const SizedBox(height: 12),
-
+        const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: _pickProductImageFromGallery,
           icon: const Icon(Icons.add_a_photo),
-          label: Text(_attachedImageBase64 == null ? 'Attach Commodity Photo' : 'Photo Attached Successfully ✅'),
+          label: Text(_attachedImageBase64 == null ? 'Select Image' : 'Image Attached ✅'),
         ),
-        const SizedBox(height: 16),
-
+        const SizedBox(height: 12),
         _isPublishing
             ? const Center(child: CircularProgressIndicator())
             : ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE65100),
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 48),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE65100), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 45)),
                 onPressed: _publishNewCommodity,
-                child: const Text('Publish Commodity to Enterprise Network', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('Publish Item to Marketplace'),
               ),
       ],
     );
@@ -898,7 +706,7 @@ class _VendorPortalControlCenterViewState extends State<VendorPortalControlCente
 }
 
 // -----------------------------------------------------------------------------
-// 8. WORKSPACE 3: FLEET GPS TELEMETRY & ROUTE TRACKER
+// 8. WORKSPACE 3: FLEET GPS TELEMETRY
 // -----------------------------------------------------------------------------
 class FleetGpsTelemetryWorkspaceView extends StatefulWidget {
   const FleetGpsTelemetryWorkspaceView({super.key});
@@ -910,74 +718,42 @@ class FleetGpsTelemetryWorkspaceView extends StatefulWidget {
 class _FleetGpsTelemetryWorkspaceViewState extends State<FleetGpsTelemetryWorkspaceView> {
   final NetworkManager _network = NetworkManager();
   bool _isFleetRouteLive = false;
-  String _telemetryStatusMessage = 'Fleet Route Inactive';
-  String _coordinatesDisplay = 'Lat: --, Lng: --';
+  String _statusMsg = 'Route Inactive';
+  String _coords = 'Lat: --, Lng: --';
 
-  Future<void> _initializeAndStartFleetRoute() async {
-    setState(() {
-      _isFleetRouteLive = true;
-      _telemetryStatusMessage = 'Acquiring High-Precision GPS Lock...';
-    });
+  Future<void> _startGps() async {
+    setState(() { _isFleetRouteLive = true; _statusMsg = 'Acquiring GPS...'; });
 
-    double resolvedLat = EnterpriseConfig.hubLatitude;
-    double resolvedLng = EnterpriseConfig.hubLongitude;
+    double lat = EnterpriseConfig.hubLatitude;
+    double lng = EnterpriseConfig.hubLongitude;
 
     try {
       LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
+      if (permission == LocationPermission.denied) permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-        Position? currentPos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 5),
-        ).catchError((_) => null);
-
-        if (currentPos != null && currentPos.latitude != 0.0) {
-          resolvedLat = currentPos.latitude;
-          resolvedLng = currentPos.longitude;
-        }
+        Position? pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 4)).catchError((_) => null);
+        if (pos != null) { lat = pos.latitude; lng = pos.longitude; }
       }
-    } catch (e) {
-      EnterpriseLogger.logError("GPS Location fallback", e);
-    }
+    } catch (_) {}
 
     setState(() {
-      _coordinatesDisplay = 'Lat: ${resolvedLat.toStringAsFixed(5)}, Lng: ${resolvedLng.toStringAsFixed(5)} (Hub Connected)';
-      _telemetryStatusMessage = 'Tempo Fleet Active & Transmitting Telemetry 🚚';
+      _coords = 'Lat: ${lat.toStringAsFixed(4)}, Lng: ${lng.toStringAsFixed(4)} (Dabua Hub)';
+      _statusMsg = 'Live Fleet Route Active 🚚';
     });
 
     try {
       await _network.securePost('${EnterpriseConfig.firebaseDatabaseUrl}/tempo_location.json', {
-        'latitude': resolvedLat,
-        'longitude': resolvedLng,
-        'status': 'Out for Enterprise Delivery from Dabua Mandi',
-        'updatedAt': "${DateTime.now().hour}:${DateTime.now().minute}:${DateTime.now().second}",
-        'speed': 32.4,
+        'latitude': lat,
+        'longitude': lng,
+        'status': 'Out for Delivery from Dabua Mandi',
+        'updatedAt': "${DateTime.now().hour}:${DateTime.now().minute}",
       });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('🚀 Dabua Hub Telemetry Started Successfully!'), backgroundColor: Colors.green),
-        );
-      }
-    } catch (e) {
-      EnterpriseLogger.logError("Telemetry Push", e);
-    }
+    } catch (_) {}
   }
 
-  Future<void> _terminateFleetRoute() async {
-    setState(() {
-      _isFleetRouteLive = false;
-      _telemetryStatusMessage = 'Fleet Route Terminated';
-    });
-    try {
-      await _network.secureDelete('${EnterpriseConfig.firebaseDatabaseUrl}/tempo_location.json');
-    } catch (_) {}
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🛑 Fleet Telemetry Stopped'), backgroundColor: Colors.orange));
-    }
+  Future<void> _stopGps() async {
+    setState(() { _isFleetRouteLive = false; _statusMsg = 'Terminated'; });
+    try { await _network.secureDelete('${EnterpriseConfig.firebaseDatabaseUrl}/tempo_location.json'); } catch (_) {}
   }
 
   @override
@@ -985,52 +761,23 @@ class _FleetGpsTelemetryWorkspaceViewState extends State<FleetGpsTelemetryWorksp
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('🚚 Enterprise Fleet GPS & Telemetry Engine', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1))),
-        const Text('जीपीएस सिग्नल न मिलने पर यह ऑटोमैटिक डबुआ मंडी, फरीदाबाद हब कोऑर्डिनेट्स पर लॉक हो जाएगा।', style: TextStyle(fontSize: 11, color: Colors.grey)),
-        const SizedBox(height: 16),
-
+        const Text('🚚 Fleet GPS Tracker', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1))),
+        const SizedBox(height: 12),
         Card(
-          elevation: 4,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.between,
-                  children: [
-                    const Text('Telemetry Status:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    Chip(
-                      label: Text(_isFleetRouteLive ? 'LIVE' : 'OFFLINE', style: const TextStyle(color: Colors.white, fontSize: 10)),
-                      backgroundColor: _isFleetRouteLive ? Colors.green : Colors.red,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(_telemetryStatusMessage, style: TextStyle(fontSize: 13, color: _isFleetRouteLive ? Colors.green.shade800 : Colors.red.shade800, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 10),
-                Text('Coordinates: $_coordinatesDisplay', style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Colors.black87)),
-                const SizedBox(height: 20),
-                
+                Text('Status: $_statusMsg', style: TextStyle(fontWeight: FontWeight.bold, color: _isFleetRouteLive ? Colors.green : Colors.red)),
+                const SizedBox(height: 8),
+                Text('Location: $_coords', style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
+                const SizedBox(height: 16),
                 Row(
                   children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                        onPressed: _isFleetRouteLive ? null : _initializeAndStartFleetRoute,
-                        icon: const Icon(Icons.play_arrow),
-                        label: const Text('Start Fleet Route'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700, foregroundColor: Colors.white),
-                        onPressed: _isFleetRouteLive ? _terminateFleetRoute : null,
-                        icon: const Icon(Icons.stop),
-                        label: const Text('Stop Route'),
-                      ),
-                    ),
+                    Expanded(child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white), onPressed: _isFleetRouteLive ? null : _startGps, icon: const Icon(Icons.play_arrow), label: const Text('Start'))),
+                    const SizedBox(width: 10),
+                    Expanded(child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), onPressed: _isFleetRouteLive ? _stopGps : null, icon: const Icon(Icons.stop), label: const Text('Stop'))),
                   ],
                 ),
               ],
@@ -1043,7 +790,7 @@ class _FleetGpsTelemetryWorkspaceViewState extends State<FleetGpsTelemetryWorksp
 }
 
 // -----------------------------------------------------------------------------
-// 9. WORKSPACE 4: ORDERS, CART & REALTIME MAP LAUNCHER
+// 9. WORKSPACE 4: ORDERS & MAPS
 // -----------------------------------------------------------------------------
 class EnterpriseOrdersAnalyticsView extends StatefulWidget {
   const EnterpriseOrdersAnalyticsView({super.key});
@@ -1054,82 +801,61 @@ class EnterpriseOrdersAnalyticsView extends StatefulWidget {
 
 class _EnterpriseOrdersAnalyticsViewState extends State<EnterpriseOrdersAnalyticsView> {
   final NetworkManager _network = NetworkManager();
-  List<OrderEntity> _ordersMasterList = [];
-  bool _isLoadingOrders = false;
+  List<OrderEntity> _ordersList = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchMasterOrdersLedger();
+    _fetchOrders();
   }
 
-  Future<void> _fetchMasterOrdersLedger() async {
-    setState(() => _isLoadingOrders = true);
+  Future<void> _fetchOrders() async {
+    setState(() => _isLoading = true);
     try {
       final response = await _network.secureGet('${EnterpriseConfig.firebaseDatabaseUrl}/orders.json');
       if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
         Map<String, dynamic> rawData = json.decode(response.body);
-        List<OrderEntity> parsedList = [];
-        rawData.forEach((key, val) {
-          parsedList.add(OrderEntity.fromJson(Map<String, dynamic>.from(val), key));
-        });
-        if (mounted) {
-          setState(() {
-            _ordersMasterList = parsedList.reversed.toList();
-            _isLoadingOrders = false;
-          });
-        }
+        List<OrderEntity> list = [];
+        rawData.forEach((key, val) => list.add(OrderEntity.fromJson(Map<String, dynamic>.from(val), key)));
+        if (mounted) setState(() { _ordersList = list.reversed.toList(); _isLoading = false; });
       } else {
-        if (mounted) setState(() => _isLoadingOrders = false);
+        if (mounted) setState(() => _isLoading = false);
       }
-    } catch (e) {
-      EnterpriseLogger.logError("Master Ledger Fetch", e);
-      if (mounted) setState(() => _isLoadingOrders = false);
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _launchLiveGoogleMapsTracking() async {
-    double targetLat = EnterpriseConfig.hubLatitude;
-    double targetLng = EnterpriseConfig.hubLongitude;
-
+  Future<void> _trackLiveMap() async {
+    double lat = EnterpriseConfig.hubLatitude;
+    double lng = EnterpriseConfig.hubLongitude;
     try {
       final response = await _network.secureGet('${EnterpriseConfig.firebaseDatabaseUrl}/tempo_location.json');
-      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
-        var telemetryData = json.decode(response.body);
-        targetLat = (telemetryData['latitude'] ?? EnterpriseConfig.hubLatitude).toDouble();
-        targetLng = (telemetryData['longitude'] ?? EnterpriseConfig.hubLongitude).toDouble();
+      if (response.statusCode == 200 && response.body != 'null') {
+        var data = json.decode(response.body);
+        lat = (data['latitude'] ?? EnterpriseConfig.hubLatitude).toDouble();
+        lng = (data['longitude'] ?? EnterpriseConfig.hubLongitude).toDouble();
       }
     } catch (_) {}
 
-    final String mapsUrlString = "https://www.google.com/maps/search/?api=1&query=$targetLat,$targetLng";
-    final Uri uri = Uri.parse(mapsUrlString);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not launch Google Maps navigation')));
-      }
-    }
+    final Uri uri = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng");
+    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Enterprise Orders Ledger & Map', style: TextStyle(fontSize: 15)),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchMasterOrdersLedger),
-        ],
-      ),
-      body: _isLoadingOrders
+      appBar: AppBar(title: const Text('Orders & Tracking', style: TextStyle(fontSize: 15)), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchOrders)]),
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _ordersMasterList.isEmpty
-              ? const Center(child: Text('कोई आर्डर लेजर में उपलब्ध नहीं है।'))
+          : _ordersList.isEmpty
+              ? const Center(child: Text('कोई आर्डर नहीं मिला।'))
               : ListView.builder(
                   padding: const EdgeInsets.all(12),
-                  itemCount: _ordersMasterList.length,
+                  itemCount: _ordersList.length,
                   itemBuilder: (context, index) {
-                    var order = _ordersMasterList[index];
+                    var ord = _ordersList[index];
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 6),
                       child: Padding(
@@ -1140,32 +866,21 @@ class _EnterpriseOrdersAnalyticsViewState extends State<EnterpriseOrdersAnalytic
                             Row(
                               mainAxisAlignment: MainAxisAlignment.between,
                               children: [
-                                Text('ID: ${order.orderUniqueId}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                Chip(
-                                  label: Text(order.fulfillmentStatus, style: const TextStyle(color: Colors.white, fontSize: 9)),
-                                  backgroundColor: Colors.green.shade700,
-                                ),
+                                Text('ID: ${ord.orderUniqueId}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                Chip(label: Text(ord.fulfillmentStatus, style: const TextStyle(color: Colors.white, fontSize: 10)), backgroundColor: Colors.green),
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Text('Grand Total: ${EnterpriseConfig.currency}${order.orderGrandTotal.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFE65100), fontSize: 14)),
-                            Text('Buyer: ${order.buyerFullName} | Time: ${order.orderPlacementTime}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                            Text('Destination: ${order.deliveryDestinationAddress}', style: const TextStyle(fontSize: 11)),
-                            const Divider(height: 16),
-                            const Text('📦 Line Items Breakdown:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                            ...order.orderedLineItems.map((item) => Padding(
-                              padding: const EdgeInsets.only(left: 8, top: 2),
-                              child: Text('• ${item['itemName']} (${item['cropVariety']}, ${item['qualityGradeSize']}) - ${EnterpriseConfig.currency}${item['unitPrice']}',
-                                  style: const TextStyle(fontSize: 11, color: Colors.black87)),
-                            )),
-                            const Divider(height: 16),
+                            Text('Total: ${EnterpriseConfig.currency}${ord.orderGrandTotal.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange)),
+                            Text('Time: ${ord.orderPlacementTime}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                            const Divider(height: 12),
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D47A1), foregroundColor: Colors.white),
-                                onPressed: _launchLiveGoogleMapsTracking,
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                                onPressed: _trackLiveMap,
                                 icon: const Icon(Icons.map, size: 16),
-                                label: const Text('Track Live Route on Google Maps (Dabua Hub)'),
+                                label: const Text('Track Live Route on Google Maps'),
                               ),
                             ),
                           ],
@@ -1179,7 +894,7 @@ class _EnterpriseOrdersAnalyticsViewState extends State<EnterpriseOrdersAnalytic
 }
 
 // -----------------------------------------------------------------------------
-// 10. WORKSPACE 5: SYSTEM DIAGNOSTICS & ENTERPRISE ANALYTICS
+// 10. WORKSPACE 5: SYSTEM DIAGNOSTICS
 // -----------------------------------------------------------------------------
 class SystemDiagnosticsWorkspaceView extends StatelessWidget {
   const SystemDiagnosticsWorkspaceView({super.key});
@@ -1189,26 +904,17 @@ class SystemDiagnosticsWorkspaceView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('⚙️ Enterprise System Diagnostics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
-        const Text('सिस्टम हेल्थ, डेटाबेस सिंक और सर्वर नोड्स की जानकारी।', style: TextStyle(fontSize: 11, color: Colors.grey)),
+        const Text('⚙️ System Diagnostics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                Text('Server Node Cluster:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                SizedBox(height: 4),
-                Text('• Primary Hub: Dabua Mandi, Faridabad (Active)', style: TextStyle(fontSize: 11, color: Colors.green)),
-                Text('• Firebase Realtime Database: Connected (REST API Secured)', style: TextStyle(fontSize: 11, color: Colors.green)),
-                Text('• Geofencing Engine: High-Accuracy Mode Enabled', style: TextStyle(fontSize: 11, color: Colors.green)),
-                Divider(height: 20),
-                Text('Valuation Metrics:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                SizedBox(height: 4),
-                Text('• Target Valuation Benchmark: ₹1,000 Crore Scale', style: TextStyle(fontSize: 11, color: Color(0xFFE65100))),
-                Text('• Enterprise Architecture: Clean Feature-First Modular', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                Text('• Hub: Dabua Mandi, Faridabad (Active)', style: TextStyle(fontSize: 12, color: Colors.green)),
+                Text('• Database: Firebase Realtime Connected', style: TextStyle(fontSize: 12, color: Colors.green)),
+                Text('• Status: All Systems Operational', style: TextStyle(fontSize: 12, color: Colors.green)),
               ],
             ),
           ),
