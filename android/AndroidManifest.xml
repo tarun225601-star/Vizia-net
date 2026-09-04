@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- For Android 13+ Photo Picker / Media -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    
+    <!-- GPS Location Permissions for Live Location Sharing -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
         android:label="Viziag Mart"
