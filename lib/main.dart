@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 void main() {
   runApp(const CakeAppEnterpriseApp());
@@ -43,6 +44,8 @@ class CakeDatabase {
   static String currentUserPhone = "9971968060";
   static String currentCustomerName = "Tarun Kumar";
   static String currentDeliveryAddress = "Sector 15A Faridabad";
+  static double currentLat = 28.4089;
+  static double currentLng = 77.3178;
 
   static Map<String, dynamic> bakeryShop = {
     'shopId': 'shop_cake_01',
@@ -145,7 +148,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
                   const Spacer(),
                   GestureDetector(
                     onTap: () => _showProfileEditDialog(context),
-                    child: const Text('(Edit Profile)', style: TextStyle(color: Color(0xFFFF4081), fontSize: 10)),
+                    child: const Text('(Edit Profile & Map)', style: TextStyle(color: Color(0xFFFF4081), fontSize: 10)),
                   ),
                 ],
               ),
@@ -201,15 +204,31 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
         final addressCtrl = TextEditingController(text: CakeDatabase.currentDeliveryAddress);
         return AlertDialog(
           title: const Text('Edit Profile & Address', style: TextStyle(fontSize: 15)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name', isDense: true)),
-              const SizedBox(height: 8),
-              TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone', isDense: true)),
-              const SizedBox(height: 8),
-              TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Address', isDense: true)),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name', isDense: true)),
+                const SizedBox(height: 8),
+                TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone', isDense: true)),
+                const SizedBox(height: 8),
+                TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Address', isDense: true)),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700, foregroundColor: Colors.white),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MapPickerScreen()),
+                    );
+                    setState(() {});
+                  },
+                  icon: const Icon(Icons.map, size: 16),
+                  label: const Text('Pick Location on Google Map'),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
@@ -228,6 +247,95 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
           ],
         );
       },
+    );
+  }
+}
+
+// ==========================================
+// GOOGLE MAP PICKER SCREEN
+// ==========================================
+class MapPickerScreen extends StatefulWidget {
+  const MapPickerScreen({super.key});
+
+  @override
+  State<MapPickerScreen> createState() => _MapPickerScreenState();
+}
+
+class _MapPickerScreenState extends State<MapPickerScreen> {
+  LatLng _selectedLocation = LatLng(CakeDatabase.currentLat, CakeDatabase.currentLng);
+  GoogleMapController? _mapController;
+
+  @override
+  void initState() {
+    super.initState();
+    _determineCurrentPosition();
+  }
+
+  Future<void> _determineCurrentPosition() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _selectedLocation = LatLng(position.latitude, position.longitude);
+      });
+      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedLocation, 16));
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Select Location on Map', style: TextStyle(fontSize: 16)),
+        backgroundColor: const Color(0xFF1A1A1A),
+        foregroundColor: Colors.white,
+      ),
+      body: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _selectedLocation,
+              zoom: 15,
+            ),
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+            onMapCreated: (controller) => _mapController = controller,
+            onCameraMove: (position) {
+              _selectedLocation = position.target;
+            },
+          ),
+          const Center(
+            child: Icon(Icons.location_pin, size: 45, color: Color(0xFFFF4081)),
+          ),
+          Positioned(
+            bottom: 20,
+            left: 20,
+            right: 20,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF4081),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onPressed: () {
+                CakeDatabase.currentLat = _selectedLocation.latitude;
+                CakeDatabase.currentLng = _selectedLocation.longitude;
+                CakeDatabase.currentDeliveryAddress = "Lat: ${_selectedLocation.latitude.toStringAsFixed(4)}, Lng: ${_selectedLocation.longitude.toStringAsFixed(4)}";
+                Navigator.pop(context);
+              },
+              child: const Text('Confirm Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1116,52 +1224,9 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
   Future<void> _sendLiveLocationOnWhatsApp() async {
     setState(() => _isFetchingLocation = true);
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('⚠️ कृपया अपने फोन का GPS (Location) ऑन करें!'), backgroundColor: Colors.red),
-          );
-        }
-        setState(() => _isFetchingLocation = false);
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('⚠️ लोकेशन की अनुमति (Permission) आवश्यक है!'), backgroundColor: Colors.red),
-            );
-          }
-          setState(() => _isFetchingLocation = false);
-          return;
-        }
-      }
-      
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('⚠️ लोकेशन की अनुमति स्थायी रूप से अस्वीकृत है। सेटिंग्स से चालू करें।'), backgroundColor: Colors.red),
-          );
-        }
-        setState(() => _isFetchingLocation = false);
-        return;
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 12),
-      );
-
-      double lat = position.latitude;
-      double lng = position.longitude;
-
       String vendorPhone = CakeDatabase.bakeryShop['whatsappNumber'] ?? '919971968060';
-      String googleMapsUrl = "https://www.google.com/maps/search/?api=1&query=$lat,$lng";
-      String locationMessage = "📍 *Live GPS Location Sharing*\nनमस्ते भाई, यह रही मेरी वर्तमान लाइव लोकेशन (जब तक केक रेडी नहीं होता):\n$googleMapsUrl";
+      String googleMapsUrl = "https://www.google.com/maps/search/?api=1&query=${CakeDatabase.currentLat},${CakeDatabase.currentLng}";
+      String locationMessage = "📍 *Live GPS Location Sharing*\nनमस्ते भाई, यह रही मेरी वर्तमान लोकेशन (या मैप पिन):\n$googleMapsUrl";
       
       String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(locationMessage)}";
       final Uri uri = Uri.parse(whatsappUrl);
@@ -1170,11 +1235,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       }
     } catch (e) {
       debugPrint("Location error: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ जीपीएस लोकेशन फेच करने में समय लगा या त्रुटि हुई। खुले आसमान के नीचे प्रयास करें।'), backgroundColor: Colors.red),
-        );
-      }
     } finally {
       if (mounted) setState(() => _isFetchingLocation = false);
     }
@@ -1193,6 +1253,8 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       'customerName': CakeDatabase.currentCustomerName,
       'customerPhone': CakeDatabase.currentUserPhone,
       'customerAddress': CakeDatabase.currentDeliveryAddress,
+      'customerLat': CakeDatabase.currentLat,
+      'customerLng': CakeDatabase.currentLng,
       'items': List.from(CakeDatabase.cartItems),
       'grandTotal': grandTotal,
       'orderTime': formattedTime,
@@ -1216,7 +1278,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     _fetchUserOrders();
 
     String vendorPhone = CakeDatabase.bakeryShop['whatsappNumber'] ?? '919971968060';
-    String message = "🎂 *New Cake Order from CakeApp*\n⏱️ *Time:* $formattedTime\n\n👤 *Customer:* ${CakeDatabase.currentCustomerName}\n📍 *Address:* ${CakeDatabase.currentDeliveryAddress}\n\n";
+    String message = "🎂 *New Cake Order from CakeApp*\n⏱️ *Time:* $formattedTime\n\n👤 *Customer:* ${CakeDatabase.currentCustomerName}\n📍 *Address:* ${CakeDatabase.currentDeliveryAddress}\n🗺️ *Map:* https://www.google.com/maps/search/?api=1&query=${CakeDatabase.currentLat},${CakeDatabase.currentLng}\n\n";
 
     String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(message)}";
     final Uri uri = Uri.parse(whatsappUrl);
