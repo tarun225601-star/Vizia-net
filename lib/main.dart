@@ -17,16 +17,19 @@ class CakeAppEnterpriseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CakeApp - Online Bakery & Store',
+      title: 'CakeApp - Ultra Premium Edition',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFF4081),
-          primary: const Color(0xFFFF4081),
-          secondary: const Color(0xFF1A1A1A),
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.dark(
+          primary: const Color(0xFFF59E0B), // Rich Neon Gold / Amber
+          secondary: const Color(0xFFEC4899), // Vibrant Pink Accent
+          surface: const Color(0xFF1E293B), // Dark Slate Card BG
+          background: const Color(0xFF0F172A), // Deep Rich Dark Background
         ),
-        scaffoldBackgroundColor: const Color(0xFFF4F6F9),
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        cardColor: const Color(0xFF1E293B),
       ),
       home: const CakeMainHubScreen(),
     );
@@ -45,7 +48,7 @@ class CakeDatabase {
 
   static Map<String, dynamic> bakeryShop = {
     'shopId': 'shop_cake_01',
-    'shopName': 'Tarun Premium Bakery',
+    'shopName': 'Tarun Fruit & Vegetable Shop',
     'ownerName': 'Tarun Kumar',
     'ownerPhone': '9971968060',
     'ownerPhotoPath': '', 
@@ -53,8 +56,8 @@ class CakeDatabase {
     'shopPhotoPath': '',
     'phone': '9971968060',
     'whatsappNumber': '919971968060',
-    'address': 'Sector 15A Faridabad',
-    'bio': 'अहर्निश ताज़ा और स्वादिष्ट केक और बेकरी उत्पाद उपलब्ध।',
+    'address': 'Sector 15A Ajronda Sabji Mandi, Faridabad',
+    'bio': 'ताज़ा फल, सब्जियां और बेकरी उत्पाद उपलब्ध।',
     'isOpen': true,
   };
 
@@ -87,56 +90,65 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
 
     return Scaffold(
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(70),
+        preferredSize: const Size.fromHeight(75),
         child: AppBar(
-          backgroundColor: const Color(0xFF1A1A1A),
+          backgroundColor: const Color(0xFF0B0F19),
+          elevation: 4,
+          shadowColor: const Color(0xFFF59E0B).withOpacity(0.3),
           title: Row(
             children: [
-              const Text(
-                'CAKEAPP',
-                style: TextStyle(color: Color(0xFFFF4081), fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.2),
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFFEC4899)],
+                ).createShader(bounds),
+                child: const Text(
+                  'CAKEAPP',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.5),
+                ),
               ),
               const Spacer(),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF4081),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  backgroundColor: const Color(0xFFF59E0B),
+                  foregroundColor: Colors.black87,
+                  elevation: 6,
+                  shadowColor: const Color(0xFFF59E0B).withOpacity(0.5),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 onPressed: () => setState(() => _selectedTabIndex = 0),
-                icon: const Icon(Icons.cake, size: 12),
-                label: const Text('Shop', style: TextStyle(fontSize: 9)),
+                icon: const Icon(Icons.cake, size: 14),
+                label: const Text('Shop', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
               ),
-              const SizedBox(width: 3),
+              const SizedBox(width: 6),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey.shade800,
+                  backgroundColor: const Color(0xFF334155),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 onPressed: () => setState(() => _selectedTabIndex = 1),
-                icon: const Icon(Icons.lock_outline, size: 12),
-                label: const Text('Vendor', style: TextStyle(fontSize: 9)),
+                icon: const Icon(Icons.lock_outline, size: 14),
+                label: const Text('Vendor', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
           bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(30),
+            preferredSize: const Size.fromHeight(32),
             child: Container(
-              color: const Color(0xFF2C2C2C),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              color: const Color(0xFF1E293B),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: Row(
                 children: [
                   GestureDetector(
                     onTap: () => _showProfileEditDialog(context),
                     child: Row(
                       children: [
-                        const Icon(Icons.person, color: Color(0xFFFF4081), size: 13),
-                        const SizedBox(width: 4),
+                        const Icon(Icons.person_pin_circle, color: Color(0xFFF59E0B), size: 15),
+                        const SizedBox(width: 6),
                         Text(
                           CakeDatabase.currentCustomerName,
                           style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
@@ -147,7 +159,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
                   const Spacer(),
                   GestureDetector(
                     onTap: () => _showProfileEditDialog(context),
-                    child: const Text('(Edit Profile & Address)', style: TextStyle(color: Color(0xFFFF4081), fontSize: 10)),
+                    child: const Text('(Edit Profile & Address)', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),
@@ -155,21 +167,31 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
           ),
         ),
       ),
-      body: IndexedStack(
-        index: _selectedTabIndex > 2 ? 2 : _selectedTabIndex,
-        children: _tabScreens,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0F172A), Color(0xFF1E1B4B)],
+          ),
+        ),
+        child: IndexedStack(
+          index: _selectedTabIndex > 2 ? 2 : _selectedTabIndex,
+          children: _tabScreens,
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedTabIndex > 2 ? 2 : _selectedTabIndex,
-        selectedItemColor: const Color(0xFFFF4081),
-        unselectedItemColor: Colors.grey,
+        selectedItemColor: const Color(0xFFF59E0B),
+        unselectedItemColor: Colors.grey.shade400,
+        backgroundColor: const Color(0xFF0B0F19),
         type: BottomNavigationBarType.fixed,
         onTap: (index) {
           setState(() => _selectedTabIndex = index);
         },
         items: [
-          const BottomNavigationBarItem(icon: Icon(Icons.cake_outlined), label: 'Cakes'),
-          const BottomNavigationBarItem(icon: Icon(Icons.lock_person_outlined), label: 'Vendor'),
+          const BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Shop'),
+          const BottomNavigationBarItem(icon: Icon(Icons.admin_panel_settings_outlined), label: 'Vendor'),
           BottomNavigationBarItem(
             icon: Stack(
               children: [
@@ -180,9 +202,9 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
                     top: 0,
                     child: Container(
                       padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                      constraints: const BoxConstraints(minWidth: 12, minHeight: 12),
-                      child: Text('$totalCartCount', style: const TextStyle(color: Colors.white, fontSize: 8), textAlign: TextAlign.center),
+                      decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
+                      constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                      child: Text('$totalCartCount', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                     ),
                   ),
               ],
@@ -202,23 +224,24 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
         final phoneCtrl = TextEditingController(text: CakeDatabase.currentUserPhone);
         final addressCtrl = TextEditingController(text: CakeDatabase.currentDeliveryAddress);
         return AlertDialog(
-          title: const Text('Edit Profile & Address', style: TextStyle(fontSize: 15)),
+          backgroundColor: const Color(0xFF1E293B),
+          title: const Text('Edit Profile & Address', style: TextStyle(fontSize: 15, color: Color(0xFFF59E0B), fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name', isDense: true)),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone', isDense: true)),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Address / Location Note', isDense: true)),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4081), foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.black87),
               onPressed: () {
                 setState(() {
                   CakeDatabase.currentCustomerName = nameCtrl.text.trim();
@@ -227,7 +250,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
                 });
                 Navigator.pop(context);
               },
-              child: const Text('Save'),
+              child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -243,7 +266,7 @@ Widget buildShopOrProdImage(String? path, double height, double width, IconData 
   if (path != null && path.isNotEmpty) {
     if (path.startsWith('http')) {
       return Image.network(path, height: height, width: width, fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(height: height, width: width, color: Colors.grey.shade300, child: Icon(fallbackIcon, size: height * 0.4)));
+          errorBuilder: (context, error, stackTrace) => Container(height: height, width: width, color: const Color(0xFF334155), child: Icon(fallbackIcon, size: height * 0.4, color: const Color(0xFFF59E0B))));
     } else if (path.startsWith('data:image')) {
       try {
         final bytes = base64Decode(path.split(',').last);
@@ -256,8 +279,11 @@ Widget buildShopOrProdImage(String? path, double height, double width, IconData 
   return Container(
     height: height,
     width: width,
-    color: Colors.grey.shade200,
-    child: Icon(fallbackIcon, size: height * 0.4, color: const Color(0xFFFF4081)),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(colors: [Color(0xFF334155), Color(0xFF1E293B)]),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Icon(fallbackIcon, size: height * 0.4, color: const Color(0xFFF59E0B)),
   );
 }
 
@@ -306,7 +332,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   @override
   void initState() {
     super.initState();
-    _fetchProductsFromCloud();
+    _fetchShopProfileAndProducts();
   }
 
   @override
@@ -320,9 +346,19 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     super.dispose();
   }
 
-  Future<void> _fetchProductsFromCloud() async {
+  Future<void> _fetchShopProfileAndProducts() async {
     setState(() => _isLoadingCloud = true);
     try {
+      final shopRes = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json'));
+      if (shopRes.statusCode == 200 && shopRes.body != 'null' && shopRes.body.isNotEmpty) {
+        var data = json.decode(shopRes.body);
+        if (data is Map) {
+          setState(() {
+            CakeDatabase.bakeryShop = Map<String, dynamic>.from(data);
+          });
+        }
+      }
+
       final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/products.json'));
       if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
         Map<String, dynamic> data = json.decode(response.body);
@@ -345,11 +381,11 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 
   void _addToCart(Map<String, dynamic> prod, double qty, String cakeMsg) {
     if (CakeDatabase.bakeryShop['isOpen'] == false) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Sorry! Bakery is currently CLOSED.'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Sorry! Shop is currently CLOSED.'), backgroundColor: Colors.red));
       return;
     }
     if (prod['inStock'] == false) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ This cake is currently OUT OF STOCK!')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ This item is currently OUT OF STOCK!')));
       return;
     }
 
@@ -373,7 +409,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('🎂 Added $qty ${prod['unit'] ?? 'Piece'} $prodName to Cart!'), duration: const Duration(milliseconds: 800)),
+      SnackBar(content: Text('🛒 Added $qty ${prod['unit'] ?? 'Piece'} $prodName to Cart!'), backgroundColor: const Color(0xFFF59E0B), duration: const Duration(milliseconds: 900)),
     );
   }
 
@@ -384,51 +420,98 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
       return p['category'] == selectedCategory;
     }).toList();
 
+    var shop = CakeDatabase.bakeryShop;
+
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: ListView(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(12),
         children: [
+          // Ultra High-End Shop Header Card with Glassmorphism & Gold Border
           Container(
-            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFFFF4081), Color(0xFFFF80AB)]),
-              borderRadius: BorderRadius.circular(10),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.5), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFF59E0B).withOpacity(0.15),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                )
+              ],
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.cake, color: Colors.white, size: 36),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                if ((shop['bannerPhotoPath'] ?? '').toString().isNotEmpty)
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                    child: buildShopOrProdImage(shop['bannerPhotoPath'], 140, double.infinity, Icons.store),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
                     children: [
-                      Text('🎂 Fresh Cakes & Pastries', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-                      Text('Order delicious custom & fresh cakes instantly!', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(9),
+                          child: buildShopOrProdImage(shop['shopPhotoPath'] ?? shop['ownerPhotoPath'], 65, 65, Icons.store),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              shop['shopName'] ?? 'Tarun Fruit & Vegetable Shop',
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFFF59E0B)),
+                            ),
+                            const SizedBox(height: 3),
+                            Text('👤 Owner: ${shop['ownerName'] ?? 'Tarun Kumar'}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70)),
+                            const SizedBox(height: 2),
+                            Text('📍 ${shop['address'] ?? 'Faridabad'}', style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _fetchShopProfileAndProducts,
+                        icon: const Icon(Icons.sync, color: Color(0xFFF59E0B)),
+                        tooltip: 'Sync Shop & Products',
+                      ),
                     ],
                   ),
-                ),
-                IconButton(
-                  onPressed: _fetchProductsFromCloud,
-                  icon: const Icon(Icons.sync, color: Colors.white),
-                  tooltip: 'Sync Cakes',
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
 
+          // Categories Horizontal Scroll with Premium Chips
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: cakeCategories.map((category) {
                 bool isSelected = selectedCategory == category;
                 return Padding(
-                  padding: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
-                    label: Text(category, style: TextStyle(fontSize: 11, color: isSelected ? Colors.white : Colors.black87)),
+                    label: Text(category, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? Colors.black87 : Colors.white70)),
                     selected: isSelected,
-                    selectedColor: const Color(0xFFFF4081),
-                    backgroundColor: Colors.white,
+                    selectedColor: const Color(0xFFF59E0B),
+                    backgroundColor: const Color(0xFF1E293B),
+                    elevation: isSelected ? 4 : 0,
+                    shadowColor: const Color(0xFFF59E0B),
+                    side: BorderSide(color: isSelected ? const Color(0xFFF59E0B) : Colors.grey.shade700),
                     onSelected: (bool selected) {
                       setState(() => selectedCategory = category);
                     },
@@ -438,9 +521,13 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
             ),
           ),
           
-          if (_isLoadingCloud) const LinearProgressIndicator(color: Color(0xFFFF4081)),
-          const SizedBox(height: 8),
+          if (_isLoadingCloud) ...[
+            const SizedBox(height: 10),
+            const LinearProgressIndicator(color: Color(0xFFF59E0B)),
+          ],
+          const SizedBox(height: 10),
 
+          // Products List with High-End Card UI
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -463,68 +550,87 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
               }
               var qtyController = _qtyControllers[prodKey]!;
 
-              return Card(
-                elevation: 2,
+              return Container(
                 margin: const EdgeInsets.symmetric(vertical: 6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    )
+                  ],
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.all(8.0),
+                  padding: const EdgeInsets.all(10.0),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Stack(
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: buildShopOrProdImage(prod['imagePath'], 90, 90, Icons.cake),
+                            borderRadius: BorderRadius.circular(10),
+                            child: buildShopOrProdImage(prod['imagePath'], 95, 95, Icons.cake),
                           ),
                           if (!inStock)
                             Container(
-                              height: 90,
-                              width: 90,
-                              color: Colors.black.withOpacity(0.6),
+                              height: 95,
+                              width: 95,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.7),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                               child: const Center(
-                                child: Text('OUT OF STOCK', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                                child: Text('OUT OF STOCK', style: TextStyle(color: Colors.redAccent, fontSize: 8, fontWeight: FontWeight.w900), textAlign: TextAlign.center),
                               ),
                             ),
                         ],
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
-                            Text(prod['category'] ?? 'General', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                            Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
                             const SizedBox(height: 2),
-                            Text('₹${unitPrice.toInt()} / ${prod['unit'] ?? 'Piece'}', style: const TextStyle(color: Color(0xFFFF4081), fontWeight: FontWeight.bold, fontSize: 11)),
-                            const SizedBox(height: 6),
+                            Text(prod['category'] ?? 'General', style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
+                            const SizedBox(height: 4),
+                            Text('₹${unitPrice.toInt()} / ${prod['unit'] ?? 'Piece'}', style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.w900, fontSize: 12)),
+                            const SizedBox(height: 8),
 
                             TextField(
                               controller: msgController,
-                              style: const TextStyle(fontSize: 11),
-                              decoration: const InputDecoration(
-                                labelText: 'तुम क्या लिखवाना चाहते हो केक पर',
-                                labelStyle: TextStyle(fontSize: 10),
-                                border: OutlineInputBorder(),
+                              style: const TextStyle(fontSize: 11, color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'विशेष निर्देश / नोट (यदि हो)',
+                                labelStyle: TextStyle(fontSize: 10, color: Colors.grey.shade400),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade700)),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFF59E0B))),
                                 isDense: true,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                               ),
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 8),
 
                             Row(
                               children: [
-                                const Text('Qty:', style: TextStyle(fontSize: 10)),
+                                const Text('Qty:', style: TextStyle(fontSize: 10, color: Colors.white70)),
                                 const SizedBox(width: 4),
                                 SizedBox(
-                                  width: 32,
-                                  height: 22,
+                                  width: 35,
+                                  height: 24,
                                   child: TextField(
                                     controller: qtyController,
                                     keyboardType: TextInputType.number,
-                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                    decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 0)),
+                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                                    decoration: InputDecoration(
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                    ),
                                     onChanged: (val) {
                                       double? q = double.tryParse(val);
                                       if (q != null && q > 0) {
@@ -534,18 +640,19 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                                   ),
                                 ),
                                 const Spacer(),
-                                Text('₹${totalPrice.toInt()}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue)),
+                                Text('₹${totalPrice.toInt()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFFEC4899))),
                                 const SizedBox(width: 8),
                                 SizedBox(
-                                  height: 26,
+                                  height: 28,
                                   child: ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: inStock ? const Color(0xFFFF4081) : Colors.grey,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      backgroundColor: inStock ? const Color(0xFFF59E0B) : Colors.grey,
+                                      foregroundColor: Colors.black87,
+                                      elevation: 4,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10),
                                     ),
                                     onPressed: inStock ? () => _addToCart(prod, selectedQty, msgController.text.trim()) : null,
-                                    child: Text(inStock ? 'Add to Cart' : 'Out of Stock', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                                    child: Text(inStock ? 'Add to Cart' : 'Out of Stock', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900)),
                                   ),
                                 ),
                               ],
@@ -656,22 +763,27 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           child: SingleChildScrollView(
             child: Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 6)]),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10)],
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.cake, size: 50, color: Color(0xFFFF4081)),
+                  const Icon(Icons.admin_panel_settings, size: 55, color: Color(0xFFF59E0B)),
                   const SizedBox(height: 10),
-                  Text(_isRegisteringNew ? '🛠️ नया पिन बनाएं' : '🔐 बेकर लॉगिन', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(_isRegisteringNew ? '🛠️ नया पिन बनाएं' : '🔐 ओनर लॉगिन', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                   const SizedBox(height: 15),
                   if (!_isRegisteringNew) ...[
                     TextField(controller: _loginPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), isDense: true)),
                     const SizedBox(height: 10),
                     TextField(controller: _loginPinCtrl, obscureText: true, keyboardType: TextInputType.number, maxLength: 4, decoration: const InputDecoration(labelText: '4-अंक का पिन', border: OutlineInputBorder(), isDense: true, counterText: '')),
                     const SizedBox(height: 15),
-                    _isLoadingAuth ? const Center(child: CircularProgressIndicator()) : ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4081), foregroundColor: Colors.white), onPressed: _verifyOrLoginVendor, child: const Text('लॉगिन करें')),
-                    TextButton(onPressed: () => setState(() => _isRegisteringNew = true), child: const Text('नया अकाउंट है? पिन सेट करें')),
+                    _isLoadingAuth ? const Center(child: CircularProgressIndicator()) : ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.black87), onPressed: _verifyOrLoginVendor, child: const Text('लॉगिन करें', style: TextStyle(fontWeight: FontWeight.bold))),
+                    TextButton(onPressed: () => setState(() => _isRegisteringNew = true), child: const Text('नया अकाउंट है? पिन सेट करें', style: TextStyle(color: Color(0xFFEC4899)))),
                   ] else ...[
                     TextField(controller: _regPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), isDense: true)),
                     const SizedBox(height: 10),
@@ -679,8 +791,8 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                     const SizedBox(height: 10),
                     TextField(controller: _reEnterPinCtrl, obscureText: true, keyboardType: TextInputType.number, maxLength: 4, decoration: const InputDecoration(labelText: 'दोबारा पिन डालें', border: OutlineInputBorder(), isDense: true, counterText: '')),
                     const SizedBox(height: 15),
-                    _isLoadingAuth ? const Center(child: CircularProgressIndicator()) : ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white), onPressed: _saveNewVendorPin, child: const Text('पिन सेव करें')),
-                    TextButton(onPressed: () => setState(() => _isRegisteringNew = false), child: const Text('लॉगिन पर वापस जाएं')),
+                    _isLoadingAuth ? const Center(child: CircularProgressIndicator()) : ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white), onPressed: _saveNewVendorPin, child: const Text('पिन सेव करें', style: TextStyle(fontWeight: FontWeight.bold))),
+                    TextButton(onPressed: () => setState(() => _isRegisteringNew = false), child: const Text('लॉगिन पर वापस जाएं', style: TextStyle(color: Color(0xFFEC4899)))),
                   ],
                 ],
               ),
@@ -882,7 +994,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
       await http.delete(Uri.parse('${CakeDatabase.firebaseRestUrl}/products/$firebaseKey.json'));
       _fetchVendorProducts();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ Product Deleted Successfully!'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ Item Deleted Successfully!'), backgroundColor: Colors.red));
       }
     } catch (e) {
       debugPrint("Error deleting product: $e");
@@ -958,7 +1070,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
 
   Future<void> _publishProductToCloud() async {
     if (_prodNameCtrl.text.isEmpty || _priceCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Please fill cake name and price!')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Please fill item name and price!')));
       return;
     }
     setState(() => _isUploadingToCloud = true);
@@ -987,7 +1099,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         _stockCtrl.clear();
         setState(() => _pickedProdImagePath = null);
         _fetchVendorProducts();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Cake Added Successfully!'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Item Added Successfully!'), backgroundColor: Colors.green));
       }
     } finally {
       if (mounted) setState(() => _isUploadingToCloud = false);
@@ -999,17 +1111,21 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        // Shop Profile Full Form Container with Permanent Photo Storage
+        // Shop Profile Full Form Container
         Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4)]),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 8)],
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('🏪 Complete Shop Profile Form (Permanent Storage)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
-              const SizedBox(height: 10),
+              const Text('🏪 Complete Shop Profile Form (Permanent Storage)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
+              const SizedBox(height: 12),
               
-              // Preview Shop and Banner Photos
               Row(
                 children: [
                   Expanded(
@@ -1017,10 +1133,10 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: buildShopOrProdImage(_pickedShopImagePath, 70, 70, Icons.store),
+                          child: buildShopOrProdImage(_pickedShopImagePath, 75, 75, Icons.store),
                         ),
                         const SizedBox(height: 4),
-                        const Text('Shop Photo', style: TextStyle(fontSize: 10)),
+                        const Text('Shop Photo', style: TextStyle(fontSize: 10, color: Colors.grey)),
                       ],
                     ),
                   ),
@@ -1029,50 +1145,52 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: buildShopOrProdImage(_pickedBannerImagePath, 70, 120, Icons.image),
+                          child: buildShopOrProdImage(_pickedBannerImagePath, 75, 130, Icons.image),
                         ),
                         const SizedBox(height: 4),
-                        const Text('Banner Photo', style: TextStyle(fontSize: 10)),
+                        const Text('Banner Photo', style: TextStyle(fontSize: 10, color: Colors.grey)),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
               TextField(controller: _shopNameCtrl, decoration: const InputDecoration(labelText: 'Shop Name', border: OutlineInputBorder(), isDense: true)),
-              const SizedBox(height: 8),
-              TextField(controller: _ownerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name', border: OutlineInputBorder(), isDense: true)),
-              const SizedBox(height: 8),
-              TextField(controller: _ownerPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Owner Phone / WhatsApp Number', border: OutlineInputBorder(), isDense: true)),
-              const SizedBox(height: 8),
-              TextField(controller: _addressCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Full Shop Address (Sector/Area, City, Pincode)', border: OutlineInputBorder(), isDense: true)),
               const SizedBox(height: 10),
+              TextField(controller: _ownerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name', border: OutlineInputBorder(), isDense: true)),
+              const SizedBox(height: 10),
+              TextField(controller: _ownerPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Owner Phone / WhatsApp Number', border: OutlineInputBorder(), isDense: true)),
+              const SizedBox(height: 10),
+              TextField(controller: _addressCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Full Shop Address (Sector/Area, City, Pincode)', border: OutlineInputBorder(), isDense: true)),
+              const SizedBox(height: 12),
               
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFFF59E0B))),
                       onPressed: () => _pickShopImage(false),
-                      icon: const Icon(Icons.store, size: 16),
-                      label: Text(_pickedShopImagePath == null ? 'Select Shop Photo' : 'Shop Photo ✓', style: const TextStyle(fontSize: 10)),
+                      icon: const Icon(Icons.store, size: 16, color: Color(0xFFF59E0B)),
+                      label: Text(_pickedShopImagePath == null ? 'Select Shop Photo' : 'Shop Photo ✓', style: const TextStyle(fontSize: 10, color: Colors.white)),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFFF59E0B))),
                       onPressed: () => _pickShopImage(true),
-                      icon: const Icon(Icons.image, size: 16),
-                      label: Text(_pickedBannerImagePath == null ? 'Select Banner' : 'Banner Photo ✓', style: const TextStyle(fontSize: 10)),
+                      icon: const Icon(Icons.image, size: 16, color: Color(0xFFF59E0B)),
+                      label: Text(_pickedBannerImagePath == null ? 'Select Banner' : 'Banner Photo ✓', style: const TextStyle(fontSize: 10, color: Colors.white)),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               _isSavingShop
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4081), foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.black87),
                       onPressed: _saveShopDetailsToCloud,
                       child: const Text('Save Shop Profile Permanently', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
@@ -1081,48 +1199,49 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         ),
 
         const SizedBox(height: 16),
-        const Divider(thickness: 2),
+        const Divider(thickness: 2, color: Color(0xFF334155)),
 
-        // Add New Cake Form with 20+ Categories
+        // Add New Item Form
         Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4)]),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFEC4899).withOpacity(0.4)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 8)],
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('📦 Add New Cake / Item (20+ Categories)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
+              const Text('📦 Add New Item / Product (20+ Categories)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
+              const SizedBox(height: 12),
+              TextField(controller: _prodNameCtrl, decoration: const InputDecoration(labelText: 'Item Name', border: OutlineInputBorder(), isDense: true)),
               const SizedBox(height: 10),
-              TextField(controller: _prodNameCtrl, decoration: const InputDecoration(labelText: 'Cake Name (e.g. Choco Truffle)', border: OutlineInputBorder(), isDense: true)),
-              const SizedBox(height: 8),
               TextField(controller: _priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price (₹)', border: OutlineInputBorder(), isDense: true)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
-                decoration: const InputDecoration(labelText: 'Cake Directory / Category', border: OutlineInputBorder(), isDense: true),
+                dropdownColor: const Color(0xFF1E293B),
+                decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder(), isDense: true),
                 items: vendorCategories.map((cat) {
-                  return DropdownMenuItem(value: cat, child: Text(cat, style: const TextStyle(fontSize: 12)));
+                  return DropdownMenuItem(value: cat, child: Text(cat, style: const TextStyle(fontSize: 12, color: Colors.white)));
                 }).toList(),
                 onChanged: (val) {
                   if (val != null) setState(() => _selectedCategory = val);
                 },
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _pickProductImage,
-                      icon: const Icon(Icons.add_a_photo, size: 16),
-                      label: Text(_pickedProdImagePath == null ? 'Select Image' : 'Image Selected ✓', style: const TextStyle(fontSize: 11)),
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 10),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFFEC4899))),
+                onPressed: _pickProductImage,
+                icon: const Icon(Icons.add_a_photo, size: 16, color: Color(0xFFEC4899)),
+                label: Text(_pickedProdImagePath == null ? 'Select Image' : 'Image Selected ✓', style: const TextStyle(fontSize: 11, color: Colors.white)),
+              ),
+              const SizedBox(height: 12),
               _isUploadingToCloud 
                   ? const Center(child: CircularProgressIndicator()) 
                   : ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4081), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)), 
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEC4899), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)), 
                       onPressed: _publishProductToCloud, 
                       child: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
@@ -1131,20 +1250,20 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         ),
 
         const SizedBox(height: 16),
-        const Divider(thickness: 2),
+        const Divider(thickness: 2, color: Color(0xFF334155)),
 
         Row(
           children: [
-            const Text('📋 Your Cake Inventory & Management', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const Text('📋 Inventory & Management', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
             const Spacer(),
-            IconButton(onPressed: _fetchVendorProducts, icon: const Icon(Icons.sync, size: 18), tooltip: 'Refresh Products'),
+            IconButton(onPressed: _fetchVendorProducts, icon: const Icon(Icons.sync, size: 18, color: Color(0xFFF59E0B)), tooltip: 'Refresh Products'),
           ],
         ),
         const SizedBox(height: 6),
         _isLoadingProducts
             ? const Center(child: CircularProgressIndicator())
             : _vendorProducts.isEmpty
-                ? const Card(child: Padding(padding: EdgeInsets.all(12), child: Center(child: Text('कोई केक उपलब्ध नहीं है'))))
+                ? const Card(child: Padding(padding: EdgeInsets.all(12), child: Center(child: Text('कोई आइटम उपलब्ध नहीं है'))))
                 : ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -1153,14 +1272,15 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                       var prod = _vendorProducts[index];
                       bool inStock = prod['inStock'] ?? true;
                       return Card(
+                        color: const Color(0xFF1E293B),
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         child: ListTile(
                           leading: ClipRRect(
                             borderRadius: BorderRadius.circular(6),
                             child: buildShopOrProdImage(prod['imagePath'], 45, 45, Icons.cake),
                           ),
-                          title: Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          subtitle: Text('${prod['category']} • ₹${prod['price']}\nStatus: ${inStock ? '🟢 In Stock' : '🔴 Out of Stock'}', style: const TextStyle(fontSize: 11)),
+                          title: Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
+                          subtitle: Text('${prod['category']} • ₹${prod['price']}\nStatus: ${inStock ? '🟢 In Stock' : '🔴 Out of Stock'}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                           isThreeLine: true,
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1171,7 +1291,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                                 onChanged: (val) => _toggleStockStatus(prod['firebaseKey'], inStock),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
                                 onPressed: () => _deleteProduct(prod['firebaseKey']),
                               ),
                             ],
@@ -1182,13 +1302,13 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                   ),
 
         const SizedBox(height: 16),
-        const Divider(thickness: 2),
+        const Divider(thickness: 2, color: Color(0xFF334155)),
 
         Row(
           children: [
-            const Text('🛒 Incoming Vendor Orders', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
+            const Text('🛒 Incoming Vendor Orders', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
             const Spacer(),
-            IconButton(onPressed: _fetchVendorOrders, icon: const Icon(Icons.sync, size: 18), tooltip: 'Refresh Orders'),
+            IconButton(onPressed: _fetchVendorOrders, icon: const Icon(Icons.sync, size: 18, color: Color(0xFFF59E0B)), tooltip: 'Refresh Orders'),
           ],
         ),
         const SizedBox(height: 6),
@@ -1208,6 +1328,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                       String custAddr = ord['customerAddress'] ?? '';
 
                       return Card(
+                        color: const Color(0xFF1E293B),
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         child: Padding(
                           padding: const EdgeInsets.all(10.0),
@@ -1216,7 +1337,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                             children: [
                               Row(
                                 children: [
-                                  Text('${ord['customerName']} - ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  Text('${ord['customerName']} - ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
                                   const Spacer(),
                                   Chip(
                                     label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 9)),
@@ -1227,11 +1348,11 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                                 ],
                               ),
                               const SizedBox(height: 4),
-                              Text('🕒 आर्डर समय: ${ord['orderTime'] ?? 'N/A'}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              Text('📞 WhatsApp: $custPhone', style: const TextStyle(fontSize: 11, color: Colors.blue)),
+                              Text('🕒 आर्डर समय: ${ord['orderTime'] ?? 'N/A'}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
+                              Text('📞 WhatsApp: $custPhone', style: const TextStyle(fontSize: 11, color: Colors.blueAccent)),
                               Text('📍 पता / लोकेशन: $custAddr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                               const SizedBox(height: 6),
-                              const Text('🎂 आर्डर किए गए आइटम और मैसेज:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
+                              const Text('📦 आर्डर किए गए आइटम:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
                               ...itemsList.map<Widget>((it) {
                                 String cakeMsg = it['cakeMessage'] ?? '';
                                 return Padding(
@@ -1239,13 +1360,13 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('• ${it['name']} (${it['qty']} ${it['unit']}) - ₹${(it['price'] * it['qty']).toInt()}', style: const TextStyle(fontSize: 11)),
+                                      Text('• ${it['name']} (${it['qty']} ${it['unit']}) - ₹${(it['price'] * it['qty']).toInt()}', style: const TextStyle(fontSize: 11, color: Colors.white70)),
                                       if (cakeMsg.isNotEmpty)
                                         Container(
                                           margin: const EdgeInsets.only(top: 2, bottom: 4),
                                           padding: const EdgeInsets.all(6),
-                                          decoration: BoxDecoration(color: Colors.pink.shade50, borderRadius: BorderRadius.circular(4)),
-                                          child: Text('💬 केक पर लिखावट: "$cakeMsg"', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.pink)),
+                                          decoration: BoxDecoration(color: Colors.pink.shade900.withOpacity(0.3), borderRadius: BorderRadius.circular(4)),
+                                          child: Text('💬 नोट: "$cakeMsg"', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
                                         ),
                                     ],
                                   ),
@@ -1402,12 +1523,12 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     _fetchUserOrders();
 
     String vendorPhone = CakeDatabase.bakeryShop['whatsappNumber'] ?? '919971968060';
-    String message = "🎂 *New Cake Order from CakeApp*\n⏱️ *Time:* $formattedTime\n\n👤 *Customer:* ${CakeDatabase.currentCustomerName}\n📱 *Phone:* ${CakeDatabase.currentUserPhone}\n📍 *Address:* ${CakeDatabase.currentDeliveryAddress}\n\n";
+    String message = "🛒 *New Order from CakeApp*\n⏱️ *Time:* $formattedTime\n\n👤 *Customer:* ${CakeDatabase.currentCustomerName}\n📱 *Phone:* ${CakeDatabase.currentUserPhone}\n📍 *Address:* ${CakeDatabase.currentDeliveryAddress}\n\n";
 
     for (var item in orderData['items'] as List) {
       message += "• ${item['name']} x ${item['qty']} ${item['unit']} = ₹${(item['price'] * item['qty']).toInt()}\n";
       if ((item['cakeMessage'] ?? '').toString().isNotEmpty) {
-        message += "  💬 Cake Msg: ${item['cakeMessage']}\n";
+        message += "  💬 Note: ${item['cakeMessage']}\n";
       }
     }
     message += "\n💰 *Grand Total: ₹${grandTotal.toInt()}*";
@@ -1428,10 +1549,10 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       padding: const EdgeInsets.all(12.0),
       child: ListView(
         children: [
-          const Text('🛒 Your Cake Cart', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          const Text('🛒 Your Cart', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
           const SizedBox(height: 6),
           cart.isEmpty
-              ? const Card(child: Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text('Cart is empty'))))
+              ? const Card(color: Color(0xFF1E293B), child: Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text('Cart is empty', style: TextStyle(color: Colors.grey)))))
               : Column(
                   children: [
                     ListView.builder(
@@ -1442,55 +1563,65 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                         var item = cart[index];
                         String cakeMsg = item['cakeMessage'] ?? '';
                         return Card(
+                          color: const Color(0xFF1E293B),
                           child: Padding(
-                            padding: const EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(10.0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: [
-                                    Expanded(child: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                                    Expanded(child: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white))),
                                     IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                      icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
                                       constraints: const BoxConstraints(),
                                       padding: EdgeInsets.zero,
                                       onPressed: () => setState(() => CakeDatabase.cartItems.removeAt(index)),
                                     ),
                                   ],
                                 ),
-                                Text('Qty: ${item['qty']} ${item['unit']} • ₹${item['price']} each', style: const TextStyle(fontSize: 11)),
+                                Text('Qty: ${item['qty']} ${item['unit']} • ₹${item['price']} each', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                                 if (cakeMsg.isNotEmpty)
-                                  Text('💬 केक पर लिखावट: $cakeMsg', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.pink)),
+                                  Text('💬 नोट: $cakeMsg', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
                               ],
                             ),
                           ),
                         );
                       },
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                      ),
                       child: Column(
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Grand Total:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                              Text('₹${grandTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
+                              const Text('Grand Total:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                              Text('₹${grandTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFFEC4899))),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           SizedBox(
                             width: double.infinity,
-                            height: 42,
+                            height: 45,
                             child: _isPlacingOrder
                                 ? const Center(child: CircularProgressIndicator())
                                 : ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF25D366),
+                                      foregroundColor: Colors.white,
+                                      elevation: 6,
+                                      shadowColor: const Color(0xFF25D366).withOpacity(0.5),
+                                    ),
                                     onPressed: _sendOrderToWhatsApp,
                                     icon: const Icon(Icons.chat, size: 18),
-                                    label: const Text('Send Order to WhatsApp 🚀', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                    label: const Text('Send Order to WhatsApp 🚀', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
                                   ),
                           ),
                         ],
@@ -1499,15 +1630,15 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                   ],
                 ),
 
-          const Divider(height: 30, thickness: 2),
+          const Divider(height: 30, thickness: 2, color: Color(0xFF334155)),
 
           Row(
             children: [
-              const Text('📦 Your Orders & Live Status', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
+              const Text('📦 Your Orders & Live Status', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
               const Spacer(),
               IconButton(
                 onPressed: _fetchUserOrders,
-                icon: const Icon(Icons.sync, size: 18),
+                icon: const Icon(Icons.sync, size: 18, color: Color(0xFFF59E0B)),
                 tooltip: 'Refresh Orders',
               ),
             ],
@@ -1517,7 +1648,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
           _isLoadingUserOrders
               ? const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator()))
               : _userOrdersList.isEmpty
-                  ? const Card(child: Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text('आपने अभी तक कोई आर्डर नहीं दिया है'))))
+                  ? const Card(color: Color(0xFF1E293B), child: Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text('आपने अभी तक कोई आर्डर नहीं दिया है', style: TextStyle(color: Colors.grey)))))
                   : ListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -1529,15 +1660,16 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                         List itemsList = ord['items'] ?? [];
 
                         return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          color: const Color(0xFF1E293B),
+                          margin: const EdgeInsets.symmetric(vertical: 6),
                           child: Padding(
-                            padding: const EdgeInsets.all(10.0),
+                            padding: const EdgeInsets.all(12.0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: [
-                                    Text('Order ID: ${ord['orderId']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                    Text('Order ID: ${ord['orderId']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey)),
                                     const Spacer(),
                                     Chip(
                                       label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 9)),
@@ -1547,27 +1679,28 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text('Total Amount: ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green)),
-                                const SizedBox(height: 2),
-                                Text('🕒 आर्डर किया गया: $orderTime', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87)),
-                                Text('📍 पता: ${ord['customerAddress']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                                 const SizedBox(height: 6),
+                                Text('Total Amount: ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFFEC4899))),
+                                const SizedBox(height: 3),
+                                Text('🕒 आर्डर किया गया: $orderTime', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
+                                Text('📍 पता: ${ord['customerAddress']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                const SizedBox(height: 8),
                                 ...itemsList.map<Widget>((it) {
                                   String cakeMsg = it['cakeMessage'] ?? '';
-                                  return Text('• ${it['name']} (${it['qty']} ${it['unit']})${cakeMsg.isNotEmpty ? ' | 💬 $cakeMsg' : ''}', style: const TextStyle(fontSize: 11, color: Colors.pink));
+                                  return Text('• ${it['name']} (${it['qty']} ${it['unit']})${cakeMsg.isNotEmpty ? ' | 💬 $cakeMsg' : ''}', style: const TextStyle(fontSize: 11, color: Colors.white70));
                                 }).toList(),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 10),
                                 
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 32,
+                                  height: 35,
                                   child: _isSharingLocation
                                       ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
                                       : ElevatedButton.icon(
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: const Color(0xFF25D366),
                                             foregroundColor: Colors.white,
+                                            elevation: 4,
                                           ),
                                           onPressed: _sendLiveLocationOnWhatsApp,
                                           icon: const Icon(Icons.share_location, size: 14),
