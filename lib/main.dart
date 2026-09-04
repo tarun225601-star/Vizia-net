@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:geolocator/geolocator.dart';
 
 void main() {
   runApp(const CakeAppEnterpriseApp());
@@ -43,19 +42,6 @@ class CakeDatabase {
   static String currentUserPhone = "9971968060";
   static String currentCustomerName = "Tarun Kumar";
   static String currentDeliveryAddress = "Sector 15A Faridabad";
-  
-  static Map<String, dynamic> tempoDriverProfile = {
-    'driverName': 'राजेश कुमार',
-    'driverPhone': '9876543210',
-    'vehicleNumber': 'HR-51-AB-1234',
-    'startLocationName': 'Sector 15A Bakery Hub, Faridabad',
-    'destinationName': 'Sector 16 Market, Faridabad',
-    'latitude': 0.0,
-    'longitude': 0.0,
-    'destLatitude': 0.0,
-    'destLongitude': 0.0,
-    'isAvailable': true,
-  };
 
   static Map<String, dynamic> bakeryShop = {
     'shopId': 'shop_cake_01',
@@ -67,8 +53,6 @@ class CakeDatabase {
     'address': 'Sector 15A Faridabad',
     'bio': 'अहर्निश ताज़ा और स्वादिष्ट केक और बेकरी उत्पाद उपलब्ध।',
     'isOpen': true,
-    'latitude': '28.4089', // Default Faridabad latitude
-    'longitude': '77.3178', // Default Faridabad longitude
   };
 
   static List<Map<String, dynamic>> productInventory = [];
@@ -91,7 +75,6 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
   final List<Widget> _tabScreens = [
     const MarketplaceBuyerView(), 
     const VendorAuthAndPortalView(), 
-    const TempoDriverDashboardView(), 
     const UserAndTempoProfileView(), 
     const CartAndWhatsAppCheckoutView(), 
   ];
@@ -137,19 +120,6 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
                 icon: const Icon(Icons.lock_outline, size: 12),
                 label: const Text('Vendor', style: TextStyle(fontSize: 9)),
               ),
-              const SizedBox(width: 3),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade800,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                onPressed: () => setState(() => _selectedTabIndex = 2),
-                icon: const Icon(Icons.local_shipping, size: 12),
-                label: const Text('Delivery GPS', style: TextStyle(fontSize: 9)),
-              ),
             ],
           ),
           bottom: PreferredSize(
@@ -160,7 +130,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () => setState(() => _selectedTabIndex = 3),
+                    onTap: () => setState(() => _selectedTabIndex = 2),
                     child: Row(
                       children: [
                         const Icon(Icons.person, color: Color(0xFFFF4081), size: 13),
@@ -174,7 +144,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: () => setState(() => _selectedTabIndex = 3),
+                    onTap: () => setState(() => _selectedTabIndex = 2),
                     child: const Text('(Edit Profile)', style: TextStyle(color: Color(0xFFFF4081), fontSize: 10)),
                   ),
                 ],
@@ -184,7 +154,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
         ),
       ),
       body: IndexedStack(
-        index: _selectedTabIndex > 4 ? 4 : _selectedTabIndex,
+        index: _selectedTabIndex > 3 ? 3 : _selectedTabIndex,
         children: _tabScreens,
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -193,9 +163,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         onTap: (index) {
-          if (index == 3) {
-            setState(() => _selectedTabIndex = 4); 
-          } else if (index == 2) {
+          if (index == 2) {
             setState(() => _selectedTabIndex = 3); 
           } else {
             setState(() => _selectedTabIndex = index);
@@ -204,7 +172,6 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
         items: [
           const BottomNavigationBarItem(icon: Icon(Icons.cake_outlined), label: 'Cakes'),
           const BottomNavigationBarItem(icon: Icon(Icons.lock_person_outlined), label: 'Vendor'),
-          const BottomNavigationBarItem(icon: Icon(Icons.local_shipping_outlined), label: 'Delivery GPS'),
           BottomNavigationBarItem(
             icon: Stack(
               children: [
@@ -454,7 +421,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                             Text('₹${unitPrice.toInt()} / ${prod['unit'] ?? 'Piece'}', style: const TextStyle(color: Color(0xFFFF4081), fontWeight: FontWeight.bold, fontSize: 11)),
                             const SizedBox(height: 6),
 
-                            // SIMPLE CAKE MESSAGE BOX AS REQUESTED
+                            // SIMPLE CAKE MESSAGE BOX
                             TextField(
                               controller: msgController,
                               style: const TextStyle(fontSize: 11),
@@ -513,215 +480,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
               );
             },
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// ==========================================
-// 🚚 DELIVERY DRIVER DASHBOARD
-// ==========================================
-class TempoDriverDashboardView extends StatefulWidget {
-  const TempoDriverDashboardView({super.key});
-
-  @override
-  State<TempoDriverDashboardView> createState() => _TempoDriverDashboardViewState();
-}
-
-class _TempoDriverDashboardViewState extends State<TempoDriverDashboardView> {
-  bool _isUpdatingGps = false;
-  Timer? _locationTimer;
-  bool _isAutoTrackingActive = false;
-  bool _isLoadingOrders = false;
-  List<Map<String, dynamic>> _incomingOrders = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchOrdersFromCloud();
-  }
-
-  @override
-  void dispose() {
-    _locationTimer?.cancel(); 
-    super.dispose();
-  }
-
-  Future<void> _fetchOrdersFromCloud() async {
-    setState(() => _isLoadingOrders = true);
-    try {
-      final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
-      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
-        Map<String, dynamic> data = json.decode(response.body);
-        List<Map<String, dynamic>> list = [];
-        data.forEach((key, val) {
-          var item = Map<String, dynamic>.from(val);
-          item['firebaseKey'] = key;
-          item['isAcceptedByTempo'] = item['isAcceptedByTempo'] ?? false;
-          list.add(item);
-        });
-        setState(() {
-          _incomingOrders = list.reversed.toList();
-        });
-      }
-    } catch (e) {
-      debugPrint("Error fetching orders: $e");
-    } finally {
-      setState(() => _isLoadingOrders = false);
-    }
-  }
-
-  Future<void> _acceptSingleOrder(String orderKey) async {
-    try {
-      String timeNow = "${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} (${DateTime.now().day}/${DateTime.now().month})";
-      await http.patch(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderKey.json'),
-        body: json.encode({
-          'isAcceptedByTempo': true,
-          'tempoAcceptedTime': timeNow,
-          'status': 'Out for Delivery 🚚'
-        }),
-      );
-      _fetchOrdersFromCloud();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Order Accepted & Delivery Started!'), backgroundColor: Colors.green));
-    } catch (e) {
-      debugPrint("Error accepting order: $e");
-    }
-  }
-
-  Future<void> _startRouteAndGps() async {
-    setState(() => _isUpdatingGps = true);
-    try {
-      await _updateLiveGpsToCloud();
-      setState(() {
-        _isAutoTrackingActive = true;
-      });
-
-      _locationTimer?.cancel();
-      _locationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-        _updateLiveGpsToCloud();
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🟢 डिलीवरी जीपीएस ट्रैकिंग चालू हो गई!'), backgroundColor: Colors.green),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('⚠️ एरर: $e'), backgroundColor: Colors.red),
-      );
-    } finally {
-      setState(() => _isUpdatingGps = false);
-    }
-  }
-
-  Future<void> _updateLiveGpsToCloud() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return;
-      }
-
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      
-      var gpsPayload = {
-        'latitude': position.latitude,
-        'longitude': position.longitude,
-        'startLocationName': CakeDatabase.tempoDriverProfile['startLocationName'],
-        'destinationName': CakeDatabase.tempoDriverProfile['destinationName'],
-        'updatedAt': DateTime.now().toIso8601String(),
-        'driverName': CakeDatabase.tempoDriverProfile['driverName'],
-        'vehicleNumber': CakeDatabase.tempoDriverProfile['vehicleNumber'],
-      };
-
-      await http.put(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/tempo_location.json'),
-        body: json.encode(gpsPayload),
-      );
-
-      setState(() {
-        CakeDatabase.tempoDriverProfile['latitude'] = position.latitude;
-        CakeDatabase.tempoDriverProfile['longitude'] = position.longitude;
-      });
-    } catch (e) {
-      debugPrint("GPS Error: $e");
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: ListView(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade700,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  onPressed: _isLoadingOrders ? null : _fetchOrdersFromCloud,
-                  icon: const Icon(Icons.download, size: 16),
-                  label: Text(_isLoadingOrders ? 'Loading...' : 'Fetch Orders', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isAutoTrackingActive ? Colors.green.shade800 : const Color(0xFFFF4081),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  onPressed: _isUpdatingGps ? null : _startRouteAndGps,
-                  child: Text(
-                    _isAutoTrackingActive ? '🟢 GPS Active' : '🚀 Start Delivery',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          const Text('📦 Incoming Cake Orders', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
-
-          _isLoadingOrders 
-              ? const Center(child: Padding(padding: EdgeInsets.all(20.0), child: CircularProgressIndicator()))
-              : _incomingOrders.isEmpty
-                  ? const Card(child: Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text('कोई नया आर्डर उपलब्ध नहीं है'))))
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _incomingOrders.length,
-                      itemBuilder: (context, index) {
-                        var ord = _incomingOrders[index];
-                        bool accepted = ord['isAcceptedByTempo'] ?? false;
-                        return Card(
-                          color: accepted ? Colors.green.shade50 : Colors.white,
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          child: ListTile(
-                            title: Text('${ord['customerName']} (₹${ord['grandTotal']?.toInt()})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            subtitle: Text('आर्डर समय: ${ord['orderTime'] ?? 'N/A'}\nपता: ${ord['customerAddress']}', style: const TextStyle(fontSize: 11)),
-                            trailing: accepted
-                                ? const Chip(label: Text('Accepted', style: TextStyle(color: Colors.white, fontSize: 9)), backgroundColor: Colors.green)
-                                : ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4081), foregroundColor: Colors.white, minimumSize: const Size(60, 30)),
-                                    onPressed: () => _acceptSingleOrder(ord['firebaseKey']),
-                                    child: const Text('Accept', style: TextStyle(fontSize: 10)),
-                                  ),
-                          ),
-                        );
-                      },
-                    ),
         ],
       ),
     );
@@ -867,11 +625,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   final TextEditingController _prodNameCtrl = TextEditingController();
   final TextEditingController _priceCtrl = TextEditingController();
   final TextEditingController _stockCtrl = TextEditingController();
-  
-  // Shop & Latitude / Longitude Controllers
   late final TextEditingController _shopNameCtrl = TextEditingController(text: activeShop['shopName']);
-  late final TextEditingController _latCtrl = TextEditingController(text: activeShop['latitude'] ?? '');
-  late final TextEditingController _lngCtrl = TextEditingController(text: activeShop['longitude'] ?? '');
 
   final String _selectedUnit = 'Piece';
   String _selectedCategory = 'Birthday Cake';
@@ -977,41 +731,16 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     }
   }
 
-  Future<void> _getCurrentLocationCoordinates() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Location services are disabled.')));
-        return;
-      }
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return;
-      }
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      setState(() {
-        _latCtrl.text = position.latitude.toString();
-        _lngCtrl.text = position.longitude.toString();
-      });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('📍 Current GPS Location Captured!'), backgroundColor: Colors.green));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error getting location: $e')));
-    }
-  }
-
   Future<void> _saveShopDetailsToCloud() async {
     setState(() => _isSavingShop = true);
     try {
       CakeDatabase.bakeryShop['shopName'] = _shopNameCtrl.text.trim();
-      CakeDatabase.bakeryShop['latitude'] = _latCtrl.text.trim();
-      CakeDatabase.bakeryShop['longitude'] = _lngCtrl.text.trim();
 
       await http.patch(
         Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json'),
         body: json.encode(CakeDatabase.bakeryShop),
       );
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Shop & Permanent Coordinates Saved!'), backgroundColor: Colors.green));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Shop Details Saved!'), backgroundColor: Colors.green));
     } catch (e) {
       debugPrint("Error saving shop: $e");
     } finally {
@@ -1070,41 +799,23 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        // SHOP PROFILE & PERMANENT LATITUDE/LONGITUDE CONFIGURATION
+        // SHOP PROFILE CONFIGURATION
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4)]),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('🏪 Shop Profile & Permanent GPS Location', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
+              const Text('🏪 Shop Profile', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
               const SizedBox(height: 10),
               TextField(controller: _shopNameCtrl, decoration: const InputDecoration(labelText: 'Shop Name', border: OutlineInputBorder(), isDense: true)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(controller: _latCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Latitude', border: OutlineInputBorder(), isDense: true)),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(controller: _lngCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Longitude', border: OutlineInputBorder(), isDense: true)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _getCurrentLocationCoordinates,
-                icon: const Icon(Icons.my_location, size: 16),
-                label: const Text('Capture Current GPS Location', style: TextStyle(fontSize: 11)),
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               _isSavingShop
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4081), foregroundColor: Colors.white),
                       onPressed: _saveShopDetailsToCloud,
-                      child: const Text('Save Shop Details & Coordinates', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text('Save Shop Details', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
             ],
           ),
@@ -1356,7 +1067,7 @@ class _UserAndTempoProfileViewState extends State<UserAndTempoProfileView> {
 }
 
 // ==========================================
-// WHATSAPP CHECKOUT CART & LIVE ORDERS TRACKING
+// WHATSAPP CHECKOUT CART & LIVE LOCATION SHARING
 // ==========================================
 class CartAndWhatsAppCheckoutView extends StatefulWidget {
   const CartAndWhatsAppCheckoutView({super.key});
@@ -1401,26 +1112,15 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     }
   }
 
-  Future<void> _openLiveTrackingMap() async {
-    try {
-      final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/tempo_location.json'));
-      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
-        var data = json.decode(response.body);
-        double lat = data['latitude'] ?? 0.0;
-        double lng = data['longitude'] ?? 0.0;
-        
-        if (lat != 0.0 && lng != 0.0) {
-          String mapUrl = "https://www.google.com/maps/search/?api=1&query=$lat,$lng";
-          final Uri uri = Uri.parse(mapUrl);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-            return;
-          }
-        }
-      }
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Live GPS location not active yet!')));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+  // Simple WhatsApp Live Location Sharing (15 mins / 1 hour / till order ready)
+  Future<void> _sendLiveLocationOnWhatsApp() async {
+    String vendorPhone = CakeDatabase.bakeryShop['whatsappNumber'] ?? '919971968060';
+    String locationMessage = "📍 *Live Location Sharing*\nनमस्ते भाई, यह रही मेरी लाइव लोकेशन (जब तक केक रेडी नहीं होता, तब तक के लिए):\nhttps://maps.google.com";
+    
+    String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(locationMessage)}";
+    final Uri uri = Uri.parse(whatsappUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -1441,7 +1141,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       'grandTotal': grandTotal,
       'orderTime': formattedTime,
       'status': 'Pending ⏳',
-      'isAcceptedByTempo': false,
     };
 
     try {
@@ -1557,7 +1256,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
 
           Row(
             children: [
-              const Text('📦 Your Orders & Live Tracking', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
+              const Text('📦 Your Orders & Location Sharing', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
               const Spacer(),
               IconButton(
                 onPressed: _fetchUserOrders,
@@ -1578,10 +1277,8 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                       itemCount: _userOrdersList.length,
                       itemBuilder: (context, index) {
                         var ord = _userOrdersList[index];
-                        bool acceptedByTempo = ord['isAcceptedByTempo'] ?? false;
                         String status = ord['status'] ?? 'Pending ⏳';
                         String orderTime = ord['orderTime'] ?? 'N/A';
-                        String tempoAcceptedTime = ord['tempoAcceptedTime'] ?? 'Pending';
                         List itemsList = ord['items'] ?? [];
 
                         return Card(
@@ -1607,7 +1304,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                                 Text('Total Amount: ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green)),
                                 const SizedBox(height: 2),
                                 Text('🕒 आर्डर किया गया: $orderTime', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87)),
-                                Text('🚚 स्वीकार किया गया: $tempoAcceptedTime', style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
                                 Text('📍 पता: ${ord['customerAddress']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                                 const SizedBox(height: 6),
                                 ...itemsList.map<Widget>((it) {
@@ -1615,23 +1311,20 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                                   return Text('• ${it['name']} (${it['qty']} ${it['unit']})${cakeMsg.isNotEmpty ? ' | 💬 $cakeMsg' : ''}', style: const TextStyle(fontSize: 11, color: Colors.pink));
                                 }).toList(),
                                 const SizedBox(height: 8),
+                                // SIMPLE LIVE LOCATION SHARING BUTTON
                                 SizedBox(
                                   width: double.infinity,
                                   height: 32,
                                   child: ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: acceptedByTempo ? Colors.blue.shade700 : Colors.grey,
+                                      backgroundColor: Colors.blue.shade700,
                                       foregroundColor: Colors.white,
                                     ),
-                                    onPressed: acceptedByTempo ? _openLiveTrackingMap : () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('⚠️ Delivery has not started for this order yet!')),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.map, size: 14),
-                                    label: Text(
-                                      acceptedByTempo ? '📍 Track Live on Map' : '⏳ Waiting for Delivery Start',
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                    onPressed: _sendLiveLocationOnWhatsApp,
+                                    icon: const Icon(Icons.share_location, size: 14),
+                                    label: const Text(
+                                      '📍 Share Live Location (WhatsApp)',
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 ),
