@@ -1154,11 +1154,10 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       }
 
       Position position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 12), // 12 सेकंड टाइमआउट ताकि ऐप कभी अटके नहीं
-        ),
-      );
+  desiredAccuracy: LocationAccuracy.high,
+  timeLimit: const Duration(seconds: 12),
+);
+
 
       double lat = position.latitude;
       double lng = position.longitude;
