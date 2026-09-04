@@ -765,18 +765,12 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     } catch (_) {}
   }
 
-  // Delivery / Vendor WhatsApp Location Share Button Function
+  // Location Share Function (Cleaned for Flutter mobile build compatibility)
   Future<void> _shareLocationToCustomer(String customerPhone, String customerAddress) async {
     try {
       if (customerPhone.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Customer phone number not found!')));
         return;
-      }
-      
-      // Get current device GPS location using standard HTML5 Geolocation API / Flutter Geolocation equivalent if applicable, 
-      // or open direct WhatsApp chat with prefilled location prompt so the delivery guy can share live location instantly.
-      
-        // Handled via browser/device geolocation if available, otherwise direct wa.me link with location request
       }
 
       String locationText = "📍 नमस्ते! यह रही डिलीवरी लोकेशन: $customerAddress. (कृपया व्हाट्सएप के अटैचमेंट आइकॉन से अपनी लाइव लोकेशन शेयर करें)";
