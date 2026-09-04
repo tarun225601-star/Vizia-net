@@ -47,7 +47,10 @@ class CakeDatabase {
     'shopId': 'shop_cake_01',
     'shopName': 'Tarun Premium Bakery',
     'ownerName': 'Tarun Kumar',
+    'ownerPhone': '9971968060',
     'ownerPhotoPath': '', 
+    'bannerPhotoPath': '',
+    'shopPhotoPath': '',
     'phone': '9971968060',
     'whatsappNumber': '919971968060',
     'address': 'Sector 15A Faridabad',
@@ -276,6 +279,30 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   final Map<String, TextEditingController> _cakeMessageControllers = {};
   final Map<String, TextEditingController> _qtyControllers = {};
 
+  final List<String> cakeCategories = [
+    'All',
+    'Birthday Cake',
+    'Anniversary Cake',
+    'Chocolate Cake',
+    'Kids / Cartoon Cake',
+    'Fruit Cake',
+    'Red Velvet',
+    'Heart Shaped Cake',
+    'Tier / Wedding Cake',
+    'Cupcakes & Pastries',
+    'Designer / Custom Cake',
+    'Truffle Cake',
+    'Butterscotch',
+    'Black Forest',
+    'Pineapple Cake',
+    'Strawberry Cake',
+    'Coffee / Mocha Cake',
+    'Photo Cake',
+    'Combos (Cake + Flowers)',
+    'Midnight Special Cake',
+    'Fasting / Eggless Special'
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -393,7 +420,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: ['All', 'Birthday Cake', 'Chocolate Cake', 'Pastry', 'Customized'].map((category) {
+              children: cakeCategories.map((category) {
                 bool isSelected = selectedCategory == category;
                 return Padding(
                   padding: const EdgeInsets.only(right: 6),
@@ -679,13 +706,20 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   final TextEditingController _prodNameCtrl = TextEditingController();
   final TextEditingController _priceCtrl = TextEditingController();
   final TextEditingController _stockCtrl = TextEditingController();
+  
   late final TextEditingController _shopNameCtrl = TextEditingController(text: activeShop['shopName']);
+  late final TextEditingController _ownerNameCtrl = TextEditingController(text: activeShop['ownerName']);
+  late final TextEditingController _ownerPhoneCtrl = TextEditingController(text: activeShop['ownerPhone'] ?? activeShop['phone']);
+  late final TextEditingController _addressCtrl = TextEditingController(text: activeShop['address']);
 
   final String _selectedUnit = 'Piece';
   String _selectedCategory = 'Birthday Cake';
   bool _isUploadingToCloud = false;
   bool _isSavingShop = false;
   String? _pickedProdImagePath;
+  String? _pickedShopImagePath;
+  String? _pickedBannerImagePath;
+  
   final ImagePicker _picker = ImagePicker();
   
   List<Map<String, dynamic>> _vendorOrders = [];
@@ -693,11 +727,58 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   bool _isLoadingOrders = false;
   bool _isLoadingProducts = false;
 
+  final List<String> vendorCategories = [
+    'Birthday Cake',
+    'Anniversary Cake',
+    'Chocolate Cake',
+    'Kids / Cartoon Cake',
+    'Fruit Cake',
+    'Red Velvet',
+    'Heart Shaped Cake',
+    'Tier / Wedding Cake',
+    'Cupcakes & Pastries',
+    'Designer / Custom Cake',
+    'Truffle Cake',
+    'Butterscotch',
+    'Black Forest',
+    'Pineapple Cake',
+    'Strawberry Cake',
+    'Coffee / Mocha Cake',
+    'Photo Cake',
+    'Combos (Cake + Flowers)',
+    'Midnight Special Cake',
+    'Fasting / Eggless Special'
+  ];
+
   @override
   void initState() {
     super.initState();
-    _fetchVendorOrders();
-    _fetchVendorProducts();
+    _fetchShopProfile().then((_) {
+      _fetchVendorOrders();
+      _fetchVendorProducts();
+    });
+  }
+
+  Future<void> _fetchShopProfile() async {
+    try {
+      final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json'));
+      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
+        var data = json.decode(response.body);
+        if (data is Map) {
+          setState(() {
+            CakeDatabase.bakeryShop = Map<String, dynamic>.from(data);
+            _shopNameCtrl.text = CakeDatabase.bakeryShop['shopName'] ?? '';
+            _ownerNameCtrl.text = CakeDatabase.bakeryShop['ownerName'] ?? '';
+            _ownerPhoneCtrl.text = CakeDatabase.bakeryShop['ownerPhone'] ?? CakeDatabase.bakeryShop['phone'] ?? '';
+            _addressCtrl.text = CakeDatabase.bakeryShop['address'] ?? '';
+            _pickedShopImagePath = CakeDatabase.bakeryShop['shopPhotoPath'];
+            _pickedBannerImagePath = CakeDatabase.bakeryShop['bannerPhotoPath'];
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching shop profile: $e");
+    }
   }
 
   Future<void> _fetchVendorOrders() async {
@@ -765,7 +846,19 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     } catch (_) {}
   }
 
-  // Location Share Function (Cleaned for Flutter mobile build compatibility)
+  Future<void> _rejectOrder(String orderKey) async {
+    try {
+      await http.patch(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderKey.json'),
+        body: json.encode({'status': 'Rejected / Not Accepted ❌'}),
+      );
+      _fetchVendorOrders();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Order Rejected!'), backgroundColor: Colors.red));
+      }
+    } catch (_) {}
+  }
+
   Future<void> _shareLocationToCustomer(String customerPhone, String customerAddress) async {
     try {
       if (customerPhone.isEmpty) {
@@ -808,17 +901,45 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     }
   }
 
+  Future<void> _pickShopImage(bool isBanner) async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      String base64Img = "data:image/jpeg;base64,${base64Encode(bytes)}";
+      setState(() {
+        if (isBanner) {
+          _pickedBannerImagePath = base64Img;
+          CakeDatabase.bakeryShop['bannerPhotoPath'] = base64Img;
+        } else {
+          _pickedShopImagePath = base64Img;
+          CakeDatabase.bakeryShop['shopPhotoPath'] = base64Img;
+        }
+      });
+    }
+  }
+
   Future<void> _saveShopDetailsToCloud() async {
     setState(() => _isSavingShop = true);
     try {
       CakeDatabase.bakeryShop['shopName'] = _shopNameCtrl.text.trim();
+      CakeDatabase.bakeryShop['ownerName'] = _ownerNameCtrl.text.trim();
+      CakeDatabase.bakeryShop['ownerPhone'] = _ownerPhoneCtrl.text.trim();
+      CakeDatabase.bakeryShop['phone'] = _ownerPhoneCtrl.text.trim();
+      CakeDatabase.bakeryShop['whatsappNumber'] = '91${_ownerPhoneCtrl.text.trim().replaceAll(RegExp(r'[^0-9]'), '')}';
+      CakeDatabase.bakeryShop['address'] = _addressCtrl.text.trim();
+      if (_pickedShopImagePath != null) {
+        CakeDatabase.bakeryShop['shopPhotoPath'] = _pickedShopImagePath;
+      }
+      if (_pickedBannerImagePath != null) {
+        CakeDatabase.bakeryShop['bannerPhotoPath'] = _pickedBannerImagePath;
+      }
 
-      await http.patch(
+      await http.put(
         Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json'),
         body: json.encode(CakeDatabase.bakeryShop),
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Shop Details Saved!'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Shop Profile & Photos Saved Permanently!'), backgroundColor: Colors.green));
       }
     } catch (e) {
       debugPrint("Error saving shop: $e");
@@ -844,8 +965,8 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
 
     var newProduct = {
       'id': 'c_${DateTime.now().millisecondsSinceEpoch}',
-      'shopName': activeShop['shopName'],
-      'owner': activeShop['ownerName'],
+      'shopName': CakeDatabase.bakeryShop['shopName'],
+      'owner': CakeDatabase.bakeryShop['ownerName'],
       'name': _prodNameCtrl.text.trim(),
       'price': double.tryParse(_priceCtrl.text) ?? 499.0,
       'unit': _selectedUnit,
@@ -878,22 +999,82 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
+        // Shop Profile Full Form Container with Permanent Photo Storage
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4)]),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('🏪 Shop Profile', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
+              const Text('🏪 Complete Shop Profile Form (Permanent Storage)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
               const SizedBox(height: 10),
+              
+              // Preview Shop and Banner Photos
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: buildShopOrProdImage(_pickedShopImagePath, 70, 70, Icons.store),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text('Shop Photo', style: TextStyle(fontSize: 10)),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: buildShopOrProdImage(_pickedBannerImagePath, 70, 120, Icons.image),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text('Banner Photo', style: TextStyle(fontSize: 10)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
               TextField(controller: _shopNameCtrl, decoration: const InputDecoration(labelText: 'Shop Name', border: OutlineInputBorder(), isDense: true)),
+              const SizedBox(height: 8),
+              TextField(controller: _ownerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name', border: OutlineInputBorder(), isDense: true)),
+              const SizedBox(height: 8),
+              TextField(controller: _ownerPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Owner Phone / WhatsApp Number', border: OutlineInputBorder(), isDense: true)),
+              const SizedBox(height: 8),
+              TextField(controller: _addressCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Full Shop Address (Sector/Area, City, Pincode)', border: OutlineInputBorder(), isDense: true)),
+              const SizedBox(height: 10),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _pickShopImage(false),
+                      icon: const Icon(Icons.store, size: 16),
+                      label: Text(_pickedShopImagePath == null ? 'Select Shop Photo' : 'Shop Photo ✓', style: const TextStyle(fontSize: 10)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _pickShopImage(true),
+                      icon: const Icon(Icons.image, size: 16),
+                      label: Text(_pickedBannerImagePath == null ? 'Select Banner' : 'Banner Photo ✓', style: const TextStyle(fontSize: 10)),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 10),
               _isSavingShop
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4081), foregroundColor: Colors.white),
                       onPressed: _saveShopDetailsToCloud,
-                      child: const Text('Save Shop Details', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text('Save Shop Profile Permanently', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
             ],
           ),
@@ -902,13 +1083,14 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         const SizedBox(height: 16),
         const Divider(thickness: 2),
 
+        // Add New Cake Form with 20+ Categories
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4)]),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('📦 Add New Cake / Item', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
+              const Text('📦 Add New Cake / Item (20+ Categories)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
               const SizedBox(height: 10),
               TextField(controller: _prodNameCtrl, decoration: const InputDecoration(labelText: 'Cake Name (e.g. Choco Truffle)', border: OutlineInputBorder(), isDense: true)),
               const SizedBox(height: 8),
@@ -917,7 +1099,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
                 decoration: const InputDecoration(labelText: 'Cake Directory / Category', border: OutlineInputBorder(), isDense: true),
-                items: ['Birthday Cake', 'Chocolate Cake', 'Pastry', 'Customized'].map((cat) {
+                items: vendorCategories.map((cat) {
                   return DropdownMenuItem(value: cat, child: Text(cat, style: const TextStyle(fontSize: 12)));
                 }).toList(),
                 onChanged: (val) {
@@ -1004,7 +1186,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
 
         Row(
           children: [
-            const Text('🛒 Customer Orders Received', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
+            const Text('🛒 Incoming Vendor Orders', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
             const Spacer(),
             IconButton(onPressed: _fetchVendorOrders, icon: const Icon(Icons.sync, size: 18), tooltip: 'Refresh Orders'),
           ],
@@ -1038,7 +1220,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                                   const Spacer(),
                                   Chip(
                                     label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 9)),
-                                    backgroundColor: status.contains('Pending') ? Colors.orange : Colors.green,
+                                    backgroundColor: status.contains('Pending') ? Colors.orange : (status.contains('Rejected') ? Colors.red : Colors.green),
                                     padding: EdgeInsets.zero,
                                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   ),
@@ -1071,23 +1253,32 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                               }).toList(),
                               const SizedBox(height: 8),
                               
-                              // Delivery/Vendor Action Buttons
                               Row(
                                 children: [
-                                  if (status.contains('Pending'))
+                                  if (status.contains('Pending')) ...[
                                     Expanded(
                                       child: SizedBox(
                                         height: 32,
                                         child: ElevatedButton(
                                           style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                                           onPressed: () => _acceptOrder(ord['firebaseKey']),
-                                          child: const Text('Accept Order', style: TextStyle(fontSize: 11)),
+                                          child: const Text('Accept', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                         ),
                                       ),
                                     ),
-                                  if (status.contains('Pending')) const SizedBox(width: 8),
-                                  
-                                  // 📍 Share Location Button for Delivery Boy/Vendor
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 32,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                          onPressed: () => _rejectOrder(ord['firebaseKey']),
+                                          child: const Text('Reject', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                  ],
                                   Expanded(
                                     child: SizedBox(
                                       height: 32,
@@ -1095,7 +1286,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                                         style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
                                         onPressed: () => _shareLocationToCustomer(custPhone, custAddr),
                                         icon: const Icon(Icons.share_location, size: 14),
-                                        label: const Text('📍 Share Location', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                        label: const Text('📍 Location', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                       ),
                                     ),
                                   ),
@@ -1157,7 +1348,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     }
   }
 
-  // WhatsApp Native Location Share Option
   Future<void> _sendLiveLocationOnWhatsApp() async {
     setState(() => _isSharingLocation = true);
     try {
@@ -1192,7 +1382,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       'items': List.from(CakeDatabase.cartItems),
       'grandTotal': grandTotal,
       'orderTime': formattedTime,
-      'status': 'Out for Delivery 🛵',
+      'status': 'Pending ⏳',
     };
 
     try {
@@ -1313,7 +1503,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
 
           Row(
             children: [
-              const Text('📦 Your Orders & Location Sharing', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
+              const Text('📦 Your Orders & Live Status', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
               const Spacer(),
               IconButton(
                 onPressed: _fetchUserOrders,
@@ -1351,7 +1541,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                                     const Spacer(),
                                     Chip(
                                       label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 9)),
-                                      backgroundColor: status.contains('Pending') ? Colors.orange : Colors.green,
+                                      backgroundColor: status.contains('Pending') ? Colors.orange : (status.contains('Rejected') ? Colors.red : Colors.green),
                                       padding: EdgeInsets.zero,
                                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     ),
