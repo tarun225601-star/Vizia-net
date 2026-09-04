@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:geolocator/geolocator.dart'; // geolocator इम्पोर्ट किया गया है
+import 'package:geolocator/geolocator.dart';
 
 void main() {
   runApp(const CakeAppEnterpriseApp());
@@ -76,8 +76,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
   final List<Widget> _tabScreens = [
     const MarketplaceBuyerView(), 
     const VendorAuthAndPortalView(), 
-    const UserAndTempoProfileView(), 
-    const CartAndWhatsAppCheckoutView(), 
+    const CartAndWhatsAppCheckoutView(),
   ];
 
   @override
@@ -131,7 +130,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () => setState(() => _selectedTabIndex = 2),
+                    onTap: () => _showProfileEditDialog(context),
                     child: Row(
                       children: [
                         const Icon(Icons.person, color: Color(0xFFFF4081), size: 13),
@@ -145,7 +144,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: () => setState(() => _selectedTabIndex = 2),
+                    onTap: () => _showProfileEditDialog(context),
                     child: const Text('(Edit Profile)', style: TextStyle(color: Color(0xFFFF4081), fontSize: 10)),
                   ),
                 ],
@@ -155,20 +154,16 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
         ),
       ),
       body: IndexedStack(
-        index: _selectedTabIndex > 3 ? 3 : _selectedTabIndex,
+        index: _selectedTabIndex > 2 ? 2 : _selectedTabIndex,
         children: _tabScreens,
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedTabIndex > 3 ? 3 : _selectedTabIndex,
+        currentIndex: _selectedTabIndex > 2 ? 2 : _selectedTabIndex,
         selectedItemColor: const Color(0xFFFF4081),
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         onTap: (index) {
-          if (index == 2) {
-            setState(() => _selectedTabIndex = 3); 
-          } else {
-            setState(() => _selectedTabIndex = index);
-          }
+          setState(() => _selectedTabIndex = index);
         },
         items: [
           const BottomNavigationBarItem(icon: Icon(Icons.cake_outlined), label: 'Cakes'),
@@ -194,6 +189,45 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showProfileEditDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final nameCtrl = TextEditingController(text: CakeDatabase.currentCustomerName);
+        final phoneCtrl = TextEditingController(text: CakeDatabase.currentUserPhone);
+        final addressCtrl = TextEditingController(text: CakeDatabase.currentDeliveryAddress);
+        return AlertDialog(
+          title: const Text('Edit Profile & Address', style: TextStyle(fontSize: 15)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name', isDense: true)),
+              const SizedBox(height: 8),
+              TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone', isDense: true)),
+              const SizedBox(height: 8),
+              TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Address', isDense: true)),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4081), foregroundColor: Colors.white),
+              onPressed: () {
+                setState(() {
+                  CakeDatabase.currentCustomerName = nameCtrl.text.trim();
+                  CakeDatabase.currentUserPhone = phoneCtrl.text.trim();
+                  CakeDatabase.currentDeliveryAddress = addressCtrl.text.trim();
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -236,13 +270,27 @@ class MarketplaceBuyerView extends StatefulWidget {
 class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   String selectedCategory = 'All';
   bool _isLoadingCloud = false;
+  
+  // बग फिक्स: कंट्रोलर्स को मैप में स्टोर किया ताकि रीबिल्ड होने पर कर्सर या ऐप न अटके
   final Map<String, double> _itemQuantities = {};
   final Map<String, TextEditingController> _cakeMessageControllers = {};
+  final Map<String, TextEditingController> _qtyControllers = {};
 
   @override
   void initState() {
     super.initState();
     _fetchProductsFromCloud();
+  }
+
+  @override
+  void dispose() {
+    for (var ctrl in _cakeMessageControllers.values) {
+      ctrl.dispose();
+    }
+    for (var ctrl in _qtyControllers.values) {
+      ctrl.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _fetchProductsFromCloud() async {
@@ -264,7 +312,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     } catch (e) {
       debugPrint("Cloud sync error: $e");
     } finally {
-      setState(() => _isLoadingCloud = false);
+      if (mounted) setState(() => _isLoadingCloud = false);
     }
   }
 
@@ -281,13 +329,11 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     String prodName = prod['name'];
     var existingIndex = CakeDatabase.cartItems.indexWhere((item) => item['name'] == prodName);
 
-    if (existingIndex >= 0) {
-      setState(() {
+    setState(() {
+      if (existingIndex >= 0) {
         CakeDatabase.cartItems[existingIndex]['qty'] = qty;
         CakeDatabase.cartItems[existingIndex]['cakeMessage'] = cakeMsg;
-      });
-    } else {
-      setState(() {
+      } else {
         CakeDatabase.cartItems.add({
           'name': prodName,
           'price': prod['price'],
@@ -296,8 +342,8 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
           'cakeMessage': cakeMsg,
           'shopName': CakeDatabase.bakeryShop['shopName'],
         });
-      });
-    }
+      }
+    });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('🎂 Added $qty ${prod['unit'] ?? 'Piece'} $prodName to Cart!'), duration: const Duration(milliseconds: 800)),
@@ -374,7 +420,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
             itemCount: filteredProducts.length,
             itemBuilder: (context, index) {
               var prod = filteredProducts[index];
-              String prodKey = prod['id'] ?? prod['name'] ?? index.toString();
+              String prodKey = prod['firebaseKey'] ?? prod['id'] ?? prod['name'] ?? index.toString();
               double unitPrice = (prod['price'] ?? 499.0).toDouble();
               double selectedQty = _itemQuantities[prodKey] ?? 1.0;
               double totalPrice = unitPrice * selectedQty;
@@ -384,6 +430,11 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                 _cakeMessageControllers[prodKey] = TextEditingController();
               }
               var msgController = _cakeMessageControllers[prodKey]!;
+
+              if (!_qtyControllers.containsKey(prodKey)) {
+                _qtyControllers[prodKey] = TextEditingController(text: selectedQty.toInt().toString());
+              }
+              var qtyController = _qtyControllers[prodKey]!;
 
               return Card(
                 elevation: 2,
@@ -422,7 +473,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                             Text('₹${unitPrice.toInt()} / ${prod['unit'] ?? 'Piece'}', style: const TextStyle(color: Color(0xFFFF4081), fontWeight: FontWeight.bold, fontSize: 11)),
                             const SizedBox(height: 6),
 
-                            // SIMPLE CAKE MESSAGE BOX
                             TextField(
                               controller: msgController,
                               style: const TextStyle(fontSize: 11),
@@ -444,14 +494,15 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                                   width: 32,
                                   height: 22,
                                   child: TextField(
+                                    controller: qtyController,
                                     keyboardType: TextInputType.number,
                                     style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                                     decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 0)),
-                                    controller: TextEditingController(text: selectedQty.toInt().toString())
-                                      ..selection = TextSelection.fromPosition(TextPosition(offset: selectedQty.toInt().toString().length)),
                                     onChanged: (val) {
                                       double? q = double.tryParse(val);
-                                      if (q != null && q > 0) setState(() => _itemQuantities[prodKey] = q);
+                                      if (q != null && q > 0) {
+                                        setState(() => _itemQuantities[prodKey] = q);
+                                      }
                                     },
                                   ),
                                 ),
@@ -535,7 +586,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     } catch (e) {
       debugPrint("Error: $e");
     } finally {
-      setState(() => _isLoadingAuth = false);
+      if (mounted) setState(() => _isLoadingAuth = false);
     }
   }
 
@@ -555,15 +606,17 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
         Uri.parse('${CakeDatabase.firebaseRestUrl}/vendors/$phone.json'),
         body: json.encode({'phone': phone, 'pin': pin1}),
       );
-      setState(() {
-        _isLoggedIn = true;
-        _isRegisteringNew = false;
-        CakeDatabase.currentUserPhone = phone;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoggedIn = true;
+          _isRegisteringNew = false;
+          CakeDatabase.currentUserPhone = phone;
+        });
+      }
     } catch (e) {
       debugPrint("Error: $e");
     } finally {
-      setState(() => _isLoadingAuth = false);
+      if (mounted) setState(() => _isLoadingAuth = false);
     }
   }
 
@@ -659,16 +712,14 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
           item['firebaseKey'] = key;
           list.add(item);
         });
-        setState(() {
-          _vendorOrders = list.reversed.toList();
-        });
+        if (mounted) setState(() => _vendorOrders = list.reversed.toList());
       } else {
-        setState(() => _vendorOrders = []);
+        if (mounted) setState(() => _vendorOrders = []);
       }
     } catch (e) {
       debugPrint("Error fetching orders: $e");
     } finally {
-      setState(() => _isLoadingOrders = false);
+      if (mounted) setState(() => _isLoadingOrders = false);
     }
   }
 
@@ -684,17 +735,19 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
           item['firebaseKey'] = key;
           list.add(item);
         });
-        setState(() {
-          _vendorProducts = list.reversed.toList();
-          CakeDatabase.productInventory = _vendorProducts;
-        });
+        if (mounted) {
+          setState(() {
+            _vendorProducts = list.reversed.toList();
+            CakeDatabase.productInventory = _vendorProducts;
+          });
+        }
       } else {
-        setState(() => _vendorProducts = []);
+        if (mounted) setState(() => _vendorProducts = []);
       }
     } catch (e) {
       debugPrint("Error fetching products: $e");
     } finally {
-      setState(() => _isLoadingProducts = false);
+      if (mounted) setState(() => _isLoadingProducts = false);
     }
   }
 
@@ -703,10 +756,12 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
       String timeNow = "${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} (${DateTime.now().day}/${DateTime.now().month})";
       await http.patch(
         Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderKey.json'),
-        body: json.encode({'status': 'Accepted by Vendor', 'vendorAcceptedTime': timeNow}),
+        body: json.encode({'status': 'Out for Delivery 🛵', 'vendorAcceptedTime': timeNow}),
       );
       _fetchVendorOrders();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Order Accepted!'), backgroundColor: Colors.green));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Order Accepted & Marked Out for Delivery!'), backgroundColor: Colors.green));
+      }
     } catch (_) {}
   }
 
@@ -714,7 +769,9 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     try {
       await http.delete(Uri.parse('${CakeDatabase.firebaseRestUrl}/products/$firebaseKey.json'));
       _fetchVendorProducts();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ Product Deleted Successfully!'), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ Product Deleted Successfully!'), backgroundColor: Colors.red));
+      }
     } catch (e) {
       debugPrint("Error deleting product: $e");
     }
@@ -741,11 +798,13 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json'),
         body: json.encode(CakeDatabase.bakeryShop),
       );
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Shop Details Saved!'), backgroundColor: Colors.green));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Shop Details Saved!'), backgroundColor: Colors.green));
+      }
     } catch (e) {
       debugPrint("Error saving shop: $e");
     } finally {
-      setState(() => _isSavingShop = false);
+      if (mounted) setState(() => _isSavingShop = false);
     }
   }
 
@@ -753,7 +812,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
     if (image != null) {
       final bytes = await image.readAsBytes();
-      setState(() => _pickedProdImagePath = "data:image/jpeg;base64,${base64Encode(bytes)}");
+      if (mounted) setState(() => _pickedProdImagePath = "data:image/jpeg;base64,${base64Encode(bytes)}");
     }
   }
 
@@ -782,7 +841,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         Uri.parse('${CakeDatabase.firebaseRestUrl}/products.json'),
         body: json.encode(newProduct),
       );
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if ((response.statusCode == 200 || response.statusCode == 201) && mounted) {
         _prodNameCtrl.clear();
         _priceCtrl.clear();
         _stockCtrl.clear();
@@ -791,7 +850,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Cake Added Successfully!'), backgroundColor: Colors.green));
       }
     } finally {
-      setState(() => _isUploadingToCloud = false);
+      if (mounted) setState(() => _isUploadingToCloud = false);
     }
   }
 
@@ -800,7 +859,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        // SHOP PROFILE CONFIGURATION
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4)]),
@@ -825,7 +883,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         const SizedBox(height: 16),
         const Divider(thickness: 2),
 
-        // ADD NEW ITEM SECTION
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4)]),
@@ -875,7 +932,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         const SizedBox(height: 16),
         const Divider(thickness: 2),
 
-        // VENDOR PRODUCT INVENTORY MANAGEMENT
         Row(
           children: [
             const Text('📋 Your Cake Inventory & Management', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
@@ -927,7 +983,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         const SizedBox(height: 16),
         const Divider(thickness: 2),
 
-        // VENDOR INCOMING ORDERS SECTION
         Row(
           children: [
             const Text('🛒 Customer Orders Received', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
@@ -1015,59 +1070,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
 }
 
 // ==========================================
-// USER PROFILE VIEW
-// ==========================================
-class UserAndTempoProfileView extends StatefulWidget {
-  const UserAndTempoProfileView({super.key});
-
-  @override
-  State<UserAndTempoProfileView> createState() => _UserAndTempoProfileViewState();
-}
-
-class _UserAndTempoProfileViewState extends State<UserAndTempoProfileView> {
-  final TextEditingController _nameCtrl = TextEditingController(text: CakeDatabase.currentCustomerName);
-  final TextEditingController _userPhoneCtrl = TextEditingController(text: CakeDatabase.currentUserPhone);
-  final TextEditingController _addressCtrl = TextEditingController(text: CakeDatabase.currentDeliveryAddress);
-
-  void _saveProfile() {
-    setState(() {
-      CakeDatabase.currentCustomerName = _nameCtrl.text.trim();
-      CakeDatabase.currentUserPhone = _userPhoneCtrl.text.trim();
-      CakeDatabase.currentDeliveryAddress = _addressCtrl.text.trim();
-    });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Profile Saved Successfully!'), backgroundColor: Colors.green));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: ListView(
-        children: [
-          const Text('👤 Customer Profile & Delivery Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Your Name', border: OutlineInputBorder(), isDense: true)),
-          const SizedBox(height: 8),
-          TextField(controller: _userPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder(), isDense: true)),
-          const SizedBox(height: 8),
-          TextField(controller: _addressCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Full Delivery Address', border: OutlineInputBorder(), isDense: true)),
-          
-          const SizedBox(height: 20),
-          SizedBox(
-            height: 48,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4081), foregroundColor: Colors.white),
-              onPressed: _saveProfile,
-              child: const Text('Save Profile Details', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ==========================================
 // WHATSAPP CHECKOUT CART & LIVE LOCATION SHARING
 // ==========================================
 class CartAndWhatsAppCheckoutView extends StatefulWidget {
@@ -1080,7 +1082,7 @@ class CartAndWhatsAppCheckoutView extends StatefulWidget {
 class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutView> {
   bool _isPlacingOrder = false;
   bool _isLoadingUserOrders = false;
-  bool _isFetchingLocation = false; // लोकेशन फेच होने पर लोडिंग दिखाने के लिए
+  bool _isFetchingLocation = false;
   List<Map<String, dynamic>> _userOrdersList = [];
 
   @override
@@ -1103,26 +1105,26 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
             list.add(item);
           }
         });
-        setState(() {
-          _userOrdersList = list.reversed.toList();
-        });
+        if (mounted) setState(() => _userOrdersList = list.reversed.toList());
       }
     } catch (e) {
       debugPrint("Error fetching user orders: $e");
     } finally {
-      setState(() => _isLoadingUserOrders = false);
+      if (mounted) setState(() => _isLoadingUserOrders = false);
     }
   }
 
-  // GEOLOCATOR के साथ वास्तविक लाइव लोकेशन WhatsApp पर भेजना
+  // बग फिक्स: जीपीएस लोकेशन में टाइमआउट जोड़ दिया ताकि ऐप हैंग या स्टक न हो
   Future<void> _sendLiveLocationOnWhatsApp() async {
     setState(() => _isFetchingLocation = true);
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('⚠️ कृपया अपने फोन का GPS (Location) ऑन करें!'), backgroundColor: Colors.red),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('⚠️ कृपया अपने फोन का GPS (Location) ऑन करें!'), backgroundColor: Colors.red),
+          );
+        }
         setState(() => _isFetchingLocation = false);
         return;
       }
@@ -1131,25 +1133,31 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('⚠️ लोकेशन की अनुमति (Permission) आवश्यक है!'), backgroundColor: Colors.red),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('⚠️ लोकेशन की अनुमति (Permission) आवश्यक है!'), backgroundColor: Colors.red),
+            );
+          }
           setState(() => _isFetchingLocation = false);
           return;
         }
       }
       
       if (permission == LocationPermission.deniedForever) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('⚠️ लोकेशन की अनुमति स्थायी रूप से अस्वीकृत है। सेटिंग्स से चालू करें।'), backgroundColor: Colors.red),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('⚠️ लोकेशन की अनुमति स्थायी रूप से अस्वीकृत है। सेटिंग्स से चालू करें।'), backgroundColor: Colors.red),
+          );
+        }
         setState(() => _isFetchingLocation = false);
         return;
       }
 
-      // जीपीएस से सटीक कोऑर्डिनेट्स निकालना
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 12), // 12 सेकंड टाइमआउट ताकि ऐप कभी अटके नहीं
+        ),
       );
 
       double lat = position.latitude;
@@ -1166,11 +1174,13 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       }
     } catch (e) {
       debugPrint("Location error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ लोकेशन फेच करने में त्रुटि: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ जीपीएस लोकेशन फेच करने में समय लगा या त्रुटि हुई। खुले आसमान के नीचे प्रयास करें।'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
-      setState(() => _isFetchingLocation = false);
+      if (mounted) setState(() => _isFetchingLocation = false);
     }
   }
 
@@ -1187,10 +1197,10 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       'customerName': CakeDatabase.currentCustomerName,
       'customerPhone': CakeDatabase.currentUserPhone,
       'customerAddress': CakeDatabase.currentDeliveryAddress,
-      'items': CakeDatabase.cartItems,
+      'items': List.from(CakeDatabase.cartItems),
       'grandTotal': grandTotal,
       'orderTime': formattedTime,
-      'status': 'Pending ⏳',
+      'status': 'Out for Delivery 🛵',
     };
 
     try {
@@ -1200,21 +1210,17 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       );
     } catch (_) {}
 
-    setState(() => _isPlacingOrder = false);
+    if (mounted) {
+      setState(() {
+        CakeDatabase.cartItems.clear();
+        _isPlacingOrder = false;
+      });
+    }
+    
     _fetchUserOrders();
 
     String vendorPhone = CakeDatabase.bakeryShop['whatsappNumber'] ?? '919971968060';
     String message = "🎂 *New Cake Order from CakeApp*\n⏱️ *Time:* $formattedTime\n\n👤 *Customer:* ${CakeDatabase.currentCustomerName}\n📍 *Address:* ${CakeDatabase.currentDeliveryAddress}\n\n";
-
-    for (int i = 0; i < CakeDatabase.cartItems.length; i++) {
-      var item = CakeDatabase.cartItems[i];
-      message += "${i + 1}. ${item['name']} - ${item['qty']} ${item['unit']} = *₹${(item['price'] * item['qty']).toStringAsFixed(0)}*\n";
-      String cakeMsg = item['cakeMessage'] ?? '';
-      if (cakeMsg.isNotEmpty) {
-        message += "   💬 *केक पर लिखावट:* $cakeMsg\n";
-      }
-    }
-    message += "\n💰 *Grand Total: ₹${grandTotal.toStringAsFixed(0)}*\n\nभाई, केक का आर्डर पैक कर देना!";
 
     String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(message)}";
     final Uri uri = Uri.parse(whatsappUrl);
@@ -1236,71 +1242,72 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
           const SizedBox(height: 6),
           cart.isEmpty
               ? const Card(child: Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text('Cart is empty'))))
-              : ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: cart.length,
-                  itemBuilder: (context, index) {
-                    var item = cart[index];
-                    String cakeMsg = item['cakeMessage'] ?? '';
-                    return Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+              : Column(
+                  children: [
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: cart.length,
+                      itemBuilder: (context, index) {
+                        var item = cart[index];
+                        String cakeMsg = item['cakeMessage'] ?? '';
+                        return Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(child: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                  constraints: const BoxConstraints(),
-                                  padding: EdgeInsets.zero,
-                                  onPressed: () => setState(() => CakeDatabase.cartItems.removeAt(index)),
+                                Row(
+                                  children: [
+                                    Expanded(child: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                      constraints: const BoxConstraints(),
+                                      padding: EdgeInsets.zero,
+                                      onPressed: () => setState(() => CakeDatabase.cartItems.removeAt(index)),
+                                    ),
+                                  ],
                                 ),
+                                Text('Qty: ${item['qty']} ${item['unit']} • ₹${item['price']} each', style: const TextStyle(fontSize: 11)),
+                                if (cakeMsg.isNotEmpty)
+                                  Text('💬 केक पर लिखावट: $cakeMsg', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.pink)),
                               ],
                             ),
-                            Text('Qty: ${item['qty']} ${item['unit']} • ₹${item['price']} each', style: const TextStyle(fontSize: 11)),
-                            if (cakeMsg.isNotEmpty)
-                              Text('💬 केक पर लिखावट: $cakeMsg', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.pink)),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-
-          if (cart.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Grand Total:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                      Text('₹${grandTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 42,
-                    child: _isPlacingOrder
-                        ? const Center(child: CircularProgressIndicator())
-                        : ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
-                            onPressed: _sendOrderToWhatsApp,
-                            icon: const Icon(Icons.chat, size: 18),
-                            label: const Text('Send Order to WhatsApp 🚀', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                           ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Grand Total:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                              Text('₹${grandTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 42,
+                            child: _isPlacingOrder
+                                ? const Center(child: CircularProgressIndicator())
+                                : ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+                                    onPressed: _sendOrderToWhatsApp,
+                                    icon: const Icon(Icons.chat, size: 18),
+                                    label: const Text('Send Order to WhatsApp 🚀', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
 
           const Divider(height: 30, thickness: 2),
 
@@ -1362,7 +1369,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                                 }).toList(),
                                 const SizedBox(height: 8),
                                 
-                                // LIVE LOCATION SHARING BUTTON WITH LOADING SPINNER
                                 SizedBox(
                                   width: double.infinity,
                                   height: 32,
