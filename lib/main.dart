@@ -775,7 +775,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
       
       // Get current device GPS location using standard HTML5 Geolocation API / Flutter Geolocation equivalent if applicable, 
       // or open direct WhatsApp chat with prefilled location prompt so the delivery guy can share live location instantly.
-      if (navigator.geolocation != null) {
+      
         // Handled via browser/device geolocation if available, otherwise direct wa.me link with location request
       }
 
