@@ -271,7 +271,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   String selectedCategory = 'All';
   bool _isLoadingCloud = false;
   
-  // बग फिक्स: कंट्रोलर्स को मैप में स्टोर किया ताकि रीबिल्ड होने पर कर्सर या ऐप न अटके
   final Map<String, double> _itemQuantities = {};
   final Map<String, TextEditingController> _cakeMessageControllers = {};
   final Map<String, TextEditingController> _qtyControllers = {};
@@ -1114,7 +1113,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     }
   }
 
-  // बग फिक्स: जीपीएस लोकेशन में टाइमआउट जोड़ दिया ताकि ऐप हैंग या स्टक न हो
   Future<void> _sendLiveLocationOnWhatsApp() async {
     setState(() => _isFetchingLocation = true);
     try {
@@ -1154,10 +1152,9 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       }
 
       Position position = await Geolocator.getCurrentPosition(
-  desiredAccuracy: LocationAccuracy.high,
-  timeLimit: const Duration(seconds: 12),
-);
-
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 12),
+      );
 
       double lat = position.latitude;
       double lng = position.longitude;
@@ -1175,7 +1172,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       debugPrint("Location error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ जीपीएस लोकेशन फेच करने में समय लगा या त्रुटि हुई। खुले आसमान के नीचे प्रयास करें।'), backgroundColor: Colors.red),
+          const SnackBar(content: Text('❌ जीपीएस लोकेशन फेच करने में समय लगा या त्रुटि हुई। खुले आसमान के नीचे प्रयास करें।'), backgroundColor: Colors.red),
         );
       }
     } finally {
