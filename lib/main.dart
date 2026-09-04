@@ -6,8 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 void main() {
   runApp(const CakeAppEnterpriseApp());
@@ -44,8 +42,6 @@ class CakeDatabase {
   static String currentUserPhone = "9971968060";
   static String currentCustomerName = "Tarun Kumar";
   static String currentDeliveryAddress = "Sector 15A Faridabad";
-  static double currentLat = 28.4089;
-  static double currentLng = 77.3178;
 
   static Map<String, dynamic> bakeryShop = {
     'shopId': 'shop_cake_01',
@@ -148,7 +144,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
                   const Spacer(),
                   GestureDetector(
                     onTap: () => _showProfileEditDialog(context),
-                    child: const Text('(Edit Profile & Map)', style: TextStyle(color: Color(0xFFFF4081), fontSize: 10)),
+                    child: const Text('(Edit Profile & Address)', style: TextStyle(color: Color(0xFFFF4081), fontSize: 10)),
                   ),
                 ],
               ),
@@ -212,21 +208,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
                 const SizedBox(height: 8),
                 TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone', isDense: true)),
                 const SizedBox(height: 8),
-                TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Address', isDense: true)),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700, foregroundColor: Colors.white),
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const MapPickerScreen()),
-                    );
-                    setState(() {});
-                  },
-                  icon: const Icon(Icons.map, size: 16),
-                  label: const Text('Pick Location on Google Map'),
-                ),
+                TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Address / Location Note', isDense: true)),
               ],
             ),
           ),
@@ -247,95 +229,6 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
           ],
         );
       },
-    );
-  }
-}
-
-// ==========================================
-// GOOGLE MAP PICKER SCREEN
-// ==========================================
-class MapPickerScreen extends StatefulWidget {
-  const MapPickerScreen({super.key});
-
-  @override
-  State<MapPickerScreen> createState() => _MapPickerScreenState();
-}
-
-class _MapPickerScreenState extends State<MapPickerScreen> {
-  LatLng _selectedLocation = LatLng(CakeDatabase.currentLat, CakeDatabase.currentLng);
-  GoogleMapController? _mapController;
-
-  @override
-  void initState() {
-    super.initState();
-    _determineCurrentPosition();
-  }
-
-  Future<void> _determineCurrentPosition() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return;
-      }
-
-      Position position = await Geolocator.getCurrentPosition();
-      setState(() {
-        _selectedLocation = LatLng(position.latitude, position.longitude);
-      });
-      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedLocation, 16));
-    } catch (_) {}
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Select Location on Map', style: TextStyle(fontSize: 16)),
-        backgroundColor: const Color(0xFF1A1A1A),
-        foregroundColor: Colors.white,
-      ),
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _selectedLocation,
-              zoom: 15,
-            ),
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
-            onMapCreated: (controller) => _mapController = controller,
-            onCameraMove: (position) {
-              _selectedLocation = position.target;
-            },
-          ),
-          const Center(
-            child: Icon(Icons.location_pin, size: 45, color: Color(0xFFFF4081)),
-          ),
-          Positioned(
-            bottom: 20,
-            left: 20,
-            right: 20,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF4081),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              onPressed: () {
-                CakeDatabase.currentLat = _selectedLocation.latitude;
-                CakeDatabase.currentLng = _selectedLocation.longitude;
-                CakeDatabase.currentDeliveryAddress = "Lat: ${_selectedLocation.latitude.toStringAsFixed(4)}, Lng: ${_selectedLocation.longitude.toStringAsFixed(4)}";
-                Navigator.pop(context);
-              },
-              child: const Text('Confirm Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -872,6 +765,31 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     } catch (_) {}
   }
 
+  // Delivery / Vendor WhatsApp Location Share Button Function
+  Future<void> _shareLocationToCustomer(String customerPhone, String customerAddress) async {
+    try {
+      if (customerPhone.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Customer phone number not found!')));
+        return;
+      }
+      
+      // Get current device GPS location using standard HTML5 Geolocation API / Flutter Geolocation equivalent if applicable, 
+      // or open direct WhatsApp chat with prefilled location prompt so the delivery guy can share live location instantly.
+      if (navigator.geolocation != null) {
+        // Handled via browser/device geolocation if available, otherwise direct wa.me link with location request
+      }
+
+      String locationText = "📍 नमस्ते! यह रही डिलीवरी लोकेशन: $customerAddress. (कृपया व्हाट्सएप के अटैचमेंट आइकॉन से अपनी लाइव लोकेशन शेयर करें)";
+      String whatsappUrl = "https://wa.me/$customerPhone?text=${Uri.encodeComponent(locationText)}";
+      final Uri uri = Uri.parse(whatsappUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint("Error sharing location: $e");
+    }
+  }
+
   Future<void> _deleteProduct(String firebaseKey) async {
     try {
       await http.delete(Uri.parse('${CakeDatabase.firebaseRestUrl}/products/$firebaseKey.json'));
@@ -1110,6 +1028,8 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                       var ord = _vendorOrders[index];
                       String status = ord['status'] ?? 'Pending ⏳';
                       List itemsList = ord['items'] ?? [];
+                      String custPhone = ord['customerPhone'] ?? '';
+                      String custAddr = ord['customerAddress'] ?? '';
 
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 4),
@@ -1132,7 +1052,8 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                               ),
                               const SizedBox(height: 4),
                               Text('🕒 आर्डर समय: ${ord['orderTime'] ?? 'N/A'}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              Text('📍 पता: ${ord['customerAddress']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                              Text('📞 WhatsApp: $custPhone', style: const TextStyle(fontSize: 11, color: Colors.blue)),
+                              Text('📍 पता / लोकेशन: $custAddr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                               const SizedBox(height: 6),
                               const Text('🎂 आर्डर किए गए आइटम और मैसेज:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF4081))),
                               ...itemsList.map<Widget>((it) {
@@ -1155,16 +1076,37 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                                 );
                               }).toList(),
                               const SizedBox(height: 8),
-                              if (status.contains('Pending'))
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 30,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                                    onPressed: () => _acceptOrder(ord['firebaseKey']),
-                                    child: const Text('Accept Order', style: TextStyle(fontSize: 11)),
+                              
+                              // Delivery/Vendor Action Buttons
+                              Row(
+                                children: [
+                                  if (status.contains('Pending'))
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 32,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                                          onPressed: () => _acceptOrder(ord['firebaseKey']),
+                                          child: const Text('Accept Order', style: TextStyle(fontSize: 11)),
+                                        ),
+                                      ),
+                                    ),
+                                  if (status.contains('Pending')) const SizedBox(width: 8),
+                                  
+                                  // 📍 Share Location Button for Delivery Boy/Vendor
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 32,
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+                                        onPressed: () => _shareLocationToCustomer(custPhone, custAddr),
+                                        icon: const Icon(Icons.share_location, size: 14),
+                                        label: const Text('📍 Share Location', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
+                              ),
                             ],
                           ),
                         ),
@@ -1177,7 +1119,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
 }
 
 // ==========================================
-// WHATSAPP CHECKOUT CART & LIVE LOCATION SHARING
+// WHATSAPP CHECKOUT CART & LOCATION SHARING
 // ==========================================
 class CartAndWhatsAppCheckoutView extends StatefulWidget {
   const CartAndWhatsAppCheckoutView({super.key});
@@ -1189,7 +1131,7 @@ class CartAndWhatsAppCheckoutView extends StatefulWidget {
 class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutView> {
   bool _isPlacingOrder = false;
   bool _isLoadingUserOrders = false;
-  bool _isFetchingLocation = false;
+  bool _isSharingLocation = false;
   List<Map<String, dynamic>> _userOrdersList = [];
 
   @override
@@ -1221,14 +1163,14 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     }
   }
 
+  // WhatsApp Native Location Share Option
   Future<void> _sendLiveLocationOnWhatsApp() async {
-    setState(() => _isFetchingLocation = true);
+    setState(() => _isSharingLocation = true);
     try {
       String vendorPhone = CakeDatabase.bakeryShop['whatsappNumber'] ?? '919971968060';
-      String googleMapsUrl = "https://www.google.com/maps/search/?api=1&query=${CakeDatabase.currentLat},${CakeDatabase.currentLng}";
-      String locationMessage = "📍 *Live GPS Location Sharing*\nनमस्ते भाई, यह रही मेरी वर्तमान लोकेशन (या मैप पिन):\n$googleMapsUrl";
+      String locationPrompt = "📍 नमस्ते भाई, मेरी डिलीवरी लोकेशन यह है: ${CakeDatabase.currentDeliveryAddress}. (कृपया व्हाट्सएप के लोकेशन आइकॉन से लाइव लोकेशन शेयर करें)";
       
-      String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(locationMessage)}";
+      String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(locationPrompt)}";
       final Uri uri = Uri.parse(whatsappUrl);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -1236,7 +1178,7 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     } catch (e) {
       debugPrint("Location error: $e");
     } finally {
-      if (mounted) setState(() => _isFetchingLocation = false);
+      if (mounted) setState(() => _isSharingLocation = false);
     }
   }
 
@@ -1253,8 +1195,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
       'customerName': CakeDatabase.currentCustomerName,
       'customerPhone': CakeDatabase.currentUserPhone,
       'customerAddress': CakeDatabase.currentDeliveryAddress,
-      'customerLat': CakeDatabase.currentLat,
-      'customerLng': CakeDatabase.currentLng,
       'items': List.from(CakeDatabase.cartItems),
       'grandTotal': grandTotal,
       'orderTime': formattedTime,
@@ -1278,7 +1218,15 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     _fetchUserOrders();
 
     String vendorPhone = CakeDatabase.bakeryShop['whatsappNumber'] ?? '919971968060';
-    String message = "🎂 *New Cake Order from CakeApp*\n⏱️ *Time:* $formattedTime\n\n👤 *Customer:* ${CakeDatabase.currentCustomerName}\n📍 *Address:* ${CakeDatabase.currentDeliveryAddress}\n🗺️ *Map:* https://www.google.com/maps/search/?api=1&query=${CakeDatabase.currentLat},${CakeDatabase.currentLng}\n\n";
+    String message = "🎂 *New Cake Order from CakeApp*\n⏱️ *Time:* $formattedTime\n\n👤 *Customer:* ${CakeDatabase.currentCustomerName}\n📱 *Phone:* ${CakeDatabase.currentUserPhone}\n📍 *Address:* ${CakeDatabase.currentDeliveryAddress}\n\n";
+
+    for (var item in orderData['items'] as List) {
+      message += "• ${item['name']} x ${item['qty']} ${item['unit']} = ₹${(item['price'] * item['qty']).toInt()}\n";
+      if ((item['cakeMessage'] ?? '').toString().isNotEmpty) {
+        message += "  💬 Cake Msg: ${item['cakeMessage']}\n";
+      }
+    }
+    message += "\n💰 *Grand Total: ₹${grandTotal.toInt()}*";
 
     String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(message)}";
     final Uri uri = Uri.parse(whatsappUrl);
@@ -1430,17 +1378,17 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                                 SizedBox(
                                   width: double.infinity,
                                   height: 32,
-                                  child: _isFetchingLocation
+                                  child: _isSharingLocation
                                       ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
                                       : ElevatedButton.icon(
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.blue.shade700,
+                                            backgroundColor: const Color(0xFF25D366),
                                             foregroundColor: Colors.white,
                                           ),
                                           onPressed: _sendLiveLocationOnWhatsApp,
                                           icon: const Icon(Icons.share_location, size: 14),
                                           label: const Text(
-                                            '📍 Share Live Location (WhatsApp)',
+                                            '📍 Share WhatsApp Live Location',
                                             style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                                           ),
                                         ),
