@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart'; // geolocator इम्पोर्ट किया गया है
 
 void main() {
   runApp(const CakeAppEnterpriseApp());
@@ -1079,6 +1080,7 @@ class CartAndWhatsAppCheckoutView extends StatefulWidget {
 class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutView> {
   bool _isPlacingOrder = false;
   bool _isLoadingUserOrders = false;
+  bool _isFetchingLocation = false; // लोकेशन फेच होने पर लोडिंग दिखाने के लिए
   List<Map<String, dynamic>> _userOrdersList = [];
 
   @override
@@ -1112,15 +1114,63 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     }
   }
 
-  // Simple WhatsApp Live Location Sharing (15 mins / 1 hour / till order ready)
+  // GEOLOCATOR के साथ वास्तविक लाइव लोकेशन WhatsApp पर भेजना
   Future<void> _sendLiveLocationOnWhatsApp() async {
-    String vendorPhone = CakeDatabase.bakeryShop['whatsappNumber'] ?? '919971968060';
-    String locationMessage = "📍 *Live Location Sharing*\nनमस्ते भाई, यह रही मेरी लाइव लोकेशन (जब तक केक रेडी नहीं होता, तब तक के लिए):\nhttps://maps.google.com";
-    
-    String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(locationMessage)}";
-    final Uri uri = Uri.parse(whatsappUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    setState(() => _isFetchingLocation = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('⚠️ कृपया अपने फोन का GPS (Location) ऑन करें!'), backgroundColor: Colors.red),
+        );
+        setState(() => _isFetchingLocation = false);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('⚠️ लोकेशन की अनुमति (Permission) आवश्यक है!'), backgroundColor: Colors.red),
+          );
+          setState(() => _isFetchingLocation = false);
+          return;
+        }
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('⚠️ लोकेशन की अनुमति स्थायी रूप से अस्वीकृत है। सेटिंग्स से चालू करें।'), backgroundColor: Colors.red),
+        );
+        setState(() => _isFetchingLocation = false);
+        return;
+      }
+
+      // जीपीएस से सटीक कोऑर्डिनेट्स निकालना
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      double lat = position.latitude;
+      double lng = position.longitude;
+
+      String vendorPhone = CakeDatabase.bakeryShop['whatsappNumber'] ?? '919971968060';
+      String googleMapsUrl = "https://www.google.com/maps/search/?api=1&query=$lat,$lng";
+      String locationMessage = "📍 *Live GPS Location Sharing*\nनमस्ते भाई, यह रही मेरी वर्तमान लाइव लोकेशन (जब तक केक रेडी नहीं होता):\n$googleMapsUrl";
+      
+      String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(locationMessage)}";
+      final Uri uri = Uri.parse(whatsappUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint("Location error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ लोकेशन फेच करने में त्रुटि: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() => _isFetchingLocation = false);
     }
   }
 
@@ -1311,22 +1361,25 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                                   return Text('• ${it['name']} (${it['qty']} ${it['unit']})${cakeMsg.isNotEmpty ? ' | 💬 $cakeMsg' : ''}', style: const TextStyle(fontSize: 11, color: Colors.pink));
                                 }).toList(),
                                 const SizedBox(height: 8),
-                                // SIMPLE LIVE LOCATION SHARING BUTTON
+                                
+                                // LIVE LOCATION SHARING BUTTON WITH LOADING SPINNER
                                 SizedBox(
                                   width: double.infinity,
                                   height: 32,
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue.shade700,
-                                      foregroundColor: Colors.white,
-                                    ),
-                                    onPressed: _sendLiveLocationOnWhatsApp,
-                                    icon: const Icon(Icons.share_location, size: 14),
-                                    label: const Text(
-                                      '📍 Share Live Location (WhatsApp)',
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
+                                  child: _isFetchingLocation
+                                      ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                                      : ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blue.shade700,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          onPressed: _sendLiveLocationOnWhatsApp,
+                                          icon: const Icon(Icons.share_location, size: 14),
+                                          label: const Text(
+                                            '📍 Share Live Location (WhatsApp)',
+                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
                                 ),
                               ],
                             ),
