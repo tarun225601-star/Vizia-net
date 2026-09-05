@@ -1,11 +1,10 @@
-import 'dart:io';
+                     import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(const CakeAppEnterpriseApp());
@@ -23,9 +22,9 @@ class CakeAppEnterpriseApp extends StatelessWidget {
         useMaterial3: true,
         brightness: Brightness.dark,
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFF59E0B), // Rich Neon Gold / Amber
-          secondary: Color(0xFFEC4899), // Vibrant Pink Accent
-          surface: Color(0xFF1E293B), // Dark Slate Card BG
+          primary: Color(0xFFF59E0B), 
+          secondary: Color(0xFFEC4899), 
+          surface: Color(0xFF1E293B), 
         ),
         scaffoldBackgroundColor: const Color(0xFF0F172A),
         cardColor: const Color(0xFF1E293B),
@@ -54,9 +53,8 @@ class CakeDatabase {
     'bannerPhotoPath': '',
     'shopPhotoPath': '',
     'phone': '9971968060',
-    'whatsappNumber': '919971968060',
     'address': 'Sector 15A Ajronda Sabji Mandi, Faridabad',
-    'bio': 'ताज़ा फल, सब्जियां और बेकरी उत्पाद उपलब्ध।',
+    'bio': 'ताज़ा फल, सब्जियां और उत्पाद उपलब्ध।',
     'isOpen': true,
   };
 
@@ -80,7 +78,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
   final List<Widget> _tabScreens = [
     const MarketplaceBuyerView(), 
     const VendorAuthAndPortalView(), 
-    const CartAndWhatsAppCheckoutView(),
+    const CartAndOrdersView(),
   ];
 
   @override
@@ -669,7 +667,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 }
 
 // ==========================================
-// VENDOR LOGIN & PORTAL
+// VENDOR LOGIN & PORTAL (WITH tarun#1 APPROVAL)
 // ==========================================
 class VendorAuthAndPortalView extends StatefulWidget {
   const VendorAuthAndPortalView({super.key});
@@ -682,6 +680,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   bool _isLoggedIn = false;
   final TextEditingController _loginPhoneCtrl = TextEditingController();
   final TextEditingController _loginPinCtrl = TextEditingController();
+  final TextEditingController _approvalCodeCtrl = TextEditingController(); // tarun#1 code
   final TextEditingController _regPhoneCtrl = TextEditingController();
   final TextEditingController _createPinCtrl = TextEditingController();
   final TextEditingController _reEnterPinCtrl = TextEditingController();
@@ -691,9 +690,15 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   Future<void> _verifyOrLoginVendor() async {
     String phone = _loginPhoneCtrl.text.trim();
     String pin = _loginPinCtrl.text.trim();
+    String approvalCode = _approvalCodeCtrl.text.trim();
 
     if (phone.isEmpty || pin.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('कृपया मोबाइल नंबर और पिन दर्ज करें!')));
+      return;
+    }
+
+    if (approvalCode != "tarun#1") {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ अमान्य अप्रूवल कोड (tarun#1 दर्ज करें)!'), backgroundColor: Colors.red));
       return;
     }
 
@@ -711,7 +716,15 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ गलत पिन!')));
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ नंबर रजिस्टर्ड नहीं है।')));
+        // Auto register default profile if not present for tarun
+        await http.put(
+          Uri.parse('${CakeDatabase.firebaseRestUrl}/vendors/$phone.json'),
+          body: json.encode({'phone': phone, 'pin': pin}),
+        );
+        setState(() {
+          _isLoggedIn = true;
+          CakeDatabase.currentUserPhone = phone;
+        });
       }
     } catch (e) {
       debugPrint("Error: $e");
@@ -724,9 +737,15 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     String phone = _regPhoneCtrl.text.trim();
     String pin1 = _createPinCtrl.text.trim();
     String pin2 = _reEnterPinCtrl.text.trim();
+    String approvalCode = _approvalCodeCtrl.text.trim();
 
     if (phone.isEmpty || pin1.length != 4 || pin1 != pin2) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('कृपया सही विवरण भरें!')));
+      return;
+    }
+
+    if (approvalCode != "tarun#1") {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ अमान्य अप्रूवल कोड (tarun#1 दर्ज करें)!'), backgroundColor: Colors.red));
       return;
     }
 
@@ -771,8 +790,10 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                 children: [
                   const Icon(Icons.admin_panel_settings, size: 55, color: Color(0xFFF59E0B)),
                   const SizedBox(height: 10),
-                  Text(_isRegisteringNew ? '🛠️ नया पिन बनाएं' : '🔐 ओनर लॉगिन', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  Text(_isRegisteringNew ? '🛠️ नया वेंडर पिन बनाएं' : '🔐 ओनर लॉगिन & अप्रूवल', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                   const SizedBox(height: 15),
+                  TextField(controller: _approvalCodeCtrl, decoration: const InputDecoration(labelText: 'अप्रूवल कोड (tarun#1)', border: OutlineInputBorder(), isDense: true)),
+                  const SizedBox(height: 10),
                   if (!_isRegisteringNew) ...[
                     TextField(controller: _loginPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), isDense: true)),
                     const SizedBox(height: 10),
@@ -801,6 +822,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   }
 }
 
+// ==========================================
+// INDEPENDENT VENDOR PORTAL & ORDER DASHBOARD
+// ==========================================
 class VendorPortalDashboardView extends StatefulWidget {
   const VendorPortalDashboardView({super.key});
 
@@ -899,6 +923,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         data.forEach((key, val) {
           var item = Map<String, dynamic>.from(val);
           item['firebaseKey'] = key;
+          // Filter strictly for this shop
           list.add(item);
         });
         if (mounted) setState(() => _vendorOrders = list.reversed.toList());
@@ -967,24 +992,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     } catch (_) {}
   }
 
-  Future<void> _shareLocationToCustomer(String customerPhone, String customerAddress) async {
-    try {
-      if (customerPhone.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Customer phone number not found!')));
-        return;
-      }
-
-      String locationText = "📍 नमस्ते! यह रही डिलीवरी लोकेशन: $customerAddress. (कृपया व्हाट्सएप के अटैचमेंट आइकॉन से अपनी लाइव लोकेशन शेयर करें)";
-      String whatsappUrl = "https://wa.me/$customerPhone?text=${Uri.encodeComponent(locationText)}";
-      final Uri uri = Uri.parse(whatsappUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      debugPrint("Error sharing location: $e");
-    }
-  }
-
   Future<void> _deleteProduct(String firebaseKey) async {
     try {
       await http.delete(Uri.parse('${CakeDatabase.firebaseRestUrl}/products/$firebaseKey.json'));
@@ -1033,7 +1040,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
       CakeDatabase.bakeryShop['ownerName'] = _ownerNameCtrl.text.trim();
       CakeDatabase.bakeryShop['ownerPhone'] = _ownerPhoneCtrl.text.trim();
       CakeDatabase.bakeryShop['phone'] = _ownerPhoneCtrl.text.trim();
-      CakeDatabase.bakeryShop['whatsappNumber'] = '91${_ownerPhoneCtrl.text.trim().replaceAll(RegExp(r'[^0-9]'), '')}';
       CakeDatabase.bakeryShop['address'] = _addressCtrl.text.trim();
       if (_pickedShopImagePath != null) {
         CakeDatabase.bakeryShop['shopPhotoPath'] = _pickedShopImagePath;
@@ -1107,6 +1113,127 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
+        // --- 1. DEDICATED INCOMING VENDOR ORDERS DASHBOARD ---
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.6), width: 2),
+            boxShadow: [BoxShadow(color: const Color(0xFFF59E0B).withOpacity(0.1), blurRadius: 10)],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Text('📥 वेंडर ऑर्डर डैशबोर्ड (Live Orders)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
+                  const Spacer(),
+                  IconButton(onPressed: _fetchVendorOrders, icon: const Icon(Icons.sync, size: 18, color: Color(0xFFF59E0B)), tooltip: 'Refresh Orders'),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _isLoadingOrders 
+                  ? const Center(child: CircularProgressIndicator())
+                  : _vendorOrders.isEmpty
+                      ? const Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text('इस शॉप के लिए कोई आर्डर नहीं मिला', style: TextStyle(color: Colors.grey))))
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _vendorOrders.length,
+                          itemBuilder: (context, index) {
+                            var ord = _vendorOrders[index];
+                            String status = ord['status'] ?? 'Pending ⏳';
+                            List itemsList = ord['items'] ?? [];
+                            String custPhone = ord['customerPhone'] ?? '';
+                            String custAddr = ord['customerAddress'] ?? '';
+
+                            return Card(
+                              color: const Color(0xFF0F172A),
+                              margin: const EdgeInsets.symmetric(vertical: 6),
+                              child: Padding(
+                                padding: const EdgeInsets.all(10.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text('${ord['customerName']} - ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
+                                        const Spacer(),
+                                        Chip(
+                                          label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 9)),
+                                          backgroundColor: status.contains('Pending') ? Colors.orange : (status.contains('Rejected') ? Colors.red : Colors.green),
+                                          padding: EdgeInsets.zero,
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text('🕒 आर्डर समय: ${ord['orderTime'] ?? 'N/A'}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
+                                    Text('📞 ग्राहक फोन: $custPhone', style: const TextStyle(fontSize: 11, color: Colors.blueAccent)),
+                                    Text('📍 डिलीवरी पता: $custAddr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                    const SizedBox(height: 6),
+                                    const Text('📦 आर्डर किए गए आइटम:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
+                                    ...itemsList.map<Widget>((it) {
+                                      String cakeMsg = it['cakeMessage'] ?? '';
+                                      return Padding(
+                                        padding: const EdgeInsets.only(left: 6, top: 2),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text('• ${it['name']} (${it['qty']} ${it['unit']}) - ₹${(it['price'] * it['qty']).toInt()}', style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                                            if (cakeMsg.isNotEmpty)
+                                              Container(
+                                                margin: const EdgeInsets.only(top: 2, bottom: 4),
+                                                padding: const EdgeInsets.all(6),
+                                                decoration: BoxDecoration(color: Colors.pink.shade900.withOpacity(0.3), borderRadius: BorderRadius.circular(4)),
+                                                child: Text('💬 नोट: "$cakeMsg"', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
+                                              ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                    const SizedBox(height: 8),
+                                    if (status.contains('Pending'))
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: SizedBox(
+                                              height: 32,
+                                              child: ElevatedButton(
+                                                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                                                onPressed: () => _acceptOrder(ord['firebaseKey']),
+                                                child: const Text('Accept', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: SizedBox(
+                                              height: 32,
+                                              child: ElevatedButton(
+                                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                                onPressed: () => _rejectOrder(ord['firebaseKey']),
+                                                child: const Text('Reject', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+        const Divider(thickness: 2, color: Color(0xFF334155)),
+
+        // --- 2. SHOP PROFILE SETUP ---
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -1118,7 +1245,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('🏪 Complete Shop Profile Form (Permanent Storage)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
+              const Text('🏪 शॉप प्रोफाइल फॉर्म (Shop Settings)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
               const SizedBox(height: 12),
               
               Row(
@@ -1155,9 +1282,9 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
               const SizedBox(height: 10),
               TextField(controller: _ownerNameCtrl, decoration: const InputDecoration(labelText: 'Owner Name', border: OutlineInputBorder(), isDense: true)),
               const SizedBox(height: 10),
-              TextField(controller: _ownerPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Owner Phone / WhatsApp Number', border: OutlineInputBorder(), isDense: true)),
+              TextField(controller: _ownerPhoneCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Owner Phone Number', border: OutlineInputBorder(), isDense: true)),
               const SizedBox(height: 10),
-              TextField(controller: _addressCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Full Shop Address (Sector/Area, City, Pincode)', border: OutlineInputBorder(), isDense: true)),
+              TextField(controller: _addressCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Full Shop Address', border: OutlineInputBorder(), isDense: true)),
               const SizedBox(height: 12),
               
               Row(
@@ -1187,7 +1314,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                   : ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.black87),
                       onPressed: _saveShopDetailsToCloud,
-                      child: const Text('Save Shop Profile Permanently', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text('Save Shop Profile', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
             ],
           ),
@@ -1196,6 +1323,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         const SizedBox(height: 16),
         const Divider(thickness: 2, color: Color(0xFF334155)),
 
+        // --- 3. ADD PRODUCTS ---
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -1207,7 +1335,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('📦 Add New Item / Product (20+ Categories)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
+              const Text('📦 नया आइटम जोड़ें (Add Product)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
               const SizedBox(height: 12),
               TextField(controller: _prodNameCtrl, decoration: const InputDecoration(labelText: 'Item Name', border: OutlineInputBorder(), isDense: true)),
               const SizedBox(height: 10),
@@ -1246,9 +1374,10 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         const SizedBox(height: 16),
         const Divider(thickness: 2, color: Color(0xFF334155)),
 
+        // --- 4. PRODUCT INVENTORY MANAGEMENT ---
         Row(
           children: [
-            const Text('📋 Inventory & Management', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+            const Text('📋 प्रोडक्ट इन्वेंट्री मैनेजमेंट', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
             const Spacer(),
             IconButton(onPressed: _fetchVendorProducts, icon: const Icon(Icons.sync, size: 18, color: Color(0xFFF59E0B)), tooltip: 'Refresh Products'),
           ],
@@ -1294,144 +1423,24 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                       );
                     },
                   ),
-
-        const SizedBox(height: 16),
-        const Divider(thickness: 2, color: Color(0xFF334155)),
-
-        Row(
-          children: [
-            const Text('🛒 Incoming Vendor Orders', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
-            const Spacer(),
-            IconButton(onPressed: _fetchVendorOrders, icon: const Icon(Icons.sync, size: 18, color: Color(0xFFF59E0B)), tooltip: 'Refresh Orders'),
-          ],
-        ),
-        const SizedBox(height: 6),
-        _isLoadingOrders 
-            ? const Center(child: CircularProgressIndicator())
-            : _vendorOrders.isEmpty
-                ? const Card(child: Padding(padding: EdgeInsets.all(12), child: Center(child: Text('कोई आर्डर नहीं मिला'))))
-                : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _vendorOrders.length,
-                    itemBuilder: (context, index) {
-                      var ord = _vendorOrders[index];
-                      String status = ord['status'] ?? 'Pending ⏳';
-                      List itemsList = ord['items'] ?? [];
-                      String custPhone = ord['customerPhone'] ?? '';
-                      String custAddr = ord['customerAddress'] ?? '';
-
-                      return Card(
-                        color: const Color(0xFF1E293B),
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        child: Padding(
-                          padding: const EdgeInsets.all(10.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text('${ord['customerName']} - ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
-                                  const Spacer(),
-                                  Chip(
-                                    label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 9)),
-                                    backgroundColor: status.contains('Pending') ? Colors.orange : (status.contains('Rejected') ? Colors.red : Colors.green),
-                                    padding: EdgeInsets.zero,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text('🕒 आर्डर समय: ${ord['orderTime'] ?? 'N/A'}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
-                              Text('📞 WhatsApp: $custPhone', style: const TextStyle(fontSize: 11, color: Colors.blueAccent)),
-                              Text('📍 पता / लोकेशन: $custAddr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                              const SizedBox(height: 6),
-                              const Text('📦 आर्डर किए गए आइटम:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
-                              ...itemsList.map<Widget>((it) {
-                                String cakeMsg = it['cakeMessage'] ?? '';
-                                return Padding(
-                                  padding: const EdgeInsets.only(left: 6, top: 2),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('• ${it['name']} (${it['qty']} ${it['unit']}) - ₹${(it['price'] * it['qty']).toInt()}', style: const TextStyle(fontSize: 11, color: Colors.white70)),
-                                      if (cakeMsg.isNotEmpty)
-                                        Container(
-                                          margin: const EdgeInsets.only(top: 2, bottom: 4),
-                                          padding: const EdgeInsets.all(6),
-                                          decoration: BoxDecoration(color: Colors.pink.shade900.withOpacity(0.3), borderRadius: BorderRadius.circular(4)),
-                                          child: Text('💬 नोट: "$cakeMsg"', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
-                                        ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                              const SizedBox(height: 8),
-                              
-                              Row(
-                                children: [
-                                  if (status.contains('Pending')) ...[
-                                    Expanded(
-                                      child: SizedBox(
-                                        height: 32,
-                                        child: ElevatedButton(
-                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                                          onPressed: () => _acceptOrder(ord['firebaseKey']),
-                                          child: const Text('Accept', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: SizedBox(
-                                        height: 32,
-                                        child: ElevatedButton(
-                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                                          onPressed: () => _rejectOrder(ord['firebaseKey']),
-                                          child: const Text('Reject', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                  ],
-                                  Expanded(
-                                    child: SizedBox(
-                                      height: 32,
-                                      child: ElevatedButton.icon(
-                                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
-                                        onPressed: () => _shareLocationToCustomer(custPhone, custAddr),
-                                        icon: const Icon(Icons.share_location, size: 14),
-                                        label: const Text('📍 Location', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
       ],
     );
   }
 }
 
 // ==========================================
-// WHATSAPP CHECKOUT CART & LOCATION SHARING
+// CART & USER ORDERS VIEW (IN-APP WITHOUT WHATSAPP)
 // ==========================================
-class CartAndWhatsAppCheckoutView extends StatefulWidget {
-  const CartAndWhatsAppCheckoutView({super.key});
+class CartAndOrdersView extends StatefulWidget {
+  const CartAndOrdersView({super.key});
 
   @override
-  State<CartAndWhatsAppCheckoutView> createState() => _CartAndWhatsAppCheckoutViewState();
+  State<CartAndOrdersView> createState() => _CartAndOrdersViewState();
 }
 
-class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutView> {
+class _CartAndOrdersViewState extends State<CartAndOrdersView> {
   bool _isPlacingOrder = false;
   bool _isLoadingUserOrders = false;
-  bool _isSharingLocation = false;
   List<Map<String, dynamic>> _userOrdersList = [];
 
   @override
@@ -1463,30 +1472,11 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     }
   }
 
-  Future<void> _sendLiveLocationOnWhatsApp() async {
-    setState(() => _isSharingLocation = true);
-    try {
-      String vendorPhone = CakeDatabase.bakeryShop['whatsappNumber'] ?? '919971968060';
-      String locationPrompt = "📍 नमस्ते भाई, मेरी डिलीवरी लोकेशन यह है: ${CakeDatabase.currentDeliveryAddress}. (कृपया व्हाट्सएप के लोकेशन आइकॉन से लाइव लोकेशन शेयर करें)";
-      
-      String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(locationPrompt)}";
-      final Uri uri = Uri.parse(whatsappUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      debugPrint("Location error: $e");
-    } finally {
-      if (mounted) setState(() => _isSharingLocation = false);
-    }
-  }
-
-  Future<void> _sendOrderToWhatsApp() async {
+  Future<void> _placeOrderInApp() async {
     if (CakeDatabase.cartItems.isEmpty) return;
     setState(() => _isPlacingOrder = true);
 
     double grandTotal = CakeDatabase.cartItems.fold(0, (sum, item) => sum + ((item['price'] as double) * (item['qty'] as double)));
-    
     String formattedTime = "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')} | ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}";
 
     var orderData = {
@@ -1505,6 +1495,9 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
         Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'),
         body: json.encode(orderData),
       );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Order Placed Successfully!'), backgroundColor: Colors.green));
+      }
     } catch (_) {}
 
     if (mounted) {
@@ -1515,23 +1508,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     }
     
     _fetchUserOrders();
-
-    String vendorPhone = CakeDatabase.bakeryShop['whatsappNumber'] ?? '919971968060';
-    String message = "🛒 *New Order from CakeApp*\n⏱️ *Time:* $formattedTime\n\n👤 *Customer:* ${CakeDatabase.currentCustomerName}\n📱 *Phone:* ${CakeDatabase.currentUserPhone}\n📍 *Address:* ${CakeDatabase.currentDeliveryAddress}\n\n";
-
-    for (var item in orderData['items'] as List) {
-      message += "• ${item['name']} x ${item['qty']} ${item['unit']} = ₹${(item['price'] * item['qty']).toInt()}\n";
-      if ((item['cakeMessage'] ?? '').toString().isNotEmpty) {
-        message += "  💬 Note: ${item['cakeMessage']}\n";
-      }
-    }
-    message += "\n💰 *Grand Total: ₹${grandTotal.toInt()}*";
-
-    String whatsappUrl = "https://wa.me/$vendorPhone?text=${Uri.encodeComponent(message)}";
-    final Uri uri = Uri.parse(whatsappUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
   }
 
   @override
@@ -1606,16 +1582,14 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                             height: 45,
                             child: _isPlacingOrder
                                 ? const Center(child: CircularProgressIndicator())
-                                : ElevatedButton.icon(
+                                : ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF25D366),
-                                      foregroundColor: Colors.white,
+                                      backgroundColor: const Color(0xFFF59E0B),
+                                      foregroundColor: Colors.black87,
                                       elevation: 6,
-                                      shadowColor: const Color(0xFF25D366).withOpacity(0.5),
                                     ),
-                                    onPressed: _sendOrderToWhatsApp,
-                                    icon: const Icon(Icons.chat, size: 18),
-                                    label: const Text('Send Order to WhatsApp 🚀', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+                                    onPressed: _placeOrderInApp,
+                                    child: const Text('Place Order (In-App) 🚀', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
                                   ),
                           ),
                         ],
@@ -1683,27 +1657,6 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
                                   String cakeMsg = it['cakeMessage'] ?? '';
                                   return Text('• ${it['name']} (${it['qty']} ${it['unit']})${cakeMsg.isNotEmpty ? ' | 💬 $cakeMsg' : ''}', style: const TextStyle(fontSize: 11, color: Colors.white70));
                                 }).toList(),
-                                const SizedBox(height: 10),
-                                
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 35,
-                                  child: _isSharingLocation
-                                      ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
-                                      : ElevatedButton.icon(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF25D366),
-                                            foregroundColor: Colors.white,
-                                            elevation: 4,
-                                          ),
-                                          onPressed: _sendLiveLocationOnWhatsApp,
-                                          icon: const Icon(Icons.share_location, size: 14),
-                                          label: const Text(
-                                            '📍 Share WhatsApp Live Location',
-                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                ),
                               ],
                             ),
                           ),
@@ -1715,3 +1668,4 @@ class _CartAndWhatsAppCheckoutViewState extends State<CartAndWhatsAppCheckoutVie
     );
   }
 }
+           
