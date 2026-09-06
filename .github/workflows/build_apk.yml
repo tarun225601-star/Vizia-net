@@ -18,24 +18,6 @@ jobs:
           flutter-version: '3.19.x'
           channel: 'stable'
 
-      - name: Install Android SDK 35 and Build Tools
-        run: |
-          echo "y" | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --sdk_root=${ANDROID_HOME} "platforms;android-35" "build-tools;35.0.0" || true
-
-      - name: Ensure Android Resources Exist
-        run: |
-          # अगर किसी वजह से एंड्रॉइड फोल्डर या आइकॉन मिसिंग हैं, तो यह उन्हें री-जेनरेट कर देगा बिना कस्टमाइजेशन खोए
-          flutter create . --platforms=android --org=com.vizia.net
-
-      - name: Force Kotlin Version Everywhere
-        run: |
-          if [ -f "android/build.gradle" ]; then
-            sed -i "s/ext.kotlin_version = '.*'/ext.kotlin_version = '1.9.0'/g" android/build.gradle
-          fi
-          find android/ -name "build.gradle" -type f -exec sed -i "s/org.jetbrains.kotlin.android/org.jetbrains.kotlin.android version '1.9.0' apply false/g" {} +
-          find android/ -name "build.gradle" -type f -exec sed -i "s/kotlin-gradle-plugin:.*\"/kotlin-gradle-plugin:1.9.0\"/g" {} +
-          echo "Kotlin version forced to 1.9.0 successfully."
-
       - name: Get Dependencies
         run: flutter pub get
 
