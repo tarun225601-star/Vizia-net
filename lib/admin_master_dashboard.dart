@@ -1,5 +1,4 @@
 // ================= FILE 10 OF 10: admin_master_dashboard.dart =================
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'database_models.dart';
@@ -89,26 +88,13 @@ class _AdminMasterDashboardScreenState extends State<AdminMasterDashboardScreen>
                   ],
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: _shopNameCtrl,
-                  decoration: const InputDecoration(labelText: 'दुकान का नाम (Shop Name)', isDense: true),
-                ),
+                TextField(controller: _shopNameCtrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'दुकान का नाम (Shop Name)', labelStyle: TextStyle(color: Colors.grey), isDense: true)),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'वेंडर मोबाइल नंबर (Phone)', isDense: true),
-                ),
+                TextField(controller: _phoneCtrl, keyboardType: TextInputType.phone, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'वेंडर मोबाइल नंबर (Phone)', labelStyle: TextStyle(color: Colors.grey), isDense: true)),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _addressCtrl,
-                  decoration: const InputDecoration(labelText: 'दुकान का पता (Address - Faridabad)', isDense: true),
-                ),
+                TextField(controller: _addressCtrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'दुकान का पता (Address - Faridabad)', labelStyle: TextStyle(color: Colors.grey), isDense: true)),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _urlCtrl,
-                  decoration: const InputDecoration(labelText: 'फायरबेस REST URL (Database Endpoint)', isDense: true),
-                ),
+                TextField(controller: _urlCtrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'फायरबेस REST URL', labelStyle: TextStyle(color: Colors.grey), isDense: true)),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
