@@ -21,9 +21,11 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Initialize Flutter Android Scaffold
+      - name: Initialize Flutter Android Scaffold & Fix Kotlin
         run: |
           flutter create . --platforms=android
+          # Fix Kotlin version automatically in build.gradle
+          sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = '\''1.9.24'\''/' android/build.gradle || true
 
       - name: Build APK
         run: flutter build apk --release
