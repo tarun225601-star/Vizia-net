@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:audioplayers/audioplayers.dart';
 
 void main() {
   runApp(const CakeAppEnterpriseApp());
@@ -817,14 +817,27 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   String? _pickedBannerImagePath;
   
   final ImagePicker _picker = ImagePicker();
-  final AudioPlayer _audioPlayer = AudioPlayer();
   
   List<Map<String, dynamic>> _vendorOrders = [];
   List<Map<String, dynamic>> _vendorProducts = [];
   bool _isLoadingProducts = false;
   Timer? _pollingTimer;
   Timer? _elapsedTickerTimer;
-  int _previousPendingCount = 0;
+
+  // वाइब्रेशन टाइमर
+  Timer? _vibrationTimer;
+
+  void startVibrationLoop() {
+    _vibrationTimer?.cancel();
+    _vibrationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      HapticFeedback.heavyImpact();
+    });
+  }
+
+  void stopVibrationLoop() {
+    _vibrationTimer?.cancel();
+    _vibrationTimer = null;
+  }
 
   final List<String> vendorCategories = [
     'Fresh Fruits',
@@ -837,12 +850,12 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   void initState() {
     super.initState();
     _fetchShopProfile().then((_) {
-      _fetchVendorOrders(playAlertIfNew: false);
+      _fetchVendorOrders();
       _fetchVendorProducts();
     });
 
     _pollingTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      _fetchVendorOrders(playAlertIfNew: true);
+      _fetchVendorOrders();
     });
 
     _elapsedTickerTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -854,16 +867,8 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   void dispose() {
     _pollingTimer?.cancel();
     _elapsedTickerTimer?.cancel();
-    _audioPlayer.dispose();
+    stopVibrationLoop();
     super.dispose();
-  }
-
-  Future<void> _playBeepSound() async {
-    try {
-      await _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
-    } catch (e) {
-      debugPrint("Audio play error: $e");
-    }
   }
 
   Future<void> _fetchShopProfile() async {
@@ -888,7 +893,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     }
   }
 
-  Future<void> _fetchVendorOrders({bool playAlertIfNew = false}) async {
+  Future<void> _fetchVendorOrders() async {
     try {
       final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
       if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
@@ -900,16 +905,25 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
           list.add(item);
         });
 
-        int currentPendingCount = list.where((o) => (o['status'] ?? '').toString().contains('Pending')).length;
-
-        if (playAlertIfNew && currentPendingCount > _previousPendingCount) {
-          _playBeepSound();
+        if (mounted) {
+          setState(() {
+            _vendorOrders = list.reversed.toList();
+          });
         }
-        _previousPendingCount = currentPendingCount;
 
-        if (mounted) setState(() => _vendorOrders = list.reversed.toList());
+        // यदि कोई ऑर्डर पेंडिंग है तो वाइब्रेशन चालू करें
+        bool hasPending = _vendorOrders.any((ord) => (ord['status'] ?? '').toString().contains('Pending'));
+        if (hasPending) {
+          startVibrationLoop();
+        } else {
+          stopVibrationLoop();
+        }
+
       } else {
-        if (mounted) setState(() => _vendorOrders = []);
+        if (mounted) {
+          setState(() => _vendorOrders = []);
+        }
+        stopVibrationLoop();
       }
     } catch (e) {
       debugPrint("Error fetching orders: $e");
@@ -959,6 +973,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   }
 
   Future<void> _acceptOrder(String orderKey) async {
+    stopVibrationLoop(); // ऑर्डर स्वीकार होने पर वाइब्रेशन बंद
     try {
       String timeNow = "${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} (${DateTime.now().day}/${DateTime.now().month})";
       await http.patch(
@@ -973,6 +988,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   }
 
   Future<void> _rejectOrder(String orderKey) async {
+    stopVibrationLoop(); // ऑर्डर रिजेक्ट होने पर वाइब्रेशन बंद
     try {
       await http.patch(
         Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderKey.json'),
@@ -1120,17 +1136,15 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                 children: [
                   const Icon(Icons.notifications_active, color: Color(0xFFF59E0B), size: 20),
                   const SizedBox(width: 8),
-                  const Text('🚨 लाइव ऑर्डर डैशबोर्ड (Live Audio & Timer)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFFF59E0B))),
+                  const Text('🚨 लाइव ऑर्डर डैशबोर्ड & टाइमर', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFFF59E0B))),
                   const Spacer(),
                   IconButton(
-                    onPressed: () => _fetchVendorOrders(playAlertIfNew: false),
+                    onPressed: _fetchVendorOrders,
                     icon: const Icon(Icons.sync, size: 18, color: Color(0xFFF59E0B)),
                     tooltip: 'Refresh Orders',
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              const Text('नया आर्डर आने पर घंटी बजेगी और टाइमर चालू हो जाएगा।', style: TextStyle(fontSize: 10, color: Colors.grey)),
               const SizedBox(height: 10),
 
               _vendorOrders.isEmpty
@@ -1652,7 +1666,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(key: null, height: 6),
                                 Text('Total Amount: ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFFEC4899))),
                                 const SizedBox(height: 3),
                                 Text('🕒 आर्डर किया गया: $orderTime', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
