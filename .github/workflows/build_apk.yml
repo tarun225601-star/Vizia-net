@@ -25,10 +25,10 @@ jobs:
         run: |
           flutter create . --platforms=android
 
-      - name: Build APK with increased heap memory
-        run: |
-          export org.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=512m"
-          flutter build apk --release
+      - name: Build APK
+        run: flutter build apk --release
+        env:
+          ORG_GRADLE_PROJECT_jvmargs: "-Xmx4g -XX:MaxMetaspaceSize=512m"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
