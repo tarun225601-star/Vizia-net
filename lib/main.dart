@@ -840,8 +840,8 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   Timer? _vibrationTimer;
 
   void startVibrationLoop() {
-    _vibrationTimer?.cancel();
-    _vibrationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    if (_vibrationTimer != null && _vibrationTimer!.isActive) return;
+    _vibrationTimer = Timer.periodic(const Duration(milliseconds: 600), (timer) {
       HapticFeedback.heavyImpact();
     });
   }
@@ -866,7 +866,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
       _fetchVendorProducts();
     });
 
-    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       _fetchVendorOrders();
     });
 
@@ -923,7 +923,12 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
           });
         }
 
-        bool hasPending = _vendorOrders.any((ord) => (ord['status'] ?? '').toString().contains('Pending'));
+        // पक्का चेक ताकि केस-इन्सेन्सेटिव तरीके से पेंडिंग ऑर्डर मिलते ही वाइब्रेशन बजने लगे
+        bool hasPending = _vendorOrders.any((ord) {
+          String status = (ord['status'] ?? '').toString().toLowerCase();
+          return status.contains('pending') || status.contains('⏳');
+        });
+
         if (hasPending) {
           startVibrationLoop();
         } else {
@@ -1173,7 +1178,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                         String firebaseKey = ord['firebaseKey'] ?? '';
                         String elapsedStr = _calculateElapsedTime(ord['orderTime'], firebaseKey);
 
-                        bool isPending = status.contains('Pending');
+                        bool isPending = status.toLowerCase().contains('pending') || status.contains('⏳');
 
                         return Container(
                           margin: const EdgeInsets.symmetric(vertical: 6),
