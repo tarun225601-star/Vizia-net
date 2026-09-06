@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:audioplayers/audioplayers.dart'; // Audio alert package
+import 'package:audioplayers/audioplayers.dart';
 
 void main() {
   runApp(const CakeAppEnterpriseApp());
@@ -17,7 +17,7 @@ class CakeAppEnterpriseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CakeApp - Ultra Premium Edition',
+      title: 'Viziag Mart',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -35,9 +35,6 @@ class CakeAppEnterpriseApp extends StatelessWidget {
   }
 }
 
-// ==========================================
-// CENTRAL DATABASE & CLOUD SYNC MODEL
-// ==========================================
 class CakeDatabase {
   static String firebaseRestUrl = "https://viziagmart-default-rtdb.firebaseio.com/"; 
 
@@ -63,9 +60,6 @@ class CakeDatabase {
   static List<Map<String, dynamic>> cartItems = [];
 }
 
-// ==========================================
-// MAIN HUB SCREEN WITH INDEXED STACK
-// ==========================================
 class CakeMainHubScreen extends StatefulWidget {
   const CakeMainHubScreen({super.key});
 
@@ -100,7 +94,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
                   colors: [Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFFEC4899)],
                 ).createShader(bounds),
                 child: const Text(
-                  'CAKEAPP',
+                  'VIZIAG MART',
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.5),
                 ),
               ),
@@ -110,13 +104,12 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
                   backgroundColor: const Color(0xFFF59E0B),
                   foregroundColor: Colors.black87,
                   elevation: 6,
-                  shadowColor: const Color(0xFFF59E0B).withOpacity(0.5),
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 onPressed: () => setState(() => _selectedTabIndex = 0),
-                icon: const Icon(Icons.cake, size: 14),
+                icon: const Icon(Icons.store, size: 14),
                 label: const Text('Shop', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 6),
@@ -257,9 +250,6 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
   }
 }
 
-// ==========================================
-// IMAGE HELPER
-// ==========================================
 Widget buildShopOrProdImage(String? path, double height, double width, IconData fallbackIcon) {
   if (path != null && path.isNotEmpty) {
     if (path.startsWith('http')) {
@@ -285,9 +275,6 @@ Widget buildShopOrProdImage(String? path, double height, double width, IconData 
   );
 }
 
-// ==========================================
-// MARKETPLACE BUYER VIEW
-// ==========================================
 class MarketplaceBuyerView extends StatefulWidget {
   const MarketplaceBuyerView({super.key});
 
@@ -303,28 +290,12 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   final Map<String, TextEditingController> _cakeMessageControllers = {};
   final Map<String, TextEditingController> _qtyControllers = {};
 
-  final List<String> cakeCategories = [
+  final List<String> categories = [
     'All',
-    'Birthday Cake',
-    'Anniversary Cake',
-    'Chocolate Cake',
-    'Kids / Cartoon Cake',
-    'Fruit Cake',
-    'Red Velvet',
-    'Heart Shaped Cake',
-    'Tier / Wedding Cake',
-    'Cupcakes & Pastries',
-    'Designer / Custom Cake',
-    'Truffle Cake',
-    'Butterscotch',
-    'Black Forest',
-    'Pineapple Cake',
-    'Strawberry Cake',
-    'Coffee / Mocha Cake',
-    'Photo Cake',
-    'Combos (Cake + Flowers)',
-    'Midnight Special Cake',
-    'Fasting / Eggless Special'
+    'Fresh Fruits',
+    'Vegetables',
+    'Organic Items',
+    'Daily Essentials',
   ];
 
   @override
@@ -398,7 +369,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
         CakeDatabase.cartItems.add({
           'name': prodName,
           'price': prod['price'],
-          'unit': prod['unit'] ?? 'Piece',
+          'unit': prod['unit'] ?? 'Kg',
           'qty': qty,
           'cakeMessage': cakeMsg,
           'shopName': CakeDatabase.bakeryShop['shopName'],
@@ -407,7 +378,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('🛒 Added $qty ${prod['unit'] ?? 'Piece'} $prodName to Cart!'), backgroundColor: const Color(0xFFF59E0B), duration: const Duration(milliseconds: 900)),
+      SnackBar(content: Text('🛒 Added $qty ${prod['unit'] ?? 'Kg'} $prodName to Cart!'), backgroundColor: const Color(0xFFF59E0B), duration: const Duration(milliseconds: 900)),
     );
   }
 
@@ -496,7 +467,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: cakeCategories.map((category) {
+              children: categories.map((category) {
                 bool isSelected = selectedCategory == category;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -530,7 +501,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
             itemBuilder: (context, index) {
               var prod = filteredProducts[index];
               String prodKey = prod['firebaseKey'] ?? prod['id'] ?? prod['name'] ?? index.toString();
-              double unitPrice = (prod['price'] ?? 499.0).toDouble();
+              double unitPrice = (prod['price'] ?? 49.0).toDouble();
               double selectedQty = _itemQuantities[prodKey] ?? 1.0;
               double totalPrice = unitPrice * selectedQty;
               bool inStock = prod['inStock'] ?? true;
@@ -568,7 +539,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(10),
-                            child: buildShopOrProdImage(prod['imagePath'], 95, 95, Icons.cake),
+                            child: buildShopOrProdImage(prod['imagePath'], 95, 95, Icons.shopping_bag),
                           ),
                           if (!inStock)
                             Container(
@@ -593,7 +564,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                             const SizedBox(height: 2),
                             Text(prod['category'] ?? 'General', style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
                             const SizedBox(height: 4),
-                            Text('₹${unitPrice.toInt()} / ${prod['unit'] ?? 'Piece'}', style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.w900, fontSize: 12)),
+                            Text('₹${unitPrice.toInt()} / ${prod['unit'] ?? 'Kg'}', style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.w900, fontSize: 12)),
                             const SizedBox(height: 8),
 
                             TextField(
@@ -667,9 +638,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   }
 }
 
-// ==========================================
-// VENDOR LOGIN & PORTAL (WITH tarun#1 APPROVAL)
-// ==========================================
 class VendorAuthAndPortalView extends StatefulWidget {
   const VendorAuthAndPortalView({super.key});
 
@@ -681,7 +649,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   bool _isLoggedIn = false;
   final TextEditingController _loginPhoneCtrl = TextEditingController();
   final TextEditingController _loginPinCtrl = TextEditingController();
-  final TextEditingController _approvalCodeCtrl = TextEditingController(); // tarun#1 code
+  final TextEditingController _approvalCodeCtrl = TextEditingController();
   final TextEditingController _regPhoneCtrl = TextEditingController();
   final TextEditingController _createPinCtrl = TextEditingController();
   final TextEditingController _reEnterPinCtrl = TextEditingController();
@@ -822,9 +790,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   }
 }
 
-// ==========================================
-// INDEPENDENT VENDOR PORTAL & ORDER DASHBOARD WITH TIMER & SOUND
-// ==========================================
 class VendorPortalDashboardView extends StatefulWidget {
   const VendorPortalDashboardView({super.key});
 
@@ -837,15 +802,14 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
 
   final TextEditingController _prodNameCtrl = TextEditingController();
   final TextEditingController _priceCtrl = TextEditingController();
-  final TextEditingController _stockCtrl = TextEditingController();
   
   late final TextEditingController _shopNameCtrl = TextEditingController(text: activeShop['shopName']);
   late final TextEditingController _ownerNameCtrl = TextEditingController(text: activeShop['ownerName']);
   late final TextEditingController _ownerPhoneCtrl = TextEditingController(text: activeShop['ownerPhone'] ?? activeShop['phone']);
   late final TextEditingController _addressCtrl = TextEditingController(text: activeShop['address']);
 
-  final String _selectedUnit = 'Piece';
-  String _selectedCategory = 'Birthday Cake';
+  final String _selectedUnit = 'Kg';
+  String _selectedCategory = 'Fresh Fruits';
   bool _isUploadingToCloud = false;
   bool _isSavingShop = false;
   String? _pickedProdImagePath;
@@ -853,37 +817,20 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   String? _pickedBannerImagePath;
   
   final ImagePicker _picker = ImagePicker();
-  final AudioPlayer _audioPlayer = AudioPlayer(); // Audio Player for Bell Alert
+  final AudioPlayer _audioPlayer = AudioPlayer();
   
   List<Map<String, dynamic>> _vendorOrders = [];
   List<Map<String, dynamic>> _vendorProducts = [];
-  bool _isLoadingOrders = false;
   bool _isLoadingProducts = false;
   Timer? _pollingTimer;
   Timer? _elapsedTickerTimer;
   int _previousPendingCount = 0;
 
   final List<String> vendorCategories = [
-    'Birthday Cake',
-    'Anniversary Cake',
-    'Chocolate Cake',
-    'Kids / Cartoon Cake',
-    'Fruit Cake',
-    'Red Velvet',
-    'Heart Shaped Cake',
-    'Tier / Wedding Cake',
-    'Cupcakes & Pastries',
-    'Designer / Custom Cake',
-    'Truffle Cake',
-    'Butterscotch',
-    'Black Forest',
-    'Pineapple Cake',
-    'Strawberry Cake',
-    'Coffee / Mocha Cake',
-    'Photo Cake',
-    'Combos (Cake + Flowers)',
-    'Midnight Special Cake',
-    'Fasting / Eggless Special'
+    'Fresh Fruits',
+    'Vegetables',
+    'Organic Items',
+    'Daily Essentials',
   ];
 
   @override
@@ -894,12 +841,10 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
       _fetchVendorProducts();
     });
 
-    // Auto poll every 10 seconds for brand new incoming orders
     _pollingTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       _fetchVendorOrders(playAlertIfNew: true);
     });
 
-    // Ticker to refresh live timer every second
     _elapsedTickerTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) setState(() {});
     });
@@ -915,15 +860,9 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
 
   Future<void> _playBeepSound() async {
     try {
-      // Plays a standard notification beep/ring when new order arrives
-      await _audioPlayer.play(AssetSource('ring.mp3')); // Make sure to add ring.mp3 in assets or use URL if needed
-    } catch (_) {
-      try {
-        // Fallback network alert sound if asset missing
-        await _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
-      } catch (e) {
-        debugPrint("Audio play error: $e");
-      }
+      await _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
+    } catch (e) {
+      debugPrint("Audio play error: $e");
     }
   }
 
@@ -964,7 +903,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         int currentPendingCount = list.where((o) => (o['status'] ?? '').toString().contains('Pending')).length;
 
         if (playAlertIfNew && currentPendingCount > _previousPendingCount) {
-          _playBeepSound(); // Ring alert (टू-टू घंटी)
+          _playBeepSound();
         }
         _previousPendingCount = currentPendingCount;
 
@@ -1006,9 +945,9 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   }
 
   String _calculateElapsedTime(String? timestampStr, String fallbackKey) {
-    // Generates live elapsed timer counting since order arrival
     try {
-      int epoch = int.tryParse(fallbackKey.replaceAll(Reg(r'[^0-9]'), '')) ?? DateTime.now().millisecondsSinceEpoch;
+      String numericOnly = fallbackKey.replaceAll(RegExp(r'[^0-9]'), '');
+      int epoch = int.tryParse(numericOnly) ?? DateTime.now().millisecondsSinceEpoch;
       DateTime orderTime = DateTime.fromMillisecondsSinceEpoch(epoch);
       Duration diff = DateTime.now().difference(orderTime);
       int mins = diff.inMinutes;
@@ -1136,9 +1075,9 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
       'shopName': CakeDatabase.bakeryShop['shopName'],
       'owner': CakeDatabase.bakeryShop['ownerName'],
       'name': _prodNameCtrl.text.trim(),
-      'price': double.tryParse(_priceCtrl.text) ?? 499.0,
+      'price': double.tryParse(_priceCtrl.text) ?? 49.0,
       'unit': _selectedUnit,
-      'stock': int.tryParse(_stockCtrl.text) ?? 20,
+      'stock': 20,
       'imagePath': _pickedProdImagePath ?? '',
       'category': _selectedCategory,
       'inStock': true,
@@ -1152,7 +1091,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
       if ((response.statusCode == 200 || response.statusCode == 201) && mounted) {
         _prodNameCtrl.clear();
         _priceCtrl.clear();
-        _stockCtrl.clear();
         setState(() => _pickedProdImagePath = null);
         _fetchVendorProducts();
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🚀 Item Added Successfully!'), backgroundColor: Colors.green));
@@ -1164,12 +1102,9 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
 
   @override
   Widget build(BuildContext context) {
-    var pendingOrders = _vendorOrders.where((o) => (o['status'] ?? '').toString().contains('Pending')).toList();
-
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        // --- 1. DEDICATED INDEPENDENT VENDOR LIVE ORDER DASHBOARD WITH TIMER & SOUND ---
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -1239,7 +1174,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                                 ],
                               ),
                               const SizedBox(height: 4),
-                              // Live Elapsed Timer Display
                               Row(
                                 children: [
                                   const Icon(Icons.timer, size: 13, color: Color(0xFFF59E0B)),
@@ -1269,7 +1203,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                                         ),
                                     ],
                                   ),
-                                ).toList();
+                                );
                               }),
                               const SizedBox(height: 8),
                               if (isPending)
@@ -1310,7 +1244,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         const SizedBox(height: 16),
         const Divider(thickness: 2, color: Color(0xFF334155)),
 
-        // --- 2. SHOP PROFILE SETUP ---
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -1400,7 +1333,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         const SizedBox(height: 16),
         const Divider(thickness: 2, color: Color(0xFF334155)),
 
-        // --- 3. ADD PRODUCTS ---
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -1451,7 +1383,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         const SizedBox(height: 16),
         const Divider(thickness: 2, color: Color(0xFF334155)),
 
-        // --- 4. PRODUCT INVENTORY MANAGEMENT ---
         Row(
           children: [
             const Text('📋 प्रोडक्ट इन्वेंट्री मैनेजमेंट', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
@@ -1477,7 +1408,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
                         child: ListTile(
                           leading: ClipRRect(
                             borderRadius: BorderRadius.circular(6),
-                            child: buildShopOrProdImage(prod['imagePath'], 45, 45, Icons.cake),
+                            child: buildShopOrProdImage(prod['imagePath'], 45, 45, Icons.shopping_bag),
                           ),
                           title: Text(prod['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
                           subtitle: Text('${prod['category']} • ₹${prod['price']}\nStatus: ${inStock ? '🟢 In Stock' : '🔴 Out of Stock'}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
@@ -1505,9 +1436,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   }
 }
 
-// ==========================================
-// CART & USER ORDERS VIEW
-// ==========================================
 class CartAndOrdersView extends StatefulWidget {
   const CartAndOrdersView({super.key});
 
@@ -1733,7 +1661,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                                 ...itemsList.map<Widget>((it) {
                                   String cakeMsg = it['cakeMessage'] ?? '';
                                   return Text('• ${it['name']} (${it['qty']} ${it['unit']})${cakeMsg.isNotEmpty ? ' | 💬 $cakeMsg' : ''}', style: const TextStyle(fontSize: 11, color: Colors.white70));
-                                }).toList(),
+                                }),
                               ],
                             ),
                           ),
