@@ -2,7 +2,7 @@
 import 'dart:convert';
 
 class EnterpriseDatabase {
-  // Firebase REST API URL (आपकी क्लाउड डेटाबेस लिंक)
+  // Firebase REST API URL
   static String firebaseRestUrl = 'https://viziagmart-default-rtdb.firebaseio.com';
 
   // एक्टिव वेंडर / शॉप प्रोफाइल (बेस64 इमेज और फुल एड्रेस के साथ)
@@ -15,12 +15,20 @@ class EnterpriseDatabase {
     'phone': '9876543210',
   };
 
-  // ग्लोबल इन्वेंट्री (उत्पाद सूची जिसमें इमेज Base64 में होगी)
+  // ग्लोबल इन्वेंट्री (उत्पाद सूची)
   static List<Map<String, dynamic>> globalInventory = [];
 
   // एक्टिव कार्ट (ग्राहकों का सामान)
   static List<Map<String, dynamic>> activeCart = [];
 
-  // सभी ऑर्डर्स की सूची (जो वेंडर के डैशबोर्ड पर दिखेगी)
+  // सभी ऑर्डर्स की सूची (वेंडर डैशबोर्ड के लिए)
   static List<Map<String, dynamic>> allOrders = [];
+
+  // कार्ट और ऑर्डर व्यू के लिए जरूरी कस्टमर डेटा वेरिएबल्स
+  static String currentCustomerName = 'Tarun Kumar';
+  static String currentUserPhone = '9876543210';
+  static String currentDeliveryAddress = 'Main Market, Faridabad, Haryana';
+
+  // लोकल ऑर्डर लेजर (Order History)
+  static List<Map<String, dynamic>> orderLedger = [];
 }
