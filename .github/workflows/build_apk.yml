@@ -18,19 +18,6 @@ jobs:
           flutter-version: '3.19.x'
           channel: 'stable'
 
-      - name: Save existing main.dart
-        run: |
-          mkdir -p /tmp/backup
-          cp lib/main.dart /tmp/backup/main.dart
-
-      - name: Initialize Flutter Android Scaffold
-        run: |
-          flutter create . --project-name=desi_ai_app --platforms=android --org=com.example.app
-
-      - name: Restore AI main.dart
-        run: |
-          cp /tmp/backup/main.dart lib/main.dart
-
       - name: Force Kotlin Version Everywhere
         run: |
           # 1. build.gradle में kotlin_version बदलना
@@ -42,7 +29,6 @@ jobs:
           find android/ -name "build.gradle" -type f -exec sed -i "s/org.jetbrains.kotlin.android/org.jetbrains.kotlin.android version '1.9.0' apply false/g" {} +
           find android/ -name "build.gradle" -type f -exec sed -i "s/kotlin-gradle-plugin:.*\"/kotlin-gradle-plugin:1.9.0\"/g" {} +
 
-          # 3. pubspec.yaml या अन्य जगहों पर वर्जन्स को संभालना
           echo "Kotlin version forced to 1.9.0 successfully."
 
       - name: Get Dependencies
