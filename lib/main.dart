@@ -1,10 +1,11 @@
-                     import 'dart:io';
+import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:audioplayers/audioplayers.dart'; // Audio alert package
 
 void main() {
   runApp(const CakeAppEnterpriseApp());
@@ -285,7 +286,7 @@ Widget buildShopOrProdImage(String? path, double height, double width, IconData 
 }
 
 // ==========================================
-// MARKETPLACE BUYER VIEW (DIRECT CAKES)
+// MARKETPLACE BUYER VIEW
 // ==========================================
 class MarketplaceBuyerView extends StatefulWidget {
   const MarketplaceBuyerView({super.key});
@@ -716,7 +717,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ गलत पिन!')));
         }
       } else {
-        // Auto register default profile if not present for tarun
         await http.put(
           Uri.parse('${CakeDatabase.firebaseRestUrl}/vendors/$phone.json'),
           body: json.encode({'phone': phone, 'pin': pin}),
@@ -823,7 +823,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 }
 
 // ==========================================
-// INDEPENDENT VENDOR PORTAL & ORDER DASHBOARD
+// INDEPENDENT VENDOR PORTAL & ORDER DASHBOARD WITH TIMER & SOUND
 // ==========================================
 class VendorPortalDashboardView extends StatefulWidget {
   const VendorPortalDashboardView({super.key});
@@ -853,11 +853,15 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   String? _pickedBannerImagePath;
   
   final ImagePicker _picker = ImagePicker();
+  final AudioPlayer _audioPlayer = AudioPlayer(); // Audio Player for Bell Alert
   
   List<Map<String, dynamic>> _vendorOrders = [];
   List<Map<String, dynamic>> _vendorProducts = [];
   bool _isLoadingOrders = false;
   bool _isLoadingProducts = false;
+  Timer? _pollingTimer;
+  Timer? _elapsedTickerTimer;
+  int _previousPendingCount = 0;
 
   final List<String> vendorCategories = [
     'Birthday Cake',
@@ -886,9 +890,41 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   void initState() {
     super.initState();
     _fetchShopProfile().then((_) {
-      _fetchVendorOrders();
+      _fetchVendorOrders(playAlertIfNew: false);
       _fetchVendorProducts();
     });
+
+    // Auto poll every 10 seconds for brand new incoming orders
+    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      _fetchVendorOrders(playAlertIfNew: true);
+    });
+
+    // Ticker to refresh live timer every second
+    _elapsedTickerTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    _elapsedTickerTimer?.cancel();
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _playBeepSound() async {
+    try {
+      // Plays a standard notification beep/ring when new order arrives
+      await _audioPlayer.play(AssetSource('ring.mp3')); // Make sure to add ring.mp3 in assets or use URL if needed
+    } catch (_) {
+      try {
+        // Fallback network alert sound if asset missing
+        await _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
+      } catch (e) {
+        debugPrint("Audio play error: $e");
+      }
+    }
   }
 
   Future<void> _fetchShopProfile() async {
@@ -913,8 +949,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
     }
   }
 
-  Future<void> _fetchVendorOrders() async {
-    setState(() => _isLoadingOrders = true);
+  Future<void> _fetchVendorOrders({bool playAlertIfNew = false}) async {
     try {
       final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
       if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
@@ -923,17 +958,22 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
         data.forEach((key, val) {
           var item = Map<String, dynamic>.from(val);
           item['firebaseKey'] = key;
-          // Filter strictly for this shop
           list.add(item);
         });
+
+        int currentPendingCount = list.where((o) => (o['status'] ?? '').toString().contains('Pending')).length;
+
+        if (playAlertIfNew && currentPendingCount > _previousPendingCount) {
+          _playBeepSound(); // Ring alert (टू-टू घंटी)
+        }
+        _previousPendingCount = currentPendingCount;
+
         if (mounted) setState(() => _vendorOrders = list.reversed.toList());
       } else {
         if (mounted) setState(() => _vendorOrders = []);
       }
     } catch (e) {
       debugPrint("Error fetching orders: $e");
-    } finally {
-      if (mounted) setState(() => _isLoadingOrders = false);
     }
   }
 
@@ -962,6 +1002,20 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
       debugPrint("Error fetching products: $e");
     } finally {
       if (mounted) setState(() => _isLoadingProducts = false);
+    }
+  }
+
+  String _calculateElapsedTime(String? timestampStr, String fallbackKey) {
+    // Generates live elapsed timer counting since order arrival
+    try {
+      int epoch = int.tryParse(fallbackKey.replaceAll(Reg(r'[^0-9]'), '')) ?? DateTime.now().millisecondsSinceEpoch;
+      DateTime orderTime = DateTime.fromMillisecondsSinceEpoch(epoch);
+      Duration diff = DateTime.now().difference(orderTime);
+      int mins = diff.inMinutes;
+      int secs = diff.inSeconds % 60;
+      return '${mins}m ${secs}s ago ⏱️';
+    } catch (_) {
+      return timestampStr ?? 'Just now ⏱️';
     }
   }
 
@@ -1110,122 +1164,145 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
 
   @override
   Widget build(BuildContext context) {
+    var pendingOrders = _vendorOrders.where((o) => (o['status'] ?? '').toString().contains('Pending')).toList();
+
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        // --- 1. DEDICATED INCOMING VENDOR ORDERS DASHBOARD ---
+        // --- 1. DEDICATED INDEPENDENT VENDOR LIVE ORDER DASHBOARD WITH TIMER & SOUND ---
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: const Color(0xFF1E293B),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.6), width: 2),
-            boxShadow: [BoxShadow(color: const Color(0xFFF59E0B).withOpacity(0.1), blurRadius: 10)],
+            border: Border.all(color: const Color(0xFFF59E0B), width: 2.5),
+            boxShadow: [BoxShadow(color: const Color(0xFFF59E0B).withOpacity(0.25), blurRadius: 15)],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
-                  const Text('📥 वेंडर ऑर्डर डैशबोर्ड (Live Orders)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
+                  const Icon(Icons.notifications_active, color: Color(0xFFF59E0B), size: 20),
+                  const SizedBox(width: 8),
+                  const Text('🚨 लाइव ऑर्डर डैशबोर्ड (Live Audio & Timer)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFFF59E0B))),
                   const Spacer(),
-                  IconButton(onPressed: _fetchVendorOrders, icon: const Icon(Icons.sync, size: 18, color: Color(0xFFF59E0B)), tooltip: 'Refresh Orders'),
+                  IconButton(
+                    onPressed: () => _fetchVendorOrders(playAlertIfNew: false),
+                    icon: const Icon(Icons.sync, size: 18, color: Color(0xFFF59E0B)),
+                    tooltip: 'Refresh Orders',
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              _isLoadingOrders 
-                  ? const Center(child: CircularProgressIndicator())
-                  : _vendorOrders.isEmpty
-                      ? const Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text('इस शॉप के लिए कोई आर्डर नहीं मिला', style: TextStyle(color: Colors.grey))))
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _vendorOrders.length,
-                          itemBuilder: (context, index) {
-                            var ord = _vendorOrders[index];
-                            String status = ord['status'] ?? 'Pending ⏳';
-                            List itemsList = ord['items'] ?? [];
-                            String custPhone = ord['customerPhone'] ?? '';
-                            String custAddr = ord['customerAddress'] ?? '';
+              const SizedBox(height: 6),
+              const Text('नया आर्डर आने पर घंटी बजेगी और टाइमर चालू हो जाएगा।', style: TextStyle(fontSize: 10, color: Colors.grey)),
+              const SizedBox(height: 10),
 
-                            return Card(
-                              color: const Color(0xFF0F172A),
-                              margin: const EdgeInsets.symmetric(vertical: 6),
-                              child: Padding(
-                                padding: const EdgeInsets.all(10.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+              _vendorOrders.isEmpty
+                  ? const Padding(padding: EdgeInsets.all(16.0), child: Center(child: Text('कोई ऑर्डर पेंडिंग नहीं है', style: TextStyle(color: Colors.grey))))
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _vendorOrders.length,
+                      itemBuilder: (context, index) {
+                        var ord = _vendorOrders[index];
+                        String status = ord['status'] ?? 'Pending ⏳';
+                        List itemsList = ord['items'] ?? [];
+                        String custPhone = ord['customerPhone'] ?? '';
+                        String custAddr = ord['customerAddress'] ?? '';
+                        String firebaseKey = ord['firebaseKey'] ?? '';
+                        String elapsedStr = _calculateElapsedTime(ord['orderTime'], firebaseKey);
+
+                        bool isPending = status.contains('Pending');
+
+                        return Container(
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isPending ? const Color(0xFF1E1B4B) : const Color(0xFF0F172A),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: isPending ? const Color(0xFFEC4899) : Colors.white12, width: isPending ? 1.5 : 1),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text('${ord['customerName']} - ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
+                                  const Spacer(),
+                                  Chip(
+                                    label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 9)),
+                                    backgroundColor: isPending ? Colors.orange : (status.contains('Rejected') ? Colors.red : Colors.green),
+                                    padding: EdgeInsets.zero,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              // Live Elapsed Timer Display
+                              Row(
+                                children: [
+                                  const Icon(Icons.timer, size: 13, color: Color(0xFFF59E0B)),
+                                  const SizedBox(width: 4),
+                                  Text('समय बीता: $elapsedStr', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text('📞 ग्राहक फोन: $custPhone', style: const TextStyle(fontSize: 11, color: Colors.blueAccent)),
+                              Text('📍 डिलीवरी पता: $custAddr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                              const SizedBox(height: 6),
+                              const Text('📦 आर्डर किए गए आइटम:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
+                              ...itemsList.map<Widget>((it) {
+                                String cakeMsg = it['cakeMessage'] ?? '';
+                                return Padding(
+                                  padding: const EdgeInsets.only(left: 6, top: 2),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('• ${it['name']} (${it['qty']} ${it['unit']}) - ₹${(it['price'] * it['qty']).toInt()}', style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                                      if (cakeMsg.isNotEmpty)
+                                        Container(
+                                          margin: const EdgeInsets.only(top: 2, bottom: 4),
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(color: Colors.pink.shade900.withOpacity(0.3), borderRadius: BorderRadius.circular(4)),
+                                          child: Text('💬 नोट: "$cakeMsg"', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
+                                        ),
+                                    ],
+                                  ),
+                                ).toList();
+                              }),
+                              const SizedBox(height: 8),
+                              if (isPending)
+                                Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        Text('${ord['customerName']} - ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
-                                        const Spacer(),
-                                        Chip(
-                                          label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 9)),
-                                          backgroundColor: status.contains('Pending') ? Colors.orange : (status.contains('Rejected') ? Colors.red : Colors.green),
-                                          padding: EdgeInsets.zero,
-                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 32,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                                          onPressed: () => _acceptOrder(firebaseKey),
+                                          child: const Text('Accept', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                         ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text('🕒 आर्डर समय: ${ord['orderTime'] ?? 'N/A'}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
-                                    Text('📞 ग्राहक फोन: $custPhone', style: const TextStyle(fontSize: 11, color: Colors.blueAccent)),
-                                    Text('📍 डिलीवरी पता: $custAddr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                    const SizedBox(height: 6),
-                                    const Text('📦 आर्डर किए गए आइटम:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
-                                    ...itemsList.map<Widget>((it) {
-                                      String cakeMsg = it['cakeMessage'] ?? '';
-                                      return Padding(
-                                        padding: const EdgeInsets.only(left: 6, top: 2),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text('• ${it['name']} (${it['qty']} ${it['unit']}) - ₹${(it['price'] * it['qty']).toInt()}', style: const TextStyle(fontSize: 11, color: Colors.white70)),
-                                            if (cakeMsg.isNotEmpty)
-                                              Container(
-                                                margin: const EdgeInsets.only(top: 2, bottom: 4),
-                                                padding: const EdgeInsets.all(6),
-                                                decoration: BoxDecoration(color: Colors.pink.shade900.withOpacity(0.3), borderRadius: BorderRadius.circular(4)),
-                                                child: Text('💬 नोट: "$cakeMsg"', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEC4899))),
-                                              ),
-                                          ],
-                                        ),
-                                      );
-                                    }).toList(),
-                                    const SizedBox(height: 8),
-                                    if (status.contains('Pending'))
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: SizedBox(
-                                              height: 32,
-                                              child: ElevatedButton(
-                                                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                                                onPressed: () => _acceptOrder(ord['firebaseKey']),
-                                                child: const Text('Accept', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: SizedBox(
-                                              height: 32,
-                                              child: ElevatedButton(
-                                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                                                onPressed: () => _rejectOrder(ord['firebaseKey']),
-                                                child: const Text('Reject', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
                                       ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 32,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                          onPressed: () => _rejectOrder(firebaseKey),
+                                          child: const Text('Reject', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
-                              ),
-                            );
-                          },
-                        ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
             ],
           ),
         ),
@@ -1429,7 +1506,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
 }
 
 // ==========================================
-// CART & USER ORDERS VIEW (IN-APP WITHOUT WHATSAPP)
+// CART & USER ORDERS VIEW
 // ==========================================
 class CartAndOrdersView extends StatefulWidget {
   const CartAndOrdersView({super.key});
@@ -1668,4 +1745,3 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
     );
   }
 }
-           
