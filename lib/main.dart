@@ -1,4 +1,4 @@
-// ================= MAIN ENTRY POINT =================
+// ================= MAIN ENTRY POINT (main.dart) =================
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -152,7 +152,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => ProductDetailsScreen(data: const {}, product: item),
+                                  builder: (context) => ProductDetailsScreen(product: item),
                                 ),
                               );
                             },
