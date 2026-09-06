@@ -1,83 +1,87 @@
-import 'dart:io';
+// ================= MAIN ENTRY POINT =================
 import 'dart:convert';
-import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'database_models.dart';
-import 'marketplace_screen.dart';
-import 'vendor_auth_and_portal.dart';
 import 'cart_and_orders_view.dart';
+import 'vendor_auth_and_portal.dart';
 import 'admin_master_dashboard.dart';
+import 'product_details_screen.dart';
 
 void main() {
-  runApp(const ViziagMartEnterpriseApp());
+  runApp(const ViziagMartApp());
 }
 
-class ViziagMartEnterpriseApp extends StatelessWidget {
-  const ViziagMartEnterpriseApp({super.key});
+class ViziagMartApp extends StatelessWidget {
+  const ViziagMartApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Viziag Mart Enterprise',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFF59E0B),
-          secondary: Color(0xFFEC4899),
-          surface: Color(0xFF1E293B),
-        ),
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
-        cardColor: const Color(0xFF1E293B),
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF0B0F19),
+        primaryColor: const Color(0xFFF59E0B),
       ),
-      home: const ViziagMainHubScreen(),
+      home: const MainHomeScreen(),
     );
   }
 }
 
-class ViziagMainHubScreen extends StatefulWidget {
-  const ViziagMainHubScreen({super.key});
+class MainHomeScreen extends StatefulWidget {
+  const MainHomeScreen({super.key});
 
   @override
-  State<ViziagMainHubScreen> createState() => _ViziagMainHubScreenState();
+  State<MainHomeScreen> createState() => _MainHomeScreenState();
 }
 
-class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
+class _MainHomeScreenState extends State<MainHomeScreen> {
   int _currentIndex = 0;
+  bool _isLoading = false;
 
-  final List<Widget> _navigationTabs = [
-    const MarketplaceBuyerView(),
-    const VendorAuthAndPortalView(),
-    const CartAndOrdersView(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchCloudProducts();
+  }
 
-  void _triggerMasterAdminDialog(BuildContext context) {
-    final TextEditingController pinController = TextEditingController();
-    const String masterSecretCode = "tarun#1";
+  Future<void> _fetchCloudProducts() async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await http.get(Uri.parse('${EnterpriseDatabase.firebaseRestUrl}/products.json'));
+      if (response.statusCode == 200 && response.body != 'null') {
+        Map<String, dynamic> data = json.decode(response.body);
+        List<Map<String, dynamic>> fetchedList = [];
+        data.forEach((key, value) {
+          var item = Map<String, dynamic>.from(value);
+          item['firebaseKey'] = key;
+          fetchedList.add(item);
+        });
+        setState(() {
+          EnterpriseDatabase.globalInventory = fetchedList;
+        });
+      }
+    } catch (e) {
+      debugPrint('Cloud fetch error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
+  void _showAdminPinDialog() {
+    TextEditingController pinCtrl = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
-        title: const Row(
-          children: [
-            Icon(Icons.security, color: Color(0xFFF59E0B)),
-            SizedBox(width: 8),
-            Text('मास्टर एडमिन पैनल', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 16)),
-          ],
-        ),
+        title: const Text('सुरक्षित एडमिन पिन दर्ज करें', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 13, fontWeight: FontWeight.bold)),
         content: TextField(
-          controller: pinController,
+          controller: pinCtrl,
           obscureText: true,
-          decoration: const InputDecoration(
-            labelText: 'गुप्त कोड (tarun#1)',
-            border: OutlineInputBorder(),
-          ),
+          maxLength: 10,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(hintText: 'गुप्त पिन डालें...', hintStyle: TextStyle(color: Colors.grey)),
         ),
         actions: [
           TextButton(
@@ -85,22 +89,16 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
             child: const Text('रद्द करें', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B)),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF59E0B), foregroundColor: Colors.black),
             onPressed: () {
-              if (pinController.text.trim() == masterSecretCode) {
+              if (pinCtrl.text.trim() == 'tarun#1') {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AdminMasterDashboardScreen()),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminMasterDashboardScreen()));
               } else {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('❌ गलत गुप्त कोड दर्ज किया गया!'), backgroundColor: Colors.red),
-                );
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ गलत एडमिन पिन!'), backgroundColor: Colors.red));
               }
             },
-            child: const Text('खोलें', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            child: const Text('खोलें'),
           ),
         ],
       ),
@@ -109,147 +107,120 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    int cartCount = EnterpriseDatabase.activeCart.fold(0, (sum, item) => sum + ((item['qty'] as num?)?.toInt() ?? 1));
-
-    return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(75),
-        child: AppBar(
-          backgroundColor: const Color(0xFF0B0F19),
-          elevation: 4,
-          title: Row(
-            children: [
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFFEC4899)],
-                ).createShader(bounds),
-                child: const Text(
-                  'VIZIAG MART',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.5),
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.vpn_key, color: Color(0xFFF59E0B)),
-                tooltip: 'Admin Access',
-                onPressed: () => _triggerMasterAdminDialog(context),
-              ),
-              const SizedBox(width: 4),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF59E0B),
-                  foregroundColor: Colors.black87,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                onPressed: () => setState(() => _currentIndex = 0),
-                icon: const Icon(Icons.store, size: 12),
-                label: const Text('Shop', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(width: 4),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF334155),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                onPressed: () => setState(() => _currentIndex = 1),
-                icon: const Icon(Icons.admin_panel_settings_outlined, size: 12),
-                label: const Text('Vendor', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(30),
-            child: Container(
-              color: const Color(0xFF1E293B),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              child: Row(
+    final List<Widget> screens = [
+      // Shop Marketplace View
+      RefreshIndicator(
+        onRefresh: _fetchCloudProducts,
+        color: const Color(0xFFF59E0B),
+        child: ListView(
+          padding: const EdgeInsets.all(12),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(10)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.person_pin_circle, color: Color(0xFFF59E0B), size: 14),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${EnterpriseDatabase.currentCustomerName} (${EnterpriseDatabase.currentDeliveryAddress})',
-                    style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
+                  Text(EnterpriseDatabase.activeShopProfile['shopName'], style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 4),
+                  Text('📍 ${EnterpriseDatabase.activeShopProfile['address']}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
                 ],
               ),
             ),
-          ),
+            const SizedBox(height: 12),
+            const Text('उपलब्ध कैटलॉग (Live Inventory)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+            const SizedBox(height: 8),
+            _isLoading
+                ? const Center(child: Padding(padding: EdgeInsets.all(30), child: CircularProgressIndicator(color: Color(0xFFF59E0B))))
+                : EnterpriseDatabase.globalInventory.isEmpty
+                    ? const Center(child: Padding(padding: EdgeInsets.all(30), child: Text('कोई उत्पाद उपलब्ध नहीं है। वेंडर पोर्टल से जोड़ें।', style: TextStyle(color: Colors.grey, fontSize: 11))))
+                    : GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.82,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
+                        itemCount: EnterpriseDatabase.globalInventory.length,
+                        itemBuilder: (context, index) {
+                          var item = EnterpriseDatabase.globalInventory[index];
+                          bool inStock = item['inStock'] ?? true;
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ProductDetailsScreen(data: const {}, product: item),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E293B),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.grey.shade800),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.black26,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      width: double.infinity,
+                                      child: const Icon(Icons.eco, color: Color(0xFFF59E0B), size: 36),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(item['name'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), maxLines: 1),
+                                  Text('₹${item['price']} / ${item['unit'] ?? 'Kg'}', style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.w900)),
+                                  const SizedBox(height: 4),
+                                  Text(inStock ? '🟢 In Stock' : '🔴 Out of Stock', style: TextStyle(color: inStock ? Colors.green : Colors.red, fontSize: 9)),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+          ],
         ),
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0F172A), Color(0xFF1E1B4B)],
-          ),
-        ),
-        child: IndexedStack(
-          index: _currentIndex > 2 ? 2 : _currentIndex,
-          children: _navigationTabs,
-        ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex > 2 ? 2 : _currentIndex,
-        selectedItemColor: const Color(0xFFF59E0B),
-        unselectedItemColor: Colors.grey.shade400,
+      // Vendor Portal View
+      const VendorAuthAndPortalView(),
+      // Cart & Orders View
+      const CartAndOrdersView(),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
         backgroundColor: const Color(0xFF0B0F19),
-        type: BottomNavigationBarType.fixed,
-        onTap: (index) => setState(() => _currentIndex = index),
-        items: [
-          const BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Shop'),
-          const BottomNavigationBarItem(icon: Icon(Icons.dashboard_customize_outlined), label: 'Portal'),
-          BottomNavigationBarItem(
-            icon: Stack(
-              children: [
-                const Icon(Icons.shopping_cart_outlined),
-                if (cartCount > 0)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
-                      constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                      child: Text('$cartCount', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                    ),
-                  ),
-              ],
-            ),
-            label: 'Cart & Orders',
+        title: const Text('VIZIAG MART', style: TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.w900, fontSize: 16)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.vpn_key, color: Color(0xFFF59E0B), size: 20),
+            onPressed: _showAdminPinDialog,
+            tooltip: 'Master Admin',
           ),
+        ],
+      ),
+      body: screens[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (val) => setState(() => _currentIndex = val),
+        backgroundColor: const Color(0xFF0B0F19),
+        selectedItemColor: const Color(0xFFF59E0B),
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.storefront), label: 'Shop'),
+          BottomNavigationBarItem(icon: Icon(Icons.admin_panel_settings), label: 'Vendor Portal'),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Cart & Orders'),
         ],
       ),
     );
   }
-}
-
-Widget buildEnterpriseMediaLoader(String? path, double height, double width, IconData fallbackIcon) {
-  if (path != null && path.isNotEmpty) {
-    if (path.startsWith('http')) {
-      return Image.network(path, height: height, width: width, fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(height: height, width: width, color: const Color(0xFF334155), child: Icon(fallbackIcon, size: height * 0.4, color: const Color(0xFFF59E0B))));
-    } else if (path.startsWith('data:image')) {
-      try {
-        final bytes = base64Decode(path.split(',').last);
-        return Image.memory(bytes, height: height, width: width, fit: BoxFit.cover);
-      } catch (_) {}
-    } else if (File(path).existsSync()) {
-      return Image.file(File(path), height: height, width: width, fit: BoxFit.cover);
-    }
-  }
-  return Container(
-    height: height,
-    width: width,
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(colors: [Color(0xFF334155), Color(0xFF1E293B)]),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Icon(fallbackIcon, size: height * 0.4, color: const Color(0xFFF59E0B)),
-  );
 }
