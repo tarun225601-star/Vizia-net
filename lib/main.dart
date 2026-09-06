@@ -1627,7 +1627,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                         List itemsList = ord['items'] ?? [];
 
                         return Card(
-                          color: const CodeColor(0xFF1E293B), // Note: standard Color widget kept below correctly
+                          
                           color: const Color(0xFF1E293B),
                           margin: const EdgeInsets.symmetric(vertical: 6),
                           child: Padding(
