@@ -320,23 +320,36 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     try {
       final shopRes = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json'));
       if (shopRes.statusCode == 200 && shopRes.body != 'null' && shopRes.body.isNotEmpty) {
-        var data = json.decode(shopRes.body);
-        if (data is Map) {
+        var decodedShop = json.decode(shopRes.body);
+        if (decodedShop is Map) {
           setState(() {
-            CakeDatabase.bakeryShop = Map<String, dynamic>.from(data);
+            CakeDatabase.bakeryShop = Map<String, dynamic>.from(
+              decodedShop.map((key, value) => MapEntry(key.toString(), value))
+            );
           });
         }
       }
 
       final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/products.json'));
       if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
-        Map<String, dynamic> data = json.decode(response.body);
+        var decodedProducts = json.decode(response.body);
         List<Map<String, dynamic>> fetchedList = [];
-        data.forEach((key, value) {
-          var item = Map<String, dynamic>.from(value);
-          item['firebaseKey'] = key;
-          fetchedList.add(item);
-        });
+        
+        if (decodedProducts is Map) {
+          decodedProducts.forEach((key, value) {
+            if (value is Map) {
+              var item = Map<String, dynamic>.from(
+                value.map((k, v) => MapEntry(k.toString(), v))
+              );
+              item['firebaseKey'] = key.toString();
+              if (item['price'] != null) {
+                item['price'] = (item['price'] as num).toDouble();
+              }
+              fetchedList.add(item);
+            }
+          });
+        }
+        
         setState(() {
           CakeDatabase.productInventory = fetchedList.reversed.toList();
         });
@@ -824,7 +837,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   Timer? _pollingTimer;
   Timer? _elapsedTickerTimer;
 
-  // वाइब्रेशन टाइमर
   Timer? _vibrationTimer;
 
   void startVibrationLoop() {
@@ -911,7 +923,6 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
           });
         }
 
-        // यदि कोई ऑर्डर पेंडिंग है तो वाइब्रेशन चालू करें
         bool hasPending = _vendorOrders.any((ord) => (ord['status'] ?? '').toString().contains('Pending'));
         if (hasPending) {
           startVibrationLoop();
@@ -973,7 +984,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   }
 
   Future<void> _acceptOrder(String orderKey) async {
-    stopVibrationLoop(); // ऑर्डर स्वीकार होने पर वाइब्रेशन बंद
+    stopVibrationLoop();
     try {
       String timeNow = "${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} (${DateTime.now().day}/${DateTime.now().month})";
       await http.patch(
@@ -988,7 +999,7 @@ class _VendorPortalDashboardViewState extends State<VendorPortalDashboardView> {
   }
 
   Future<void> _rejectOrder(String orderKey) async {
-    stopVibrationLoop(); // ऑर्डर रिजेक्ट होने पर वाइब्रेशन बंद
+    stopVibrationLoop();
     try {
       await http.patch(
         Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderKey.json'),
