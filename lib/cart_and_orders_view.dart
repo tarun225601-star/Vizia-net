@@ -119,7 +119,8 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                             itemCount: EnterpriseDatabase.activeCart.length,
                             itemBuilder: (context, index) {
                               var item = EnterpriseDatabase.activeCart[index];
-                              double itemTotal = (item['price'] as num) * (item['qty'] as num);
+                              double itemTotal = ((item['price'] as num) * (item['qty'] as num)).toDouble();
+
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 padding: const EdgeInsets.all(10),
