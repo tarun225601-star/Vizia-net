@@ -42,7 +42,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
       'deliveryAddress': EnterpriseDatabase.currentDeliveryAddress,
       'items': List<Map<String, dynamic>>.from(EnterpriseDatabase.activeCart),
       'totalAmount': totalAmount,
-      'timestamp': DateTime.now().toString(),
+      'timestamp': DateTime.now().toString().substring(0, 16),
       'status': 'Placed',
     };
 
@@ -107,6 +107,8 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.shopping_cart_outlined, size: 60, color: Colors.grey),
+                            SizedBox(height: 8),
+                            Text('कार्ट खाली है', style: TextStyle(color: Colors.grey, fontSize: 12)),
                           ],
                         ),
                       )
@@ -120,7 +122,6 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                             itemBuilder: (context, index) {
                               var item = EnterpriseDatabase.activeCart[index];
                               double itemTotal = ((item['price'] as num) * (item['qty'] as num)).toDouble();
-
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 padding: const EdgeInsets.all(10),
@@ -219,7 +220,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                                   children: [
                                     Text(order['orderId'], style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 12)),
                                     const Spacer(),
-                                    Text('₹${(order['totalAmount'] as double).toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                    Text('₹${(order['totalAmount'] as num).toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
