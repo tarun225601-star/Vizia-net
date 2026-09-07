@@ -40,7 +40,8 @@ class _VendorAuthViewState extends State<VendorAuthView> {
     EnterpriseDatabase.currentVendorId = phone;
     EnterpriseDatabase.currentShopName = _isRegistering ? shopName : "मेरी दुकान";
 
-    Navigator.pushReplacement(
+    // नेविगेशन कॉन्टेक्स्ट को सेफ रखने के लिए push का उपयोग
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const VendorDashboardView()),
     );
