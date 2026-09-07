@@ -186,70 +186,286 @@ class VendorAuthAndPortalView extends StatefulWidget {
 }
 
 class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
-  bool _isLoggedIn = false;
-  final pinCtrl = TextEditingController();
-  final approvalCtrl = TextEditingController();
+  // 0 = वेंडर रजिस्ट्रेशन स्क्रीन, 1 = वेंडर डैशबोर्ड, 2 = एडमिन गुप्त कोड स्क्रीन, 3 = एडमिन अप्रूवल पैनल
+  int _viewMode = 0;
 
-  void _login() {
-    if (pinCtrl.text == '9971' && approvalCtrl.text == 'tarun#1') {
-      setState(() => _isLoggedIn = true);
+  final phoneCtrl = TextEditingController();
+  final pass1Ctrl = TextEditingController();
+  final pass2Ctrl = TextEditingController();
+  final adminCodeCtrl = TextEditingController();
+
+  // पेंडिंग दुकानें जो एडमिन अप्रूवल का इंतज़ार कर रही हैं
+  List<Map<String, dynamic>> pendingShops = [
+    {'id': '1', 'name': 'Tarun Fruit Shop', 'phone': '9971000000', 'address': 'Sector 15A, Faridabad'},
+  ];
+
+  void _submitVendorRegistration() {
+    if (phoneCtrl.text.trim().length < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ कृपया सही मोबाइल नंबर दर्ज करें!'), backgroundColor: Colors.red));
+      return;
+    }
+    if (pass1Ctrl.text.isEmpty || pass1Ctrl.text != pass2Ctrl.text) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ पासवर्ड मेल नहीं खा रहे हैं!'), backgroundColor: Colors.red));
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('⏳ रिक्वेस्ट सबमिट हो गई'),
+        content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन द्वारा अप्रूव होने के बाद ही यह लाइव होगी।'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() => _viewMode = 0);
+            },
+            child: const Text('ठीक है'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _verifyAdminCode() {
+    if (adminCodeCtrl.text.trim() == 'tarun#1') {
+      setState(() => _viewMode = 3);
+      adminCodeCtrl.clear();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ गलत पिन या अप्रूवल कोड!'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ गलत गुप्त कोड!'), backgroundColor: Colors.red));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isLoggedIn) {
+    if (_viewMode == 0) {
       return Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: ListView(
           children: [
-            const Text('🔒 वेंडर लॉगिन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            TextField(controller: pinCtrl, obscureText: true, decoration: const InputDecoration(labelText: '4-Digit PIN (9971)', border: OutlineInputBorder())),
             const SizedBox(height: 10),
-            TextField(controller: approvalCtrl, decoration: const InputDecoration(labelText: 'Approval Code (tarun#1)', border: OutlineInputBorder())),
+            const Center(child: Icon(Icons.storefront, size: 65, color: Colors.green)),
+            const SizedBox(height: 10),
+            const Center(child: Text('🛍️ वेंडर दुकान रजिस्ट्रेशन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+            const Center(child: Text('मोबाइल नंबर और पासवर्ड डालकर अपनी दुकान जोड़ें (एडमिन अप्रूवल के बाद लाइव होगी)', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center)),
+            const SizedBox(height: 25),
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              maxLength: 10,
+              decoration: const InputDecoration(
+                labelText: 'मोबाइल नंबर',
+                border: OutlineInputBorder(),
+                counterText: '',
+                prefixIcon: Icon(Icons.phone),
+              ),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: pass1Ctrl,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'पासवर्ड बनाएं',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.lock_outline),
+              ),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: pass2Ctrl,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'पासवर्ड दोबारा दर्ज करें',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.lock),
+              ),
+            ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-              onPressed: _login,
-              child: const Text('लॉग इन करें', style: TextStyle(fontWeight: FontWeight.bold)),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+                onPressed: _submitVendorRegistration,
+                child: const Text('सेव करें (Approval के लिए भेजें)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              ),
+            ),
+            const SizedBox(height: 30),
+            const Divider(),
+            const SizedBox(height: 10),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => setState(() => _viewMode = 2),
+                icon: const Icon(Icons.admin_panel_settings, color: Colors.green),
+                label: const Text('मास्टर शॉप अप्रूवल डैशबोर्ड (Admin)', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+              ),
             ),
           ],
         ),
       );
     }
-    return DefaultTabController(
-      length: 3,
-      child: Column(
-        children: [
-          Material(
-            color: Colors.white,
-            child: TabBar(
-              isScrollable: true,
-              labelColor: Colors.green.shade700,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: Colors.green.shade700,
-              tabs: const [
-                Tab(text: '📦 प्रोडक्ट्स जोड़ें & मैनेज करें'),
-                Tab(text: '📋 कस्टमर आर्डर्स'),
-                Tab(text: '⚙️ दुकान सेटिंग्स'),
-              ],
+
+    if (_viewMode == 1) {
+      return DefaultTabController(
+        length: 3,
+        child: Column(
+          children: [
+            Container(
+              color: Colors.green.shade50,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                children: [
+                  const Text('🟢 वेंडर डैशबोर्ड (लाइव)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => setState(() => _viewMode = 0),
+                    child: const Text('लॉग आउट', style: TextStyle(fontSize: 11, color: Colors.red)),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Expanded(
-            child: TabBarView(
-              children: [
-                VendorInventoryTab(),
-                VendorOrdersTab(),
-                VendorSettingsTab(),
-              ],
+            const Material(
+              color: Colors.white,
+              child: TabBar(
+                isScrollable: true,
+                labelColor: Colors.green,
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: Colors.green,
+                tabs: [
+                  Tab(text: '📦 प्रोडक्ट्स जोड़ें & मैनेज करें'),
+                  Tab(text: '📋 कस्टमर आर्डर्स'),
+                  Tab(text: '⚙️ दुकान सेटिंग्स'),
+                ],
+              ),
             ),
+            const Expanded(
+              child: TabBarView(
+                children: [
+                  VendorInventoryTab(),
+                  VendorOrdersTab(),
+                  VendorSettingsTab(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_viewMode == 2) {
+      return Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.lock_person, size: 65, color: Colors.green),
+            const SizedBox(height: 15),
+            const Text('🔐 मास्टर अप्रूवल लॉगिन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 5),
+            const Text('फर्जी दुकानों को रोकने के लिए अपना गुप्त कोड दर्ज करें', style: TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
+            const SizedBox(height: 25),
+            TextField(
+              controller: adminCodeCtrl,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'गुप्त कोड दर्ज करें (••••••)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.key),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+                onPressed: _verifyAdminCode,
+                child: const Text('डैशबोर्ड खोलें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => setState(() => _viewMode = 0),
+              child: const Text('← वापस जाएं', style: TextStyle(color: Colors.grey)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        Container(
+          color: Colors.green.shade800,
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              const Icon(Icons.admin_panel_settings, color: Colors.white),
+              const SizedBox(width: 8),
+              const Text('शॉप अप्रूवल मास्टर डैशबोर्ड', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.logout, color: Colors.white),
+                onPressed: () => setState(() => _viewMode = 0),
+                tooltip: 'बाहर निकलें',
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        Expanded(
+          child: pendingShops.isEmpty
+              ? const Center(child: Text('अप्रूवल के लिए कोई नई दुकान नहीं है', style: TextStyle(color: Colors.grey)))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: pendingShops.length,
+                  itemBuilder: (context, index) {
+                    var shop = pendingShops[index];
+                    return Card(
+                      elevation: 3,
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('🏪 ${shop['name']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+                            const SizedBox(height: 4),
+                            Text('मोबाइल: ${shop['phone']} | पता: ${shop['address']}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            const Divider(height: 20),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                                    onPressed: () {
+                                      setState(() => pendingShops.removeAt(index));
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान अप्रूव कर दी गई, अब यह लाइव है!'), backgroundColor: Colors.green));
+                                    },
+                                    icon: const Icon(Icons.check_circle, size: 16),
+                                    label: const Text('Approve (रखें)'),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                    onPressed: () {
+                                      setState(() => pendingShops.removeAt(index));
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ दुकान डिलीट / रिजेक्ट कर दी गई!'), backgroundColor: Colors.red));
+                                    },
+                                    icon: const Icon(Icons.delete, size: 16),
+                                    label: const Text('Delete (हटाएं)'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }
