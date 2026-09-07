@@ -186,33 +186,48 @@ class VendorAuthAndPortalView extends StatefulWidget {
 }
 
 class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
-  // 0 = वेंडर रजिस्ट्रेशन स्क्रीन, 1 = वेंडर डैशबोर्ड, 2 = एडमिन गुप्त कोड स्क्रीन, 3 = एडमिन अप्रूवल पैनल
+  // 0 = होम स्क्रीन (दो बटन), 1 = नया रजिस्ट्रेशन, 2 = लॉगिन, 3 = वेंडर डैशबोर्ड, 4 = एडमिन गुप्त कोड, 5 = एडमिन अप्रूवल पैनल
   int _viewMode = 0;
 
-  final phoneCtrl = TextEditingController();
-  final pass1Ctrl = TextEditingController();
-  final pass2Ctrl = TextEditingController();
+  final regShopNameCtrl = TextEditingController();
+  final regPhoneCtrl = TextEditingController();
+  final regAddressCtrl = TextEditingController();
+  final regPass1Ctrl = TextEditingController();
+  final regPass2Ctrl = TextEditingController();
+
+  final loginPhoneCtrl = TextEditingController();
+  final loginPassCtrl = TextEditingController();
+
   final adminCodeCtrl = TextEditingController();
 
-  // पेंडिंग दुकानें जो एडमिन अप्रूवल का इंतज़ार कर रही हैं
-  List<Map<String, dynamic>> pendingShops = [
-    {'id': '1', 'name': 'Tarun Fruit Shop', 'phone': '9971000000', 'address': 'Sector 15A, Faridabad'},
+  // डेटा लिस्ट्स (सुरक्षा के लिए)
+  static final List<Map<String, dynamic>> pendingShops = [
+    {'name': 'Tarun Fruit Shop', 'phone': '9971968060', 'address': 'Sector 15A, Faridabad', 'pass': '1234'},
   ];
+  static final List<Map<String, dynamic>> approvedShops = [];
 
-  void _submitVendorRegistration() {
-    if (phoneCtrl.text.trim().length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ कृपया सही मोबाइल नंबर दर्ज करें!'), backgroundColor: Colors.red));
+  void _submitRegistration() {
+    if (regPhoneCtrl.text.trim().length < 10 || regShopNameCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ कृपया दुकान का नाम और सही मोबाइल नंबर भरें!'), backgroundColor: Colors.red));
       return;
     }
-    if (pass1Ctrl.text.isEmpty || pass1Ctrl.text != pass2Ctrl.text) {
+    if (regPass1Ctrl.text.isEmpty || regPass1Ctrl.text != regPass2Ctrl.text) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ पासवर्ड मेल नहीं खा रहे हैं!'), backgroundColor: Colors.red));
       return;
     }
+
+    pendingShops.add({
+      'name': regShopNameCtrl.text.trim(),
+      'phone': regPhoneCtrl.text.trim(),
+      'address': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
+      'pass': regPass1Ctrl.text.trim(),
+    });
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('⏳ रिक्वेस्ट सबमिट हो गई'),
-        content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन द्वारा अप्रूव होने के बाद ही यह लाइव होगी।'),
+        content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन (तरुण) द्वारा अप्रूव होने के बाद ही आप लॉगिन कर पाएंगे।'),
         actions: [
           TextButton(
             onPressed: () {
@@ -226,9 +241,38 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     );
   }
 
+  void _loginVendor() {
+    String phone = loginPhoneCtrl.text.trim();
+    String pass = loginPassCtrl.text.trim();
+
+    if (phone.isEmpty || pass.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ कृपया मोबाइल नंबर और पासवर्ड दर्ज करें!'), backgroundColor: Colors.red));
+      return;
+    }
+
+    bool isApproved = approvedShops.any((shop) => shop['phone'] == phone && shop['pass'] == pass);
+
+    if (isApproved) {
+      setState(() => _viewMode = 3);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ स्वागत है! वेंडर डैशबोर्ड खुल गया है।'), backgroundColor: Colors.green));
+    } else {
+      // अगर अप्रूव नहीं है तो साफ़ एरर दिखाएगा
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('⚠️ लॉगिन असफल (Not Approved)'),
+          content: const Text('आपकी दुकान अभी तक मास्टर एडमिन (तरुण) द्वारा अप्रूव नहीं की गई है! कृपया पहले अप्रूवल लें या सही डिटेल्स भरें।'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('ठीक है')),
+          ],
+        ),
+      );
+    }
+  }
+
   void _verifyAdminCode() {
     if (adminCodeCtrl.text.trim() == 'tarun#1') {
-      setState(() => _viewMode = 3);
+      setState(() => _viewMode = 5);
       adminCodeCtrl.clear();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ गलत गुप्त कोड!'), backgroundColor: Colors.red));
@@ -237,74 +281,125 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
   @override
   Widget build(BuildContext context) {
+    // 0: होम चॉइस स्क्रीन (दो मुख्य बटन)
     if (_viewMode == 0) {
       return Padding(
         padding: const EdgeInsets.all(20),
-        child: ListView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(height: 10),
-            const Center(child: Icon(Icons.storefront, size: 65, color: Colors.green)),
-            const SizedBox(height: 10),
-            const Center(child: Text('🛍️ वेंडर दुकान रजिस्ट्रेशन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
-            const Center(child: Text('मोबाइल नंबर और पासवर्ड डालकर अपनी दुकान जोड़ें (एडमिन अप्रूवल के बाद लाइव होगी)', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center)),
-            const SizedBox(height: 25),
-            TextField(
-              controller: phoneCtrl,
-              keyboardType: TextInputType.phone,
-              maxLength: 10,
-              decoration: const InputDecoration(
-                labelText: 'मोबाइल नंबर',
-                border: OutlineInputBorder(),
-                counterText: '',
-                prefixIcon: Icon(Icons.phone),
-              ),
-            ),
+            const Icon(Icons.storefront, size: 75, color: Colors.green),
             const SizedBox(height: 15),
-            TextField(
-              controller: pass1Ctrl,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'पासवर्ड बनाएं',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock_outline),
-              ),
-            ),
-            const SizedBox(height: 15),
-            TextField(
-              controller: pass2Ctrl,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'पासवर्ड दोबारा दर्ज करें',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock),
-              ),
-            ),
-            const SizedBox(height: 20),
+            const Text('🛍️ वेंडर पोर्टल', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 5),
+            const Text('बिना एडमिन अप्रूवल के कोई भी वेंडर लॉगिन नहीं कर सकता', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
+            const SizedBox(height: 40),
+            
             SizedBox(
               width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
+              height: 50,
+              child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                onPressed: _submitVendorRegistration,
-                child: const Text('सेव करें (Approval के लिए भेजें)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                onPressed: () => setState(() => _viewMode = 1),
+                icon: const Icon(Icons.person_add),
+                label: const Text('नई दुकान रजिस्टर करें (New Registration)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ),
-            const SizedBox(height: 30),
-            const Divider(),
-            const SizedBox(height: 10),
-            Center(
-              child: TextButton.icon(
+            const SizedBox(height: 15),
+
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.green, width: 2), foregroundColor: Colors.green.shade800),
                 onPressed: () => setState(() => _viewMode = 2),
-                icon: const Icon(Icons.admin_panel_settings, color: Colors.green),
-                label: const Text('मास्टर शॉप अप्रूवल डैशबोर्ड (Admin)', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.login),
+                label: const Text('वेंडर लॉगिन (Existing Vendor Login)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ),
+            ),
+
+            const Spacer(),
+            const Divider(),
+            TextButton.icon(
+              onPressed: () => setState(() => _viewMode = 4),
+              icon: const Icon(Icons.admin_panel_settings, color: Colors.green),
+              label: const Text('मास्टर शॉप अप्रूवल डैशबोर्ड (Admin)', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
       );
     }
 
+    // 1: नया रजिस्ट्रेशन फॉर्म
     if (_viewMode == 1) {
+      return Padding(
+        padding: const EdgeInsets.all(20),
+        child: ListView(
+          children: [
+            const SizedBox(height: 10),
+            const Center(child: Text('📝 नया वेंडर रजिस्ट्रेशन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+            const SizedBox(height: 20),
+            TextField(controller: regShopNameCtrl, decoration: const InputDecoration(labelText: 'दुकान का नाम (Shop Name)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.store))),
+            const SizedBox(height: 15),
+            TextField(controller: regPhoneCtrl, keyboardType: TextInputType.phone, maxLength: 10, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), counterText: '', prefixIcon: Icon(Icons.phone))),
+            const SizedBox(height: 15),
+            TextField(controller: regAddressCtrl, decoration: const InputDecoration(labelText: 'दुकान का पता / लोकेशन', border: OutlineInputBorder(), prefixIcon: Icon(Icons.location_on))),
+            const SizedBox(height: 15),
+            TextField(controller: regPass1Ctrl, obscureText: true, decoration: const InputDecoration(labelText: 'पासवर्ड बनाएं', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock_outline))),
+            const SizedBox(height: 15),
+            TextField(controller: regPass2Ctrl, obscureText: true, decoration: const InputDecoration(labelText: 'पासवर्ड दोबारा दर्ज करें', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock))),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+                onPressed: _submitRegistration,
+                child: const Text('अप्रूवल के लिए सबमिट करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(onPressed: () => setState(() => _viewMode = 0), child: const Text('← वापस जाएं')),
+          ],
+        ),
+      );
+    }
+
+    // 2: वेंडर लॉगिन फॉर्म
+    if (_viewMode == 2) {
+      return Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.lock_open, size: 65, color: Colors.green),
+            const SizedBox(height: 15),
+            const Text('🔐 वेंडर लॉगिन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 5),
+            const Text('पहले एडमिन से अप्रूव कराना अनिवार्य है', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 25),
+            TextField(controller: loginPhoneCtrl, keyboardType: TextInputType.phone, maxLength: 10, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), counterText: '', prefixIcon: Icon(Icons.phone))),
+            const SizedBox(height: 15),
+            TextField(controller: loginPassCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'पासवर्ड', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock))),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+                onPressed: _loginVendor,
+                child: const Text('लॉगिन करें ➔', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(onPressed: () => setState(() => _viewMode = 0), child: const Text('← वापस जाएं', style: TextStyle(color: Colors.grey))),
+          ],
+        ),
+      );
+    }
+
+    // 3: वेंडर डैशबोर्ड (जब दुकान अप्रूव हो चुकी हो)
+    if (_viewMode == 3) {
       return DefaultTabController(
         length: 3,
         child: Column(
@@ -351,27 +446,18 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    if (_viewMode == 2) {
+    // 4: एडमिन गुप्त कोड स्क्रीन
+    if (_viewMode == 4) {
       return Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.lock_person, size: 65, color: Colors.green),
+            const Icon(Icons.admin_panel_settings, size: 65, color: Colors.green),
             const SizedBox(height: 15),
-            const Text('🔐 मास्टर अप्रूवल लॉगिन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            const Text('फर्जी दुकानों को रोकने के लिए अपना गुप्त कोड दर्ज करें', style: TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
+            const Text('🔐 मास्टर एडमिन लॉगिन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 25),
-            TextField(
-              controller: adminCodeCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'गुप्त कोड दर्ज करें (••••••)',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.key),
-              ),
-            ),
+            TextField(controller: adminCodeCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'गुप्त कोड (Secret Code)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.key))),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -379,19 +465,16 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
                 onPressed: _verifyAdminCode,
-                child: const Text('डैशबोर्ड खोलें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                child: const Text('अप्रूवल पैनल खोलें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: () => setState(() => _viewMode = 0),
-              child: const Text('← वापस जाएं', style: TextStyle(color: Colors.grey)),
-            ),
+            TextButton(onPressed: () => setState(() => _viewMode = 0), child: const Text('← वापस जाएं', style: TextStyle(color: Colors.grey))),
           ],
         ),
       );
     }
 
+    // 5: एडमिन अप्रूवल पैनल (जहाँ से तू दुकान चेक करके अप्रूव या डिलीट करेगा)
     return Column(
       children: [
         Container(
@@ -403,11 +486,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               const SizedBox(width: 8),
               const Text('शॉप अप्रूवल मास्टर डैशबोर्ड', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
               const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.logout, color: Colors.white),
-                onPressed: () => setState(() => _viewMode = 0),
-                tooltip: 'बाहर निकलें',
-              ),
+              IconButton(icon: const Icon(Icons.logout, color: Colors.white), onPressed: () => setState(() => _viewMode = 0)),
             ],
           ),
         ),
@@ -420,15 +499,12 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                   itemBuilder: (context, index) {
                     var shop = pendingShops[index];
                     return Card(
-                      elevation: 3,
-                      margin: const EdgeInsets.symmetric(vertical: 8),
                       child: Padding(
                         padding: const EdgeInsets.all(12.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('🏪 ${shop['name']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
-                            const SizedBox(height: 4),
+                            Text('🏪 ${shop['name']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                             Text('मोबाइल: ${shop['phone']} | पता: ${shop['address']}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                             const Divider(height: 20),
                             Row(
@@ -437,11 +513,14 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                                   child: ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                                     onPressed: () {
-                                      setState(() => pendingShops.removeAt(index));
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान अप्रूव कर दी गई, अब यह लाइव है!'), backgroundColor: Colors.green));
+                                      setState(() {
+                                        var approvedShop = pendingShops.removeAt(index);
+                                        approvedShops.add(approvedShop);
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान अप्रूव हो गई! अब वेंडर लॉगिन कर सकता है।'), backgroundColor: Colors.green));
                                     },
                                     icon: const Icon(Icons.check_circle, size: 16),
-                                    label: const Text('Approve (रखें)'),
+                                    label: const Text('Approve'),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
@@ -450,10 +529,10 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                                     style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                                     onPressed: () {
                                       setState(() => pendingShops.removeAt(index));
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ दुकान डिलीट / रिजेक्ट कर दी गई!'), backgroundColor: Colors.red));
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ फर्जी दुकान डिलीट कर दी गई!'), backgroundColor: Colors.red));
                                     },
                                     icon: const Icon(Icons.delete, size: 16),
-                                    label: const Text('Delete (हटाएं)'),
+                                    label: const Text('Delete'),
                                   ),
                                 ),
                               ],
