@@ -1,10 +1,12 @@
 // ============================================================================
-// FILE: vendor_dashboard_view.dart (Multi-Vendor Marketplace - Bulletproof)
+// FILE: vendor_dashboard_view.dart (Multi-Vendor Marketplace - Base64 Storage Final)
 // ============================================================================
 
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'database_models.dart';
 
 class VendorDashboardView extends StatefulWidget {
@@ -18,6 +20,42 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
   int _currentIndex = 0;
   bool _isShopOpen = true;
 
+  // Helper method to convert File to Base64 String
+  Future<String?> _convertFileToBase64(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        final bytes = await file.readAsBytes();
+        return base64Encode(bytes);
+      }
+    } catch (e) {
+      debugPrint('Base64 Encoding Error: $e');
+    }
+    return null;
+  }
+
+  // Helper method to display Image from Base64 or File path
+  Widget _buildImageWidget(String? imageSource, {BoxFit fit = BoxFit.cover}) {
+    if (imageSource == null || imageSource.isEmpty) {
+      return const Icon(Icons.image, color: Colors.amber, size: 30);
+    }
+    try {
+      // Check if it's already a base64 string or a local file path
+      if (!imageSource.startsWith('/')) {
+        final bytes = base64Decode(imageSource);
+        return Image.memory(bytes, fit: fit);
+      } else {
+        return Image.file(File(imageSource), fit: fit);
+      }
+    } catch (e) {
+      // Fallback if decode fails
+      if (File(imageSource).existsSync()) {
+        return Image.file(File(imageSource), fit: fit);
+      }
+      return const Icon(Icons.broken_image, color: Colors.red, size: 30);
+    }
+  }
+
   void _showProfessionalProductDialog({Map<String, dynamic>? existingProduct, int? editIndex}) {
     final nameController = TextEditingController(text: existingProduct?['name'] ?? '');
     final priceController = TextEditingController(text: existingProduct?['price']?.toString() ?? '');
@@ -25,7 +63,7 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
     final descController = TextEditingController(text: existingProduct?['description'] ?? '');
     
     String category = existingProduct?['category'] ?? 'Automotive Care';
-    String? localImagePath = existingProduct?['image'];
+    String? localImageBase64 = existingProduct?['image'];
     bool isInStock = existingProduct?['isInStock'] ?? true;
 
     final List<String> categories = [
@@ -35,6 +73,19 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
       'Microfiber & Tools',
       'General Accessories'
     ];
+
+    Future<void> pickAndConvertImage(StateSetter setDialogState) async {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 60);
+      if (pickedFile != null) {
+        final base64String = await _convertFileToBase64(pickedFile.path);
+        if (base64String != null) {
+          setDialogState(() {
+            localImageBase64 = base64String;
+          });
+        }
+      }
+    }
 
     showDialog(
       context: context,
@@ -65,6 +116,35 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                   ),
                   const Divider(color: Colors.grey),
                   const SizedBox(height: 10),
+
+                  Center(
+                    child: GestureDetector(
+                      onTap: () => pickAndConvertImage(setDialogState),
+                      child: Container(
+                        height: 90,
+                        width: 90,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[850],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.amber, width: 1.5),
+                        ),
+                        child: localImageBase64 != null && localImageBase64!.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: _buildImageWidget(localImageBase64),
+                              )
+                            : const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_a_photo, color: Colors.amber, size: 28),
+                                  SizedBox(height: 4),
+                                  Text('फोटो जोड़ें', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
 
                   TextField(
                     controller: nameController,
@@ -140,7 +220,7 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                         'stock': int.tryParse(stockController.text) ?? 10,
                         'category': category,
                         'description': descController.text.trim(),
-                        'image': localImagePath ?? '',
+                        'image': localImageBase64 ?? '', // Base64 Saved
                         'isInStock': isInStock,
                       };
 
@@ -154,7 +234,7 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
 
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('उत्पाद सुरक्षित कर दिया गया है!'), backgroundColor: Colors.green),
+                        const SnackBar(content: Text('उत्पाद Base64 डेटाबेस में सुरक्षित कर दिया गया!'), backgroundColor: Colors.green),
                       );
                     },
                     child: Text(
@@ -205,10 +285,20 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
         elevation: 2,
         title: Row(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               backgroundColor: Colors.amber,
               radius: 16,
-              child: Icon(Icons.store, color: Colors.black, size: 18),
+              child: EnterpriseDatabase.activeShopProfile['shopImage'] != null &&
+                     EnterpriseDatabase.activeShopProfile['shopImage'].toString().isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: _buildImageWidget(EnterpriseDatabase.activeShopProfile['shopImage']),
+                      ),
+                    )
+                  : const Icon(Icons.store, color: Colors.black, size: 18),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -274,7 +364,6 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
     int totalOrders = EnterpriseDatabase.orderLedger.length;
     double totalRevenue = 0;
     
-    // सुरक्षित पार्सिंग ताकि स्ट्रिंग या डबल दोनों में क्रैश न हो
     for (var order in EnterpriseDatabase.orderLedger) {
       var rawAmount = order['totalAmount'];
       if (rawAmount != null) {
@@ -360,7 +449,7 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
       itemCount: EnterpriseDatabase.globalInventory.length,
       itemBuilder: (context, index) {
         final item = EnterpriseDatabase.globalInventory[index];
-        final imgPath = item['image']?.toString() ?? '';
+        final imgSource = item['image']?.toString() ?? '';
         final bool isInStock = item['isInStock'] ?? true;
 
         return Card(
@@ -377,9 +466,7 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                     width: 60,
                     height: 60,
                     color: Colors.grey[850],
-                    child: imgPath.isNotEmpty && File(imgPath).existsSync()
-                        ? Image.file(File(imgPath), fit: BoxFit.cover)
-                        : const Icon(Icons.image, color: Colors.amber, size: 30),
+                    child: _buildImageWidget(imgSource),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -427,6 +514,8 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
             itemCount: EnterpriseDatabase.orderLedger.length,
             itemBuilder: (context, index) {
               final order = EnterpriseDatabase.orderLedger[index];
+              final String status = order['status'] ?? 'Pending';
+
               return Card(
                 color: const Color(0xFF1E1E1E),
                 margin: const EdgeInsets.only(bottom: 12),
@@ -439,44 +528,91 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('ऑर्डर #${order['orderId']}', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 15)),
-                          Text(order['date'] ?? 'आज', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          Text('ऑर्डर #${order['orderId'] ?? '1001'}', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 15)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: status == 'Accepted' ? Colors.green.withOpacity(0.2) : status == 'Rejected' ? Colors.red.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              status == 'Accepted' ? 'स्वीकृत (Accepted)' : status == 'Rejected' ? 'अस्वीकृत (Rejected)' : 'लंबित (Pending)',
+                              style: TextStyle(
+                                color: status == 'Accepted' ? Colors.green : status == 'Rejected' ? Colors.red : Colors.orange,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       const Divider(color: Colors.grey, height: 16),
-                      Text('ग्राहक: ${order['customerName']} (${order['phone']})', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                      Text('आइटम: ${order['items']}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                      Text('ग्राहक: ${order['customerName'] ?? 'ग्राहक'} (${order['phone'] ?? 'नंबर नहीं'})', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('डिलिवरी पता: ${order['address'] ?? 'Faridabad (लोकल एड्रेस)'}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      Text('आइटम: ${order['items'] ?? ''}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
                       const SizedBox(height: 8),
-                      Text('कुल राशि: ₹${order['totalAmount']}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 15)),
-                      const SizedBox(height: 12),
+                      Text('कुल राशि: ₹${order['totalAmount'] ?? '0'}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 15)),
+                      const SizedBox(height: 14),
 
                       Row(
                         children: [
                           Expanded(
                             child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
                               onPressed: () {
                                 HapticFeedback.vibrate();
                                 setState(() {
                                   order['status'] = 'Accepted';
                                 });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('ऑर्डर स्वीकार कर लिया गया! ग्राहक खुद पिकअप करने आ रहा है या आप डिलीवर करेंगे।'), backgroundColor: Colors.green),
+                                );
                               },
-                              child: const Text('Accept (स्वीकार करें)', style: TextStyle(color: Colors.white, fontSize: 12)),
+                              child: const Text('Accept (स्वीकार करें)', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red[800]),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red[700],
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
                               onPressed: () {
+                                HapticFeedback.vibrate();
                                 setState(() {
                                   order['status'] = 'Rejected';
                                 });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('ऑर्डर रद्द कर दिया गया।'), backgroundColor: Colors.red),
+                                );
                               },
-                              child: const Text('Reject (रद्द करें)', style: TextStyle(color: Colors.white, fontSize: 12)),
+                              child: const Text('Reject (रद्द करें)', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.iconStyleFrom(
+                            side: const BorderSide(color: Colors.amber),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: const Icon(Icons.storefront, color: Colors.amber, size: 18),
+                          label: const Text('Self Delivery / दुकान से पिकअप', style: TextStyle(color: Colors.amber, fontSize: 12)),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('सेल्फ डिलीवरी / पिकअप के लिए आर्डर तैयार है (${order['customerName'] ?? 'ग्राहक'} के लिए)।')),
+                            );
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -487,40 +623,186 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
   }
 
   Widget _buildStoreSettingsTab() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final shopNameController = TextEditingController(text: EnterpriseDatabase.activeShopProfile['shopName'] ?? '');
+    final ownerNameController = TextEditingController(text: EnterpriseDatabase.activeShopProfile['ownerName'] ?? '');
+    final phoneController = TextEditingController(text: EnterpriseDatabase.activeShopProfile['phone'] ?? '');
+    final shopNumberController = TextEditingController(text: EnterpriseDatabase.activeShopProfile['shopNumber'] ?? '');
+    final addressController = TextEditingController(text: EnterpriseDatabase.activeShopProfile['address'] ?? '');
+
+    Future<void> pickAndConvertStoreImage(bool isShop, StateSetter setSettingsState) async {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 60);
+      if (pickedFile != null) {
+        final base64String = await _convertFileToBase64(pickedFile.path);
+        if (base64String != null) {
+          setSettingsState(() {
+            if (isShop) {
+              EnterpriseDatabase.activeShopProfile['shopImage'] = base64String;
+            } else {
+              EnterpriseDatabase.activeShopProfile['ownerImage'] = base64String;
+            }
+          });
+          setState(() {}); // Refresh appbar if shop image changes
+        }
+      }
+    }
+
+    return StatefulBuilder(
+      builder: (context, setSettingsState) => ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          const Text('दुकान सेटिंग्स', style: TextStyle(color: Colors.amber, fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          Card(
-            color: const Color(0xFF1E1E1E),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
+          const Text('मेरी दुकान और ओनर प्रोफाइल सेटिंग्स', style: TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          const Text('यहाँ अपनी दुकान और अपनी सही जानकारी भरें। सभी फोटो Base64 फॉर्मेट में सेव होंगी।', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          const SizedBox(height: 20),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.store, color: Colors.amber),
-                    title: const Text('दुकान का नाम', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    subtitle: Text(EnterpriseDatabase.activeShopProfile['shopName'] ?? 'मेरी दुकान', style: const TextStyle(color: Colors.white, fontSize: 16)),
+                  GestureDetector(
+                    onTap: () => pickAndConvertStoreImage(true, setSettingsState),
+                    child: Container(
+                      height: 90,
+                      width: 90,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[850],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber, width: 1.5),
+                      ),
+                      child: EnterpriseDatabase.activeShopProfile['shopImage'] != null && 
+                             EnterpriseDatabase.activeShopProfile['shopImage'].toString().isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: _buildImageWidget(EnterpriseDatabase.activeShopProfile['shopImage']),
+                            )
+                          : const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.store, color: Colors.amber, size: 28),
+                                SizedBox(height: 4),
+                                Text('शॉप फोटो', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                              ],
+                            ),
+                    ),
                   ),
-                  const Divider(color: Colors.grey),
-                  ListTile(
-                    leading: const Icon(Icons.phone, color: Colors.amber),
-                    title: const Text('मोबाइल नंबर', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    subtitle: Text(EnterpriseDatabase.activeShopProfile['phone'] ?? '9999999999', style: const TextStyle(color: Colors.white, fontSize: 16)),
-                  ),
-                  const Divider(color: Colors.grey),
-                  ListTile(
-                    leading: const Icon(Icons.location_on, color: Colors.amber),
-                    title: const Text('पता', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    subtitle: Text(EnterpriseDatabase.activeShopProfile['address'] ?? 'Faridabad', style: const TextStyle(color: Colors.white, fontSize: 16)),
-                  ),
+                  const SizedBox(height: 6),
+                  const Text('दुकान का फोटो', style: TextStyle(color: Colors.white70, fontSize: 12)),
                 ],
               ),
+              Column(
+                children: [
+                  GestureDetector(
+                    onTap: () => pickAndConvertStoreImage(false, setSettingsState),
+                    child: Container(
+                      height: 90,
+                      width: 90,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[850],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber, width: 1.5),
+                      ),
+                      child: EnterpriseDatabase.activeShopProfile['ownerImage'] != null && 
+                             EnterpriseDatabase.activeShopProfile['ownerImage'].toString().isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: _buildImageWidget(EnterpriseDatabase.activeShopProfile['ownerImage']),
+                            )
+                          : const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.person, color: Colors.amber, size: 28),
+                                SizedBox(height: 4),
+                                Text('ओनर फोटो', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                              ],
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('मालिक का फोटो', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          TextField(
+            controller: shopNameController,
+            style: const TextStyle(color: Colors.white),
+            decoration: _getInputDecoration('दुकान का नाम (Shop Name)', Icons.store),
+          ),
+          const SizedBox(height: 14),
+
+          TextField(
+            controller: ownerNameController,
+            style: const TextStyle(color: Colors.white),
+            decoration: _getInputDecoration('मालिक का नाम (Owner Name)', Icons.person),
+          ),
+          const SizedBox(height: 14),
+
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _getInputDecoration('मोबाइल नंबर', Icons.phone),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: shopNumberController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _getInputDecoration('शॉप नंबर / बूथ नं', Icons.confirmation_number),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          TextField(
+            controller: addressController,
+            maxLines: 2,
+            style: const TextStyle(color: Colors.white),
+            decoration: _getInputDecoration('पूरा एड्रेस (Full Address & Landmark)', Icons.location_on),
+          ),
+          const SizedBox(height: 24),
+
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              if (shopNameController.text.isEmpty || phoneController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('कृपया दुकान का नाम और मोबाइल नंबर भरें!'), backgroundColor: Colors.red),
+                );
+                return;
+              }
+
+              setState(() {
+                EnterpriseDatabase.activeShopProfile['shopName'] = shopNameController.text.trim();
+                EnterpriseDatabase.activeShopProfile['ownerName'] = ownerNameController.text.trim();
+                EnterpriseDatabase.activeShopProfile['phone'] = phoneController.text.trim();
+                EnterpriseDatabase.activeShopProfile['shopNumber'] = shopNumberController.text.trim();
+                EnterpriseDatabase.activeShopProfile['address'] = addressController.text.trim();
+              });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('दुकान और ओनर की प्रोफाइल Base64 के साथ सेव हो गई!'), backgroundColor: Colors.green),
+              );
+            },
+            child: const Text(
+              'दुकान की जानकारी सेव करें',
+              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ),
+          const SizedBox(height: 30),
         ],
       ),
     );
