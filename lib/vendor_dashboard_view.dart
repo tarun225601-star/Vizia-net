@@ -1,6 +1,13 @@
-// ================= FILE: vendor_dashboard_view.dart =================
+// ============================================================================
+// FILE: vendor_dashboard_view.dart
+// ARCHITECTURE: Ultimate Professional Vendor Master Module with All Features
+// ============================================================================
+
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // वाइब्रेशन और साउंड के लिए
 import 'database_models.dart';
+import 'image_picker_helper.dart';
 
 class VendorDashboardView extends StatefulWidget {
   const VendorDashboardView({super.key});
@@ -10,127 +17,608 @@ class VendorDashboardView extends StatefulWidget {
 }
 
 class _VendorDashboardViewState extends State<VendorDashboardView> {
-  void _showAddProductDialog() {
-    final nameController = TextEditingController();
-    final priceController = TextEditingController();
-    final stockController = TextEditingController();
+  int _currentIndex = 0;
+  
+  // दुकान की मास्टर स्थिति (खुली है या बंद)
+  bool _isShopOpen = true;
+
+  final TextEditingController _searchController = TextEditingController();
+  String _selectedFilterCategory = 'All';
+
+  // नया प्रोडक्ट जोड़ने या एडिट करने का डायलॉग (गैलरी फोटो + स्टॉक टॉगल)
+  void _showProfessionalProductDialog({Map<String, dynamic>? existingProduct, int? editIndex}) {
+    final nameController = TextEditingController(text: existingProduct?['name'] ?? '');
+    final priceController = TextEditingController(text: existingProduct?['price']?.toString() ?? '');
+    final stockController = TextEditingController(text: existingProduct?['stock']?.toString() ?? '');
+    final descController = TextEditingController(text: existingProduct?['description'] ?? '');
+    
+    String category = existingProduct?['category'] ?? 'Automotive Care';
+    String? localImagePath = existingProduct?['image'];
+    bool isInStock = existingProduct?['isInStock'] ?? true;
+
+    final List<String> categories = [
+      'Automotive Care',
+      'Dash & Polish',
+      'Shampoos & Waxes',
+      'Microfiber & Tools',
+      'General Accessories'
+    ];
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.between,
+                    children: [
+                      Text(
+                        editIndex == null ? 'नया उत्पाद जोड़ें' : 'उत्पाद अपडेट करें',
+                        style: const TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.grey),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Colors.grey),
+                  const SizedBox(height: 10),
+
+                  // गैलरी से फोटो चुनने का बॉक्स
+                  Center(
+                    child: GestureDetector(
+                      onTap: () async {
+                        final pickedPath = await ImagePickerHelper.pickImageFromGallery();
+                        if (pickedPath != null) {
+                          setDialogState(() {
+                            localImagePath = pickedPath;
+                          });
+                        }
+                      },
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[850],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.amber, width: 1.5),
+                        ),
+                        child: localImagePath != null && localImagePath!.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: File(localImagePath!).existsSync()
+                                    ? Image.file(File(localImagePath!), fit: BoxFit.cover)
+                                    : Image.network(localImagePath!, fit: BoxFit.cover,
+                                        errorBuilder: (c, e, s) => const Icon(Icons.broken_image, color: Colors.amber)),
+                              )
+                            : const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_a_photo, color: Colors.amber, size: 30),
+                                  SizedBox(height: 4),
+                                  Text('फोटो चुनें', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  TextField(
+                    controller: nameController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _getInputDecoration('उत्पाद का नाम', Icons.shopping_bag),
+                  ),
+                  const SizedBox(height: 12),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: priceController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _getInputDecoration('कीमत (₹)', Icons.currency_rupee),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: stockController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _getInputDecoration('स्टॉक मात्रा', Icons.inventory),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  DropdownButtonFormField<String>(
+                    value: categories.contains(category) ? category : categories.first,
+                    dropdownColor: const Color(0xFF2C2C2C),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _getInputDecoration('उत्पाद श्रेणी', Icons.category),
+                    items: categories.map((cat) {
+                      return DropdownMenuItem(value: cat, child: Text(cat));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setDialogState(() => category = val);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // इन-स्टॉक / आउट-ऑफ-स्टॉक टॉगल बटन
+                  SwitchListTile(
+                    title: const Text('उपलब्ध है (In-Stock)', style: TextStyle(color: Colors.white, fontSize: 14)),
+                    subtitle: Text(isInStock ? 'ग्राहक इसे खरीद सकते हैं' : 'यह आउट ऑफ स्टॉक है', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    value: isInStock,
+                    activeColor: Colors.green,
+                    onChanged: (val) => setDialogState(() => isInStock = val),
+                  ),
+                  const SizedBox(height: 20),
+
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () {
+                      if (nameController.text.isEmpty || priceController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('कृपया नाम और कीमत भरें!')),
+                        );
+                        return;
+                      }
+
+                      final productData = {
+                        'id': existingProduct?['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                        'name': nameController.text.trim(),
+                        'price': double.tryParse(priceController.text) ?? 0.0,
+                        'stock': int.tryParse(stockController.text) ?? 10,
+                        'category': category,
+                        'description': descController.text.trim(),
+                        'image': localImagePath ?? '',
+                        'isInStock': isInStock,
+                      };
+
+                      setState(() {
+                        if (editIndex != null) {
+                          EnterpriseDatabase.globalInventory[editIndex] = productData;
+                        } else {
+                          EnterpriseDatabase.globalInventory.add(productData);
+                        }
+                      });
+
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('उत्पाद सुरक्षित कर दिया गया है!'), backgroundColor: Colors.green),
+                      );
+                    },
+                    child: Text(
+                      editIndex == null ? 'डेटाबेस में जोड़ें' : 'अपडेट करें',
+                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _getInputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+      prefixIcon: Icon(icon, color: Colors.amber, size: 20),
+      enabledBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Colors.grey),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Colors.amber, width: 2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      filled: true,
+      fillColor: const Color(0xFF252525),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Widget> pages = [
+      _buildAnalyticsDashboardTab(),
+      _buildInventoryCatalogTab(),
+      _buildOrderLedgerTab(),
+      _buildStoreSettingsTab(),
+    ];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF121212),
+      appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('नया उत्पाद जोड़ें', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+        elevation: 2,
+        title: Row(
           children: [
-            TextField(
-              controller: nameController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'उत्पाद का नाम',
-                labelStyle: TextStyle(color: Colors.grey),
-              ),
+            const CircleAvatar(
+              backgroundColor: Colors.amber,
+              radius: 16,
+              child: Icon(Icons.store, color: Colors.black, size: 18),
             ),
-            TextField(
-              controller: priceController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'कीमत (₹)',
-                labelStyle: TextStyle(color: Colors.grey),
-              ),
-            ),
-            TextField(
-              controller: stockController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'स्टॉक मात्रा',
-                labelStyle: TextStyle(color: Colors.grey),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    EnterpriseDatabase.activeShopProfile['shopName'] ?? 'मेरी दुकान',
+                    style: const TextStyle(color: Colors.amber, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    _isShopOpen ? '● दुकान खुली है (Live)' : '● दुकान बंद है (Closed)',
+                    style: TextStyle(color: _isShopOpen ? Colors.green : Colors.red, fontSize: 11),
+                  ),
+                ],
               ),
             ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('रद्द करें', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
-            onPressed: () {
-              if (nameController.text.isNotEmpty && priceController.text.isNotEmpty) {
-                setState(() {
-                  EnterpriseDatabase.globalInventory.add({
-                    'id': DateTime.now().millisecondsSinceEpoch.toString(),
-                    'name': nameController.text.trim(),
-                    'price': double.tryParse(priceController.text) ?? 0.0,
-                    'stock': int.tryParse(stockController.text) ?? 10,
-                    'category': 'General',
-                    'image': '',
-                  });
-                });
-                Navigator.pop(context);
-              }
+          // दुकान खोलने/बंद करने का मास्टर स्विच बटन
+          Switch(
+            value: _isShopOpen,
+            activeColor: Colors.green,
+            inactiveThumbColor: Colors.red,
+            onChanged: (val) {
+              setState(() {
+                _isShopOpen = val;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(_isShopOpen ? 'दुकान लाइव हो गई है।' : 'दुकान बंद कर दी गई है।')),
+              );
             },
-            child: const Text('जोड़ें', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+      body: pages[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: const Color(0xFF1E1E1E),
+        selectedItemColor: Colors.amber,
+        unselectedItemColor: Colors.grey,
+        currentIndex: _currentIndex,
+        type: BottomNavigationBarType.fixed,
+        onTap: (index) => setState(() => _currentIndex = index),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'डैशबोर्ड'),
+          BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: 'कैटलॉग'),
+          BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'ऑर्डर्स'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'सेटिंग्स'),
+        ],
+      ),
+      floatingActionButton: _currentIndex == 1
+          ? FloatingActionButton.extended(
+              backgroundColor: Colors.amber,
+              onPressed: () => _showProfessionalProductDialog(),
+              icon: const Icon(Icons.add, color: Colors.black),
+              label: const Text('नया उत्पाद', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            )
+          : null,
+    );
+  }
+
+  // टैब 0: डैशबोर्ड ओवरव्यू
+  Widget _buildAnalyticsDashboardTab() {
+    int totalOrders = EnterpriseDatabase.orderLedger.length;
+    double totalRevenue = 0;
+    for (var order in EnterpriseDatabase.orderLedger) {
+      totalRevenue += (order['totalAmount'] ?? 0.0) as double;
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _isShopOpen ? Colors.green.withOpacity(0.5) : Colors.red.withOpacity(0.5)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.between,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_isShopOpen ? 'आपकी दुकान लाइव है' : 'दुकान बंद है', style: TextStyle(color: _isShopOpen ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    const Text('ग्राहक अभी ऑर्डर दे सकते हैं', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
+                Switch(
+                  value: _isShopOpen,
+                  activeColor: Colors.green,
+                  onChanged: (val) => setState(() => _isShopOpen = val),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text('कारोबार सारांश', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.5,
+            children: [
+              _buildMetricCard('कुल बिक्री', '₹${totalRevenue.toStringAsFixed(1)}', Icons.currency_rupee, Colors.greenAccent),
+              _buildMetricCard('कुल ऑर्डर्स', '$totalOrders', Icons.shopping_cart, Colors.amber),
+            ],
           ),
         ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF121212),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: Text(
-          '${EnterpriseDatabase.activeShopProfile['shopName']} - डैशबोर्ड',
-          style: const TextStyle(color: Colors.amber),
-        ),
+  Widget _buildMetricCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(12),
       ),
-      body: EnterpriseDatabase.globalInventory.isEmpty
-          ? const Center(
-              child: Text(
-                'कोई उत्पाद उपलब्ध नहीं है।\nनीचे दिए गए + बटन से नया उत्पाद जोड़ें।',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, fontSize: 16),
-              ),
-            )
-          : ListView.builder(
-              itemCount: EnterpriseDatabase.globalInventory.length,
-              itemBuilder: (context, index) {
-                final item = EnterpriseDatabase.globalInventory[index];
-                return Card(
-                  color: const Color(0xFF1E1E1E),
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: ListTile(
-                    title: Text(
-                      item['name'],
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.between,
+            children: [
+              Text(title, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              Icon(icon, color: color, size: 20),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(value, style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  // टैब 1: कैटलॉग मैनेजमेंट
+  Widget _buildInventoryCatalogTab() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: EnterpriseDatabase.globalInventory.length,
+      itemBuilder: (context, index) {
+        final item = EnterpriseDatabase.globalInventory[index];
+        final imgPath = item['image']?.toString() ?? '';
+        final bool isInStock = item['isInStock'] ?? true;
+
+        return Card(
+          color: const Color(0xFF1E1E1E),
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    color: Colors.grey[850],
+                    child: imgPath.isNotEmpty && File(imgPath).existsSync()
+                        ? Image.file(File(imgPath), fit: BoxFit.cover)
+                        : const Icon(Icons.image, color: Colors.amber, size: 30),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item['name'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('₹${item['price']} | स्टॉक: ${item['stock']}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                      const SizedBox(height: 4),
+                      Text(isInStock ? '● In-Stock' : '● Out of Stock', style: TextStyle(color: isInStock ? Colors.green : Colors.red, fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                Column(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.amber, size: 20),
+                      onPressed: () => _showProfessionalProductDialog(existingProduct: item, editIndex: index),
                     ),
-                    subtitle: Text(
-                      'कीमत: ₹${item['price']} | स्टॉक: ${item['stock']}',
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.redAccent),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
                       onPressed: () {
                         setState(() {
                           EnterpriseDatabase.globalInventory.removeAt(index);
                         });
                       },
                     ),
-                  ),
-                );
-              },
+                  ],
+                ),
+              ],
             ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.amber,
-        onPressed: _showAddProductDialog,
-        child: const Icon(Icons.add, color: Colors.black),
+          ),
+        );
+      },
+    );
+  }
+
+  // टैब 2: ऑर्डर लेजर (टाइम, वाइब्रेशन, एक्सेप्ट/रिजेक्ट और डिलीवरी मोड बटन)
+  Widget _buildOrderLedgerTab() {
+    return EnterpriseDatabase.orderLedger.isEmpty
+        ? const Center(child: Text('कोई नया ऑर्डर नहीं है।', style: TextStyle(color: Colors.grey, fontSize: 16)))
+        : ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: EnterpriseDatabase.orderLedger.length,
+            itemBuilder: (context, index) {
+              final order = EnterpriseDatabase.orderLedger[index];
+              return Card(
+                color: const Color(0xFF1E1E1E),
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.between,
+                        children: [
+                          Text('ऑर्डर #${order['orderId']}', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 15)),
+                          Text(order['date'] ?? 'आज', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        ],
+                      ),
+                      const Divider(color: Colors.grey, height: 16),
+                      Text('ग्राहक: ${order['customerName']} (${order['phone']})', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                      Text('आइटम: ${order['items']}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                      const SizedBox(height: 8),
+                      Text('कुल राशि: ₹${order['totalAmount']}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 15)),
+                      const SizedBox(height: 12),
+
+                      // एक्सेप्ट और रिजेक्ट बटन
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.styleFrom(backgroundColor: Colors.green).wrap(
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                onPressed: () {
+                                  HapticFeedback.vibrate(); // ऑर्डर एक्सेप्ट पर वाइब्रेशन
+                                  setState(() {
+                                    order['status'] = 'Accepted';
+                                  });
+                                },
+                                child: const Text('Accept (स्वीकार करें)', style: TextStyle(color: Colors.white, fontSize: 12)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red[800]),
+                              onPressed: () {
+                                setState(() {
+                                  order['status'] = 'Rejected';
+                                });
+                              },
+                              child: const Text('Reject (रद्द करें)', style: TextStyle(color: Colors.white, fontSize: 12)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // डिलीवरी मोड चुनने के दो बटन: खुद डिलीवरी या पोर्टल बुक
+                      const Text('डिलीवरी मोड चुनें:', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.amber)),
+                              icon: const Icon(Icons.delivery_dining, color: Colors.amber, size: 18),
+                              label: const Text('खुद डिलीवरी', style: TextStyle(color: Colors.amber, fontSize: 11)),
+                              onPressed: () {
+                                HapticFeedback.mediumImpact();
+                                setState(() {
+                                  order['deliveryMode'] = 'Self Delivery';
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('आपने खुद डिलीवरी करने का विकल्प चुना है।')),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.blueAccent)),
+                              icon: const Icon(Icons.local_shipping, color: Colors.blueAccent, size: 18),
+                              label: const Text('पोर्टल बुक करें', style: TextStyle(color: Colors.blueAccent, fontSize: 11)),
+                              onPressed: () {
+                                HapticFeedback.mediumImpact();
+                                setState(() {
+                                  order['deliveryMode'] = 'Portal Delivery Booked';
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('पोर्टल डिलीवरी बुक कर दी गई है!')),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (order['deliveryMode'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text('मोड: ${order['deliveryMode']}', style: const TextStyle(color: Colors.amber, fontSize: 11)),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+  }
+
+  // टैब 3: वेंडर सेटिंग्स
+  Widget _buildStoreSettingsTab() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('दुकान सेटिंग्स', style: TextStyle(color: Colors.amber, fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          Card(
+            color: const Color(0xFF1E1E1E),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.store, color: Colors.amber),
+                    title: const Text('दुकान का नाम', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    subtitle: Text(EnterpriseDatabase.activeShopProfile['shopName'] ?? 'मेरी दुकान', style: const TextStyle(color: Colors.white, fontSize: 16)),
+                  ),
+                  const Divider(color: Colors.grey),
+                  ListTile(
+                    leading: const Icon(Icons.phone, color: Colors.amber),
+                    title: const Text('मोबाइल नंबर', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    subtitle: Text(EnterpriseDatabase.activeShopProfile['phone'] ?? '9999999999', style: const TextStyle(color: Colors.white, fontSize: 16)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
