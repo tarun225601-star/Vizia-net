@@ -264,7 +264,7 @@ class VendorInventoryTab extends StatefulWidget {
 class _VendorInventoryTabState extends State<VendorInventoryTab> {
   final nameCtrl = TextEditingController();
   final priceCtrl = TextEditingController();
-  final unitCtrl = TextEditingController(text: 'Kg'); // फ्री-टेक्स्ट यूनिट बॉक्स
+  final unitCtrl = TextEditingController(text: 'Kg');
   String category = 'Fresh Fruits';
   String? itemImageBase64;
   bool _isLoading = false;
@@ -288,8 +288,6 @@ class _VendorInventoryTabState extends State<VendorInventoryTab> {
       itemImageBase64 = null;
       _isLoading = false;
     });
-    // रिफ्रेश के लिए पैरेंट को बताएं या लोकल लिस्ट अपडेट करें
-    (contextzenState?.call() );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ प्रोडक्ट सफलतापूर्वक जुड़ गया!'), backgroundColor: Colors.green));
     }
@@ -314,7 +312,6 @@ class _VendorInventoryTabState extends State<VendorInventoryTab> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        // नया प्रोडक्ट फॉर्म कार्ड
         Card(
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -350,7 +347,6 @@ class _VendorInventoryTabState extends State<VendorInventoryTab> {
                   decoration: const InputDecoration(labelText: 'कैटेगरी', isDense: true),
                 ),
                 const SizedBox(height: 10),
-                // फ्री-टेक्स्ट यूनिट बॉक्स (अब इसमें Kg, Box, Piece कुछ भी लिख सकते हैं)
                 TextField(
                   controller: unitCtrl,
                   decoration: const InputDecoration(
@@ -374,7 +370,6 @@ class _VendorInventoryTabState extends State<VendorInventoryTab> {
         const SizedBox(height: 20),
         const Text('📋 आपके मौजूदा प्रोडक्ट्स (मैनेज करें)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
         const SizedBox(height: 10),
-        // लाइव प्रोडक्ट्स लिस्ट फेच करके मैनेज करने के लिए
         FutureBuilder<http.Response>(
           future: http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/products.json')),
           builder: (context, snapshot) {
@@ -417,7 +412,6 @@ class _VendorInventoryTabState extends State<VendorInventoryTab> {
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Stock Toggle Button
                           Switch(
                             value: inStock,
                             activeColor: Colors.green,
@@ -426,7 +420,6 @@ class _VendorInventoryTabState extends State<VendorInventoryTab> {
                               setState(() {});
                             },
                           ),
-                          // Delete Button
                           IconButton(
                             icon: const Icon(Icons.delete, color: Colors.red),
                             onPressed: () => _deleteProduct(p['firebaseKey']),
@@ -564,7 +557,6 @@ class _VendorSettingsTabState extends State<VendorSettingsTab> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        // दुकान चालू / बंद करने का मुख्य स्विच बटन
         Card(
           color: isOpen ? Colors.green.shade50 : Colors.red.shade50,
           child: SwitchListTile(
