@@ -601,7 +601,7 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          style: OutlinedButton.iconStyleFrom(
+                          style: OutlinedButton.styleFrom( // FIXED HERE
                             side: const BorderSide(color: Colors.amber),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
