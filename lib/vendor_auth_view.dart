@@ -1,4 +1,4 @@
-// ================= FILE: vendor_auth_view.dart =================
+// ================= कोड को पूरा कॉपी करके अपनी फाइल में डालें =================
 import 'package:flutter/material.dart';
 import 'database_models.dart';
 import 'vendor_dashboard_view.dart';
@@ -37,7 +37,6 @@ class _VendorAuthViewState extends State<VendorAuthView> {
       return;
     }
 
-    // लोकल डेटाबेस में सेशन सेट करना
     EnterpriseDatabase.currentVendorId = phone;
     EnterpriseDatabase.currentShopName = _isRegistering ? shopName : "मेरी दुकान";
 
@@ -68,7 +67,7 @@ class _VendorAuthViewState extends State<VendorAuthView> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(y: 30),
+                const SizedBox(height: 30), // यहाँ y की जगह height कर दिया गया है
                 if (_isRegistering) ...[
                   TextField(
                     controller: _shopNameController,
