@@ -1,13 +1,11 @@
 // ============================================================================
-// FILE: vendor_dashboard_view.dart
-// ARCHITECTURE: Ultimate Professional Vendor Master Module (100% Error Free & Clean)
+// FILE: vendor_dashboard_view.dart (Multi-Vendor Marketplace - Bulletproof)
 // ============================================================================
 
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'database_models.dart';
-import 'image_picker_helper.dart';
 
 class VendorDashboardView extends StatefulWidget {
   const VendorDashboardView({super.key});
@@ -19,8 +17,6 @@ class VendorDashboardView extends StatefulWidget {
 class _VendorDashboardViewState extends State<VendorDashboardView> {
   int _currentIndex = 0;
   bool _isShopOpen = true;
-
-  final TextEditingController _searchController = TextEditingController();
 
   void _showProfessionalProductDialog({Map<String, dynamic>? existingProduct, int? editIndex}) {
     final nameController = TextEditingController(text: existingProduct?['name'] ?? '');
@@ -69,45 +65,6 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                   ),
                   const Divider(color: Colors.grey),
                   const SizedBox(height: 10),
-
-                  Center(
-                    child: GestureDetector(
-                      onTap: () async {
-                        final pickedPath = await ImagePickerHelper.pickImageFromGallery();
-                        if (pickedPath != null) {
-                          setDialogState(() {
-                            localImagePath = pickedPath;
-                          });
-                        }
-                      },
-                      child: Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[850],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.amber, width: 1.5),
-                        ),
-                        child: localImagePath != null && localImagePath!.isNotEmpty
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: File(localImagePath!).existsSync()
-                                    ? Image.file(File(localImagePath!), fit: BoxFit.cover)
-                                    : Image.network(localImagePath!, fit: BoxFit.cover,
-                                        errorBuilder: (c, e, s) => const Icon(Icons.broken_image, color: Colors.amber)),
-                              )
-                            : const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.add_a_photo, color: Colors.amber, size: 30),
-                                  SizedBox(height: 4),
-                                  Text('फोटो चुनें', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                                ],
-                              ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
 
                   TextField(
                     controller: nameController,
@@ -316,8 +273,13 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
   Widget _buildAnalyticsDashboardTab() {
     int totalOrders = EnterpriseDatabase.orderLedger.length;
     double totalRevenue = 0;
+    
+    // सुरक्षित पार्सिंग ताकि स्ट्रिंग या डबल दोनों में क्रैश न हो
     for (var order in EnterpriseDatabase.orderLedger) {
-      totalRevenue += (order['totalAmount'] ?? 0.0) as double;
+      var rawAmount = order['totalAmount'];
+      if (rawAmount != null) {
+        totalRevenue += double.tryParse(rawAmount.toString()) ?? 0.0;
+      }
     }
 
     return SingleChildScrollView(
@@ -355,7 +317,6 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
           const Text('कारोबार सारांश', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           
-          // सुरक्षित लेआउट बिना ग्रिड क्रैश के
           Row(
             children: [
               Expanded(child: _buildMetricCard('कुल बिक्री', '₹${totalRevenue.toStringAsFixed(1)}', Icons.currency_rupee, Colors.greenAccent)),
@@ -517,52 +478,6 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-
-                      const Text('डिलीवरी मोड चुनें:', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.amber)),
-                              icon: const Icon(Icons.delivery_dining, color: Colors.amber, size: 18),
-                              label: const Text('खुद डिलीवरी', style: TextStyle(color: Colors.amber, fontSize: 11)),
-                              onPressed: () {
-                                HapticFeedback.mediumImpact();
-                                setState(() {
-                                  order['deliveryMode'] = 'Self Delivery';
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('आपने खुद डिलीवरी करने का विकल्प चुना है।')),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.blueAccent)),
-                              icon: const Icon(Icons.local_shipping, color: Colors.blueAccent, size: 18),
-                              label: const Text('पोर्टल बुक करें', style: TextStyle(color: Colors.blueAccent, fontSize: 11)),
-                              onPressed: () {
-                                HapticFeedback.mediumImpact();
-                                setState(() {
-                                  order['deliveryMode'] = 'Portal Delivery Booked';
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('पोर्टल डिलीवरी बुक कर दी गई है!')),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (order['deliveryMode'] != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text('मोड: ${order['deliveryMode']}', style: const TextStyle(color: Colors.amber, fontSize: 11)),
-                        ),
                     ],
                   ),
                 ),
@@ -595,6 +510,12 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                     leading: const Icon(Icons.phone, color: Colors.amber),
                     title: const Text('मोबाइल नंबर', style: TextStyle(color: Colors.grey, fontSize: 12)),
                     subtitle: Text(EnterpriseDatabase.activeShopProfile['phone'] ?? '9999999999', style: const TextStyle(color: Colors.white, fontSize: 16)),
+                  ),
+                  const Divider(color: Colors.grey),
+                  ListTile(
+                    leading: const Icon(Icons.location_on, color: Colors.amber),
+                    title: const Text('पता', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    subtitle: Text(EnterpriseDatabase.activeShopProfile['address'] ?? 'Faridabad', style: const TextStyle(color: Colors.white, fontSize: 16)),
                   ),
                 ],
               ),
