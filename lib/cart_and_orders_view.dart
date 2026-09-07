@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'database_models.dart';
+import 'image_picker_helper.dart';
 
 class CartAndOrdersView extends StatefulWidget {
   const CartAndOrdersView({super.key});
@@ -76,11 +77,22 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
         children: [
           Container(
             color: const Color(0xFF1E293B),
-            child: const TabBar(
-              labelColor: Color(0xFFF59E0B),
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: Color(0xFFF59E0B),
-              tabs: [Tab(text: '🛒 मेरा कार्ट'), Tab(text: '📦 आर्डर इतिहास')],
+            child: Row(
+              children: [
+                const Expanded(
+                  child: TabBar(
+                    labelColor: Color(0xFFF59E0B),
+                    unselectedLabelColor: Colors.grey,
+                    indicatorColor: Color(0xFFF59E0B),
+                    tabs: [Tab(text: '🛒 मेरा कार्ट'), Tab(text: '📦 आर्डर इतिहास')],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.sync, color: Color(0xFFF59E0B)),
+                  onPressed: _fetchCustomerOrders,
+                  tooltip: 'आर्डर रिफ्रेश करें',
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -99,6 +111,10 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                                   color: const Color(0xFF1E293B),
                                   margin: const EdgeInsets.all(8),
                                   child: ListTile(
+                                    leading: ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: buildShopOrProdImage(item['image'], 45, 45, Icons.fastfood),
+                                    ),
                                     title: Text(item['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                                     subtitle: Text('₹${item['price']} x ${item['qty']} ${item['unit']}'),
                                     trailing: IconButton(
@@ -140,7 +156,8 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                             margin: const EdgeInsets.all(8),
                             child: ListTile(
                               title: Text('आर्डर #${ord['orderId']} - ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                              subtitle: Text('स्टेटस: ${ord['status']}'),
+                              subtitle: Text('स्टेटस: ${ord['status']}\nपता: ${ord['customerAddress']}'),
+                              isThreeLine: true,
                             ),
                           );
                         },
