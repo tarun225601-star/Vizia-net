@@ -74,6 +74,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
         'price': prod['price'],
         'unit': prod['unit'] ?? 'Kg',
         'qty': qty,
+        'image': prod['image'] ?? '',
         'shopName': CakeDatabase.bakeryShop['shopName'],
       });
     });
@@ -100,7 +101,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                   padding: const EdgeInsets.all(12.0),
                   child: Row(
                     children: [
-                      buildShopOrProdImage(shop['shopPhotoPath'], 50, 50, Icons.store),
+                      buildShopOrProdImage(shop['shopPhotoPath'] ?? shop['ownerPhotoPath'], 50, 50, Icons.store),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -144,6 +145,10 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
               return Card(
                 color: const Color(0xFF1E293B),
                 child: ListTile(
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: buildShopOrProdImage(prod['image'], 45, 45, Icons.shopping_bag),
+                  ),
                   title: Text(prod['name'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   subtitle: Text('₹${prod['price']} / ${prod['unit'] ?? 'Kg'}', style: const TextStyle(color: Color(0xFFF59E0B))),
                   trailing: ElevatedButton(
