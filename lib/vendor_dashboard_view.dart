@@ -1,11 +1,11 @@
 // ============================================================================
 // FILE: vendor_dashboard_view.dart
-// ARCHITECTURE: Ultimate Professional Vendor Master Module with All Features
+// ARCHITECTURE: Ultimate Professional Vendor Master Module (Error Free)
 // ============================================================================
 
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // वाइब्रेशन और साउंड के लिए
+import 'package:flutter/services.dart';
 import 'database_models.dart';
 import 'image_picker_helper.dart';
 
@@ -18,14 +18,10 @@ class VendorDashboardView extends StatefulWidget {
 
 class _VendorDashboardViewState extends State<VendorDashboardView> {
   int _currentIndex = 0;
-  
-  // दुकान की मास्टर स्थिति (खुली है या बंद)
   bool _isShopOpen = true;
 
   final TextEditingController _searchController = TextEditingController();
-  String _selectedFilterCategory = 'All';
 
-  // नया प्रोडक्ट जोड़ने या एडिट करने का डायलॉग (गैलरी फोटो + स्टॉक टॉगल)
   void _showProfessionalProductDialog({Map<String, dynamic>? existingProduct, int? editIndex}) {
     final nameController = TextEditingController(text: existingProduct?['name'] ?? '');
     final priceController = TextEditingController(text: existingProduct?['price']?.toString() ?? '');
@@ -59,7 +55,7 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.between,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         editIndex == null ? 'नया उत्पाद जोड़ें' : 'उत्पाद अपडेट करें',
@@ -74,11 +70,10 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                   const Divider(color: Colors.grey),
                   const SizedBox(height: 10),
 
-                  // गैलरी से फोटो चुनने का बॉक्स
                   Center(
                     child: GestureDetector(
                       onTap: () async {
-                        final pickedPath = await ImagePickerHelper.pickImageFromGallery();
+                        final pickedPath = await ImagePickerHelper.pickImage();
                         if (pickedPath != null) {
                           setDialogState(() {
                             localImagePath = pickedPath;
@@ -158,7 +153,6 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                   ),
                   const SizedBox(height: 12),
 
-                  // इन-स्टॉक / आउट-ऑफ-स्टॉक टॉगल बटन
                   SwitchListTile(
                     title: const Text('उपलब्ध है (In-Stock)', style: TextStyle(color: Colors.white, fontSize: 14)),
                     subtitle: Text(isInStock ? 'ग्राहक इसे खरीद सकते हैं' : 'यह आउट ऑफ स्टॉक है', style: const TextStyle(color: Colors.grey, fontSize: 12)),
@@ -278,7 +272,6 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
           ],
         ),
         actions: [
-          // दुकान खोलने/बंद करने का मास्टर स्विच बटन
           Switch(
             value: _isShopOpen,
             activeColor: Colors.green,
@@ -320,7 +313,6 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
     );
   }
 
-  // टैब 0: डैशबोर्ड ओवरव्यू
   Widget _buildAnalyticsDashboardTab() {
     int totalOrders = EnterpriseDatabase.orderLedger.length;
     double totalRevenue = 0;
@@ -341,7 +333,7 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
               border: Border.all(color: _isShopOpen ? Colors.green.withOpacity(0.5) : Colors.red.withOpacity(0.5)),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.between,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -391,7 +383,7 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.between,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(title, style: const TextStyle(color: Colors.grey, fontSize: 12)),
               Icon(icon, color: color, size: 20),
@@ -404,7 +396,6 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
     );
   }
 
-  // टैब 1: कैटलॉग मैनेजमेंट
   Widget _buildInventoryCatalogTab() {
     return ListView.builder(
       padding: const EdgeInsets.all(12),
@@ -470,7 +461,6 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
     );
   }
 
-  // टैब 2: ऑर्डर लेजर (टाइम, वाइब्रेशन, एक्सेप्ट/रिजेक्ट और डिलीवरी मोड बटन)
   Widget _buildOrderLedgerTab() {
     return EnterpriseDatabase.orderLedger.isEmpty
         ? const Center(child: Text('कोई नया ऑर्डर नहीं है।', style: TextStyle(color: Colors.grey, fontSize: 16)))
@@ -489,7 +479,7 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('ऑर्डर #${order['orderId']}', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 15)),
                           Text(order['date'] ?? 'आज', style: const TextStyle(color: Colors.grey, fontSize: 12)),
@@ -502,21 +492,18 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                       Text('कुल राशि: ₹${order['totalAmount']}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 15)),
                       const SizedBox(height: 12),
 
-                      // एक्सेप्ट और रिजेक्ट बटन
                       Row(
                         children: [
                           Expanded(
-                            child: ElevatedButton.styleFrom(backgroundColor: Colors.green).wrap(
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                                onPressed: () {
-                                  HapticFeedback.vibrate(); // ऑर्डर एक्सेप्ट पर वाइब्रेशन
-                                  setState(() {
-                                    order['status'] = 'Accepted';
-                                  });
-                                },
-                                child: const Text('Accept (स्वीकार करें)', style: TextStyle(color: Colors.white, fontSize: 12)),
-                              ),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                              onPressed: () {
+                                HapticFeedback.vibrate();
+                                setState(() {
+                                  order['status'] = 'Accepted';
+                                });
+                              },
+                              child: const Text('Accept (स्वीकार करें)', style: TextStyle(color: Colors.white, fontSize: 12)),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -535,7 +522,6 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
                       ),
                       const SizedBox(height: 8),
 
-                      // डिलीवरी मोड चुनने के दो बटन: खुद डिलीवरी या पोर्टल बुक
                       const Text('डिलीवरी मोड चुनें:', style: TextStyle(color: Colors.grey, fontSize: 12)),
                       const SizedBox(height: 6),
                       Row(
@@ -588,7 +574,6 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
           );
   }
 
-  // टैब 3: वेंडर सेटिंग्स
   Widget _buildStoreSettingsTab() {
     return Padding(
       padding: const EdgeInsets.all(16),
