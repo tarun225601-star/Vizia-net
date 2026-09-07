@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+                           import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'database_models.dart';
@@ -78,7 +78,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
         'shopName': CakeDatabase.bakeryShop['shopName'],
       });
     });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🛒 ${prod['name']} कार्ट में जुड़ गया!'), backgroundColor: const Color(0xFF10B981)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🛒 ${prod['name']} कार्ट में जुड़ गया!'), backgroundColor: Colors.green));
   }
 
   @override
@@ -87,30 +87,30 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     var shop = CakeDatabase.bakeryShop;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212), // शुद्ध मैट ब्लैक पेपर बैकग्राउंड
+      backgroundColor: const Color(0xFFF8F9FA), // एकदम साफ़ क्लीन वाइट बैकग्राउंड
       body: ListView(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         children: [
-          // दुकान बैनर कार्ड (मैट ब्लैक पेपर स्टाइल)
+          // दुकान बैनर कार्ड
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white10),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.6),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
             child: Column(
               children: [
                 if ((shop['bannerPhotoPath'] ?? '').toString().isNotEmpty)
-                  ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(16)), child: buildShopOrProdImage(shop['bannerPhotoPath'], 110, double.infinity, Icons.store)),
+                  ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(12)), child: buildShopOrProdImage(shop['bannerPhotoPath'], 110, double.infinity, Icons.store)),
                 Padding(
-                  padding: const EdgeInsets.all(12.0),
+                  padding: const EdgeInsets.all(10.0),
                   child: Row(
                     children: [
                       ClipRRect(borderRadius: BorderRadius.circular(8), child: buildShopOrProdImage(shop['shopPhotoPath'] ?? shop['ownerPhotoPath'], 45, 45, Icons.store)),
@@ -119,65 +119,68 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(shop['shopName'] ?? 'Tarun Fruit & Vegetable Shop', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)),
+                            Text(shop['shopName'] ?? 'Tarun Fruit & Vegetable Shop', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 13)),
                             const SizedBox(height: 2),
-                            Text('📍 ${shop['address'] ?? 'Faridabad'}', style: const TextStyle(fontSize: 10, color: Colors.white54)),
+                            Text('📍 ${shop['address'] ?? 'Faridabad'}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
                           ],
                         ),
                       ),
-                      IconButton(icon: const Icon(Icons.sync, color: Color(0xFF34D399)), onPressed: _fetchShopProfileAndProducts),
+                      IconButton(icon: const Icon(Icons.sync, color: Colors.green), onPressed: _fetchShopProfileAndProducts),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
-          // कैटेगरी चॉइस चिप्स
+          const SizedBox(height: 10),
+          // कैटेगरी चॉइस चिप्स (वाइट थीम)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: categories.map((cat) => Padding(
-                padding: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.only(right: 6),
                 child: ChoiceChip(
-                  label: Text(cat, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  label: Text(cat, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   selected: selectedCategory == cat,
-                  selectedColor: const Color(0xFF34D399),
-                  backgroundColor: const Color(0xFF1E1E1E),
-                  labelStyle: TextStyle(color: selectedCategory == cat ? Colors.black : Colors.white70),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: selectedCategory == cat ? Colors.transparent : Colors.white12)),
+                  selectedColor: Colors.green.shade700,
+                  backgroundColor: Colors.white,
+                  labelStyle: TextStyle(color: selectedCategory == cat ? Colors.white : Colors.black87),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(color: selectedCategory == cat ? Colors.transparent : Colors.grey.shade300),
+                  ),
                   onSelected: (_) => setState(() => selectedCategory = cat),
                 ),
               )).toList(),
             ),
           ),
-          if (_isLoadingCloud) const LinearProgressIndicator(color: Color(0xFF34D399)),
-          const SizedBox(height: 14),
-          // ब्लिंकईट जैसी परफेक्ट 2-कॉलम ग्रिड व्यू (मैट ब्लैक कार्ड्स)
+          if (_isLoadingCloud) const LinearProgressIndicator(color: Colors.green),
+          const SizedBox(height: 10),
+          // ब्लिंकईट जैसी परफेक्ट 2-कॉलम ग्रिड व्यू (वाइट कार्ड्स)
           filtered.isEmpty
-              ? const Padding(padding: EdgeInsets.all(40), child: Center(child: Text('कोई प्रोडक्ट नहीं मिला', style: TextStyle(color: Colors.white38))))
+              ? const Padding(padding: EdgeInsets.all(40), child: Center(child: Text('कोई प्रोडक्ट नहीं मिला', style: TextStyle(color: Colors.black45))))
               : GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    childAspectRatio: 0.74,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.72,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
                   ),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     var prod = filtered[index];
                     return Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E1E1E), // मैट ब्लैक पेपर शेड कार्ड
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.white.withOpacity(0.06)),
+                        color: Colors.white, // साफ़ सफ़ेद कार्ड
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200, width: 1),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.5),
-                            blurRadius: 6,
-                            offset: const Offset(0, 3),
+                            color: Colors.grey.withOpacity(0.12),
+                            blurRadius: 5,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
@@ -186,7 +189,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                         children: [
                           Expanded(
                             child: ClipRRect(
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                               child: Stack(
                                 children: [
                                   SizedBox(
@@ -198,8 +201,8 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                                     left: 6,
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(4)),
-                                      child: const Text('⚡ 10 MINS', style: TextStyle(color: Color(0xFF34D399), fontSize: 8, fontWeight: FontWeight.bold)),
+                                      decoration: BoxDecoration(color: Colors.blue.shade700, borderRadius: BorderRadius.circular(4)),
+                                      child: const Text('⚡ 9 MINS', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
                                     ),
                                   ),
                                 ],
@@ -207,30 +210,26 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(10.0),
+                            padding: const EdgeInsets.all(8.0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(prod['name'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                Text(prod['name'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 12)),
                                 const SizedBox(height: 2),
-                                Text('1 ${prod['unit'] ?? 'Kg'}', style: const TextStyle(color: Colors.white54, fontSize: 10)),
-                                const SizedBox(height: 8),
+                                Text('1 ${prod['unit'] ?? 'Kg'}', style: const TextStyle(color: Colors.black54, fontSize: 10)),
+                                const SizedBox(height: 6),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text('₹${prod['price']}', style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.bold, fontSize: 13)),
+                                    Text('₹${prod['price']}', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
                                     SizedBox(
                                       height: 28,
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF262626),
-                                          foregroundColor: const Color(0xFF34D399),
-                                          elevation: 0,
+                                      child: OutlinedButton(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.green.shade700,
+                                          side: BorderSide(color: Colors.green.shade700, width: 1.2),
                                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(6),
-                                            side: const BorderSide(color: Color(0xFF34D399), width: 0.8),
-                                          ),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                                         ),
                                         onPressed: () => _addToCart(prod, 1.0),
                                         child: const Text('ADD', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
@@ -251,3 +250,4 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     );
   }
 }
+    
