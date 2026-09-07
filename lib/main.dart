@@ -1,4 +1,4 @@
-// ================= MAIN ENTRY POINT (main.dart) =================
+// ================= MAIN ENTRY POINT (main.dart) - Bulletproof =================
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +9,7 @@ import 'admin_master_dashboard.dart';
 import 'product_details_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const ViziagMartApp());
 }
 
@@ -47,6 +48,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   }
 
   Future<void> _fetchCloudProducts() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final response = await http.get(Uri.parse('${EnterpriseDatabase.firebaseRestUrl}/products.json'));
@@ -54,13 +56,17 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         Map<String, dynamic> data = json.decode(response.body);
         List<Map<String, dynamic>> fetchedList = [];
         data.forEach((key, value) {
-          var item = Map<String, dynamic>.from(value);
-          item['firebaseKey'] = key;
-          fetchedList.add(item);
+          if (value != null) {
+            var item = Map<String, dynamic>.from(value);
+            item['firebaseKey'] = key;
+            fetchedList.add(item);
+          }
         });
-        setState(() {
-          EnterpriseDatabase.globalInventory = fetchedList;
-        });
+        if (mounted) {
+          setState(() {
+            EnterpriseDatabase.globalInventory = fetchedList;
+          });
+        }
       }
     } catch (e) {
       debugPrint('Cloud fetch error: $e');
@@ -112,80 +118,96 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       RefreshIndicator(
         onRefresh: _fetchCloudProducts,
         color: const Color(0xFFF59E0B),
-        child: ListView(
-          padding: const EdgeInsets.all(12),
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(10)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(EnterpriseDatabase.activeShopProfile['shopName'], style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 4),
-                  Text('📍 ${EnterpriseDatabase.activeShopProfile['address']}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
-                ],
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(10)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(EnterpriseDatabase.activeShopProfile['shopName'] ?? 'मेरी दुकान', style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 14)),
+                          const SizedBox(height: 4),
+                          Text('📍 ${EnterpriseDatabase.activeShopProfile['address'] ?? 'Faridabad'}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('उपलब्ध कैटलॉग (Live Inventory)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            const Text('उपलब्ध कैटलॉग (Live Inventory)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-            const SizedBox(height: 8),
             _isLoading
-                ? const Center(child: Padding(padding: EdgeInsets.all(30), child: CircularProgressIndicator(color: Color(0xFFF59E0B))))
+                ? const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator(color: Color(0xFFF59E0B))),
+                  )
                 : EnterpriseDatabase.globalInventory.isEmpty
-                    ? const Center(child: Padding(padding: EdgeInsets.all(30), child: Text('कोई उत्पाद उपलब्ध नहीं है। वेंडर पोर्टल से जोड़ें।', style: TextStyle(color: Colors.grey, fontSize: 11))))
-                    : GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.82,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                        ),
-                        itemCount: EnterpriseDatabase.globalInventory.length,
-                        itemBuilder: (context, index) {
-                          var item = EnterpriseDatabase.globalInventory[index];
-                          bool inStock = item['inStock'] ?? true;
-                          return GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ProductDetailsScreen(product: item),
+                    ? const SliverFillRemaining(
+                        child: Center(child: Text('कोई उत्पाद उपलब्ध नहीं है। वेंडर पोर्टल से जोड़ें।', style: TextStyle(color: Colors.grey, fontSize: 11))),
+                      )
+                    : SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        sliver: SliverGrid(
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.82,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              var item = EnterpriseDatabase.globalInventory[index];
+                              bool inStock = item['inStock'] ?? true;
+                              return GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ProductDetailsScreen(product: item),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1E293B),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: Colors.grey.shade800),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.black26,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          width: double.infinity,
+                                          child: const Icon(Icons.eco, color: Color(0xFFF59E0B), size: 36),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(item['name'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), maxLines: 1),
+                                      Text('₹${item['price']} / ${item['unit'] ?? 'Kg'}', style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.w900)),
+                                      const SizedBox(height: 4),
+                                      Text(inStock ? '🟢 In Stock' : '🔴 Out of Stock', style: TextStyle(color: inStock ? Colors.green : Colors.red, fontSize: 9)),
+                                    ],
+                                  ),
                                 ),
                               );
                             },
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1E293B),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.grey.shade800),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.black26,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      width: double.infinity,
-                                      child: const Icon(Icons.eco, color: Color(0xFFF59E0B), size: 36),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(item['name'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12), maxLines: 1),
-                                  Text('₹${item['price']} / ${item['unit'] ?? 'Kg'}', style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.w900)),
-                                  const SizedBox(height: 4),
-                                  Text(inStock ? '🟢 In Stock' : '🔴 Out of Stock', style: TextStyle(color: inStock ? Colors.green : Colors.red, fontSize: 9)),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                            childCount: EnterpriseDatabase.globalInventory.length,
+                          ),
+                        ),
                       ),
           ],
         ),
