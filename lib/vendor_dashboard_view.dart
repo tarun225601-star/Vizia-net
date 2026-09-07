@@ -1,6 +1,6 @@
 // ============================================================================
 // FILE: vendor_dashboard_view.dart
-// ARCHITECTURE: Ultimate Professional Vendor Master Module (100% Error Free)
+// ARCHITECTURE: Ultimate Professional Vendor Master Module (100% Error Free & Clean)
 // ============================================================================
 
 import 'dart:io';
@@ -354,16 +354,13 @@ class _VendorDashboardViewState extends State<VendorDashboardView> {
           const SizedBox(height: 20),
           const Text('कारोबार सारांश', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.5,
+          
+          // सुरक्षित लेआउट बिना ग्रिड क्रैश के
+          Row(
             children: [
-              _buildMetricCard('कुल बिक्री', '₹${totalRevenue.toStringAsFixed(1)}', Icons.currency_rupee, Colors.greenAccent),
-              _buildMetricCard('कुल ऑर्डर्स', '$totalOrders', Icons.shopping_cart, Colors.amber),
+              Expanded(child: _buildMetricCard('कुल बिक्री', '₹${totalRevenue.toStringAsFixed(1)}', Icons.currency_rupee, Colors.greenAccent)),
+              const SizedBox(width: 12),
+              Expanded(child: _buildMetricCard('कुल ऑर्डर्स', '$totalOrders', Icons.shopping_cart, Colors.amber)),
             ],
           ),
         ],
