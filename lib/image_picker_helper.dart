@@ -1,6 +1,17 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+Future<String?> pickAndConvertToBase64() async {
+  final picker = ImagePicker();
+  final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
+  if (pickedFile != null) {
+    final bytes = await File(pickedFile.path).readAsBytes();
+    return 'data:image/jpeg;base64,${base64Encode(bytes)}';
+  }
+  return null;
+}
 
 Widget buildShopOrProdImage(String? path, double height, double width, IconData fallbackIcon) {
   if (path != null && path.isNotEmpty) {
@@ -9,7 +20,8 @@ Widget buildShopOrProdImage(String? path, double height, double width, IconData 
           errorBuilder: (context, error, stackTrace) => Container(height: height, width: width, color: const Color(0xFF334155), child: Icon(fallbackIcon, size: height * 0.4, color: const Color(0xFFF59E0B))));
     } else if (path.startsWith('data:image')) {
       try {
-        final bytes = base64Decode(path.split(',').last);
+        final base64String = path.contains(',') ? path.split(',').last : path;
+        final bytes = base64Decode(base64String);
         return Image.memory(bytes, height: height, width: width, fit: BoxFit.cover);
       } catch (_) {}
     } else if (File(path).existsSync()) {
