@@ -186,7 +186,7 @@ class VendorAuthAndPortalView extends StatefulWidget {
 }
 
 class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
-  // 0 = होम स्क्रीन (दो बटन), 1 = नया रजिस्ट्रेशन, 2 = लॉगिन, 3 = वेंडर डैशबोर्ड, 4 = एडमिन गुप्त कोड, 5 = एडमिन अप्रूवल पैनल
+  // 0 = होम स्क्रीन, 1 = नया रजिस्ट्रेशन, 2 = लॉगिन, 3 = वेंडर डैशबोर्ड, 4 = एडमिन गुप्त कोड, 5 = एडमिन अप्रूवल पैनल
   int _viewMode = 0;
 
   final regShopNameCtrl = TextEditingController();
@@ -199,14 +199,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   final loginPassCtrl = TextEditingController();
 
   final adminCodeCtrl = TextEditingController();
+  bool _isLoading = false;
 
-  // डेटा लिस्ट्स (सुरक्षा के लिए)
-  static final List<Map<String, dynamic>> pendingShops = [
-    {'name': 'Tarun Fruit Shop', 'phone': '9971968060', 'address': 'Sector 15A, Faridabad', 'pass': '1234'},
-  ];
-  static final List<Map<String, dynamic>> approvedShops = [];
-
-  void _submitRegistration() {
+  Future<void> _submitRegistration() async {
     if (regPhoneCtrl.text.trim().length < 10 || regShopNameCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ कृपया दुकान का नाम और सही मोबाइल नंबर भरें!'), backgroundColor: Colors.red));
       return;
@@ -216,32 +211,46 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       return;
     }
 
-    pendingShops.add({
-      'name': regShopNameCtrl.text.trim(),
-      'phone': regPhoneCtrl.text.trim(),
-      'address': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
-      'pass': regPass1Ctrl.text.trim(),
-    });
+    setState(() => _isLoading = true);
+    try {
+      var shopData = {
+        'name': regShopNameCtrl.text.trim(),
+        'phone': regPhoneCtrl.text.trim(),
+        'address': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
+        'pass': regPass1Ctrl.text.trim(),
+        'status': 'pending', // pending या approved
+      };
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('⏳ रिक्वेस्ट सबमिट हो गई'),
-        content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन (तरुण) द्वारा अप्रूव होने के बाद ही आप लॉगिन कर पाएंगे।'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() => _viewMode = 0);
-            },
-            child: const Text('ठीक है'),
+      // Firebase में पेंडिंग दुकान सेव करें
+      await http.post(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json'),
+        body: json.encode(shopData),
+      );
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('⏳ रिक्वेस्ट सबमिट हो गई'),
+            content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन (तरुण) द्वारा अप्रूव होने के बाद ही आप लॉगिन कर पाएंगे।'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() => _viewMode = 0);
+                },
+                child: const Text('ठीक है'),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  void _loginVendor() {
+  Future<void> _loginVendor() async {
     String phone = loginPhoneCtrl.text.trim();
     String pass = loginPassCtrl.text.trim();
 
@@ -250,23 +259,41 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       return;
     }
 
-    bool isApproved = approvedShops.any((shop) => shop['phone'] == phone && shop['pass'] == pass);
+    setState(() => _isLoading = true);
+    try {
+      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json'));
+      bool isApproved = false;
 
-    if (isApproved) {
-      setState(() => _viewMode = 3);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ स्वागत है! वेंडर डैशबोर्ड खुल गया है।'), backgroundColor: Colors.green));
-    } else {
-      // अगर अप्रूव नहीं है तो साफ़ एरर दिखाएगा
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('⚠️ लॉगिन असफल (Not Approved)'),
-          content: const Text('आपकी दुकान अभी तक मास्टर एडमिन (तरुण) द्वारा अप्रूव नहीं की गई है! कृपया पहले अप्रूवल लें या सही डिटेल्स भरें।'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('ठीक है')),
-          ],
-        ),
-      );
+      if (res.statusCode == 200 && res.body != 'null' && res.body.isNotEmpty) {
+        Map<String, dynamic> data = json.decode(res.body);
+        data.forEach((key, val) {
+          if (val['phone'] == phone && val['pass'] == pass && val['status'] == 'approved') {
+            isApproved = true;
+          }
+        });
+      }
+
+      if (isApproved) {
+        setState(() => _viewMode = 3);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ स्वागत है! वेंडर डैशबोर्ड खुल गया है।'), backgroundColor: Colors.green));
+        }
+      } else {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('⚠️ लॉगिन असफल (Not Approved)'),
+              content: const Text('आपकी दुकान अभी तक मास्टर एडमिन (तरुण) द्वारा अप्रूव नहीं की गई है! कृपया पहले अप्रूवल लें या सही डिटेल्स भरें।'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('ठीक है')),
+              ],
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -281,7 +308,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
   @override
   Widget build(BuildContext context) {
-    // 0: होम चॉइस स्क्रीन (दो मुख्य बटन)
     if (_viewMode == 0) {
       return Padding(
         padding: const EdgeInsets.all(20),
@@ -330,7 +356,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // 1: नया रजिस्ट्रेशन फॉर्म
     if (_viewMode == 1) {
       return Padding(
         padding: const EdgeInsets.all(20),
@@ -354,8 +379,8 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                onPressed: _submitRegistration,
-                child: const Text('अप्रूवल के लिए सबमिट करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                onPressed: _isLoading ? null : _submitRegistration,
+                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('अप्रूवल के लिए सबमिट करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ),
             ),
             const SizedBox(height: 10),
@@ -365,7 +390,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // 2: वेंडर लॉगिन फॉर्म
     if (_viewMode == 2) {
       return Padding(
         padding: const EdgeInsets.all(20),
@@ -387,8 +411,8 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                onPressed: _loginVendor,
-                child: const Text('लॉगिन करें ➔', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                onPressed: _isLoading ? null : _loginVendor,
+                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('लॉगिन करें ➔', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
             const SizedBox(height: 10),
@@ -398,7 +422,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // 3: वेंडर डैशबोर्ड (जब दुकान अप्रूव हो चुकी हो)
     if (_viewMode == 3) {
       return DefaultTabController(
         length: 3,
@@ -446,7 +469,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // 4: एडमिन गुप्त कोड स्क्रीन
     if (_viewMode == 4) {
       return Padding(
         padding: const EdgeInsets.all(20),
@@ -474,7 +496,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // 5: एडमिन अप्रूवल पैनल (जहाँ से तू दुकान चेक करके अप्रूव या डिलीट करेगा)
+    // 5: एडमिन अप्रूवल पैनल (Firebase से डेटा लोड करेगा)
     return Column(
       children: [
         Container(
@@ -491,13 +513,36 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           ),
         ),
         Expanded(
-          child: pendingShops.isEmpty
-              ? const Center(child: Text('अप्रूवल के लिए कोई नई दुकान नहीं है', style: TextStyle(color: Colors.grey)))
-              : ListView.builder(
+          child: FutureBuilder<http.Response>(
+            future: http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json')),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (!snapshot.hasData || snapshot.data!.body == 'null' || snapshot.data!.body.isEmpty) {
+                return const Center(child: Text('अप्रूवल के लिए कोई नई दुकान नहीं है', style: TextStyle(color: Colors.grey)));
+              }
+
+              try {
+                Map<String, dynamic> data = json.decode(snapshot.data!.body);
+                List<Map<String, dynamic>> pendingList = [];
+                data.forEach((key, val) {
+                  var shop = Map<String, dynamic>.from(val);
+                  shop['firebaseKey'] = key;
+                  if (shop['status'] == 'pending') {
+                    pendingList.add(shop);
+                  }
+                });
+
+                if (pendingList.isEmpty) {
+                  return const Center(child: Text('अप्रूवल के लिए कोई पेंडिंग दुकान नहीं है', style: TextStyle(color: Colors.grey)));
+                }
+
+                return ListView.builder(
                   padding: const EdgeInsets.all(12),
-                  itemCount: pendingShops.length,
+                  itemCount: pendingList.length,
                   itemBuilder: (context, index) {
-                    var shop = pendingShops[index];
+                    var shop = pendingList[index];
                     return Card(
                       child: Padding(
                         padding: const EdgeInsets.all(12.0),
@@ -512,12 +557,16 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                                 Expanded(
                                   child: ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                                    onPressed: () {
-                                      setState(() {
-                                        var approvedShop = pendingShops.removeAt(index);
-                                        approvedShops.add(approvedShop);
-                                      });
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान अप्रूव हो गई! अब वेंडर लॉगिन कर सकता है।'), backgroundColor: Colors.green));
+                                    onPressed: () async {
+                                      // डेटाबेस में स्टेटस को 'approved' कर देगा
+                                      await http.patch(
+                                        Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests/${shop['firebaseKey']}.json'),
+                                        body: json.encode({'status': 'approved'}),
+                                      );
+                                      setState(() {});
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान स्थायी रूप से अप्रूव हो गई!'), backgroundColor: Colors.green));
+                                      }
                                     },
                                     icon: const Icon(Icons.check_circle, size: 16),
                                     label: const Text('Approve'),
@@ -527,9 +576,12 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                                 Expanded(
                                   child: ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                                    onPressed: () {
-                                      setState(() => pendingShops.removeAt(index));
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ फर्जी दुकान डिलीट कर दी गई!'), backgroundColor: Colors.red));
+                                    onPressed: () async {
+                                      await http.delete(Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests/${shop['firebaseKey']}.json'));
+                                      setState(() {});
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ दुकान डिलीट कर दी गई!'), backgroundColor: Colors.red));
+                                      }
                                     },
                                     icon: const Icon(Icons.delete, size: 16),
                                     label: const Text('Delete'),
@@ -542,7 +594,12 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                       ),
                     );
                   },
-                ),
+                );
+              } catch (_) {
+                return const Center(child: Text('डेटा लोड करने में त्रुटि'));
+              }
+            },
+          ),
         ),
       ],
     );
