@@ -1,10 +1,10 @@
-// ================= MAIN ENTRY POINT (main.dart) - Bulletproof =================
+// ================= MAIN ENTRY POINT (main.dart) - Final Clean =================
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'database_models.dart';
 import 'cart_and_orders_view.dart';
-import 'vendor_auth_and_portal.dart';
+import 'vendor_auth_and_portal.dart'; // बची हुई वेंडर पोर्टल वाली फाइल
 import 'admin_master_dashboard.dart';
 import 'product_details_screen.dart';
 
@@ -212,7 +212,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
           ],
         ),
       ),
-      // Vendor Portal View
+      // Vendor Portal View (Using VendorAuthAndPortalView)
       const VendorAuthAndPortalView(),
       // Cart & Orders View
       const CartAndOrdersView(),
