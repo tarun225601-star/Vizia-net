@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // HapticFeedback (वाइब्रेशन) के लिए
 import 'dart:async';
 import 'database_models.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart'; // WhatsApp पर भेजने के लिए
 
-// 🚀 1. राइडर रजिस्ट्रेशन स्क्रीन (जहाँ राइडर अपना नाम, फोन और गाड़ी नंबर दर्ज करेगा)
+// 🚀 1. राइडर रजिस्ट्रेशन स्क्रीन (REST API आधारित)
 class RiderRegistrationScreen extends StatefulWidget {
   const RiderRegistrationScreen({Key? key}) : super(key: key);
 
@@ -20,34 +21,41 @@ class _RiderRegistrationScreenState extends State<RiderRegistrationScreen> {
   final TextEditingController _vehicleController = TextEditingController();
   bool _isLoading = false;
 
-  // Firebase में राइडर रजिस्टर करने का फंक्शन
+  // Firebase REST API के जरिए राइडर रजिस्टर करने का फंक्शन
   Future<void> _registerRider() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
         String riderId = "rider_${DateTime.now().millisecondsSinceEpoch}";
         
-        // Firestore में राइडर का डेटा सेव करना
-        await FirebaseFirestore.instance.collection('riders').doc(riderId).set({
+        var riderData = {
           'riderId': riderId,
           'name': _nameController.text.trim(),
           'phone': _phoneController.text.trim(),
           'vehicleNumber': _vehicleController.text.trim().toUpperCase(),
-          'isReady': true, // रजिस्टर होते ही राइडर को फ्री/रेडी मान लिया जाएगा
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+          'isReady': true, // रजिस्टर होते ही राइडर फ्री/रेडी माना जाएगा
+        };
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("🎉 राइडर सफलतापूर्वक रजिस्टर हो गया!")),
+        // REST API के जरिए डेटा भेजना
+        await http.post(
+          Uri.parse('${CakeDatabase.firebaseRestUrl}/riders.json'),
+          body: json.encode(riderData),
         );
 
-        Navigator.pop(context); // रजिस्टर होने के बाद वापस पीछे जाएं
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("🎉 राइडर सफलतापूर्वक रजिस्टर हो गया!")),
+          );
+          Navigator.pop(context);
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("❌ एरर: $e")),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("❌ एरर: $e")),
+          );
+        }
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
@@ -71,7 +79,6 @@ class _RiderRegistrationScreenState extends State<RiderRegistrationScreen> {
               ),
               const SizedBox(height: 20),
               
-              // राइडर का नाम
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -83,7 +90,6 @@ class _RiderRegistrationScreenState extends State<RiderRegistrationScreen> {
               ),
               const SizedBox(height: 15),
 
-              // मोबाइल नंबर
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
@@ -96,7 +102,6 @@ class _RiderRegistrationScreenState extends State<RiderRegistrationScreen> {
               ),
               const SizedBox(height: 15),
 
-              // गाड़ी का नंबर (Vehicle Number)
               TextFormField(
                 controller: _vehicleController,
                 decoration: const InputDecoration(
@@ -108,7 +113,6 @@ class _RiderRegistrationScreenState extends State<RiderRegistrationScreen> {
               ),
               const SizedBox(height: 30),
 
-              // सबमिट बटन
               SizedBox(
                 height: 50,
                 child: ElevatedButton(
@@ -128,41 +132,47 @@ class _RiderRegistrationScreenState extends State<RiderRegistrationScreen> {
 }
 
 
-// 🚀 2. वेंडर डैशबोर्ड से 'Dispatch' करने का कोर लॉजिक
+// 🚀 2. वेंडर डैशबोर्ड से 'Dispatch' करने का REST API लॉजिक
 class DeliveryDispatcherManager {
-  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  static Future<String> dispatchOrderToAvailableRider(String orderId, Map<String, dynamic> orderData) async {
+  static Future<String> dispatchOrderToAvailableRider(String orderKey, Map<String, dynamic> orderData) async {
     try {
-      // डेटाबेस से पहला खाली (isReady: true) राइडर खोजो
-      QuerySnapshot availableRiders = await _firestore
-          .collection('riders')
-          .where('isReady', isEqualTo: true)
-          .limit(1)
-          .get();
-
-      if (availableRiders.docs.isEmpty) {
-        return "NO_RIDER_AVAILABLE"; // अगर सभी राइडर बिजी हैं
+      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/riders.json'));
+      if (res.statusCode != 200 || res.body == 'null' || res.body.isEmpty) {
+        return "NO_RIDER_AVAILABLE";
       }
 
-      var riderDoc = availableRiders.docs.first;
-      String riderId = riderDoc.id;
-      String riderPhone = riderDoc['phone'] ?? '';
-      String vehicleNo = riderDoc['vehicleNumber'] ?? '';
+      Map<String, dynamic> data = json.decode(res.body);
+      String? matchedRiderFirebaseKey;
+      String riderPhone = '';
+      String vehicleNo = '';
 
-      // ट्रांजैक्शन के जरिए ऑर्डर असाइन करो और राइडर को बिजी करो
-      await _firestore.runTransaction((transaction) async {
-        transaction.update(_firestore.collection('orders').doc(orderId), {
-          'assignedRiderId': riderId,
+      data.forEach((key, val) {
+        if (val['isReady'] == true && matchedRiderFirebaseKey == null) {
+          matchedRiderFirebaseKey = key;
+          riderPhone = val['phone'] ?? '';
+          vehicleNo = val['vehicleNumber'] ?? '';
+        }
+      });
+
+      if (matchedRiderFirebaseKey == null) {
+        return "NO_RIDER_AVAILABLE";
+      }
+
+      // 1. ऑर्डर को अपडेट करें
+      await http.patch(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderKey.json'),
+        body: json.encode({
           'riderPhone': riderPhone,
           'vehicleNumber': vehicleNo,
           'orderStatus': 'Out for Delivery',
-        });
+        }),
+      );
 
-        transaction.update(_firestore.collection('riders').doc(riderId), {
-          'isReady': false, // राइडर अब व्यस्त हो गया
-        });
-      });
+      // 2. राइडर को व्यस्त (isReady: false) करें
+      await http.patch(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/riders/$matchedRiderFirebaseKey.json'),
+        body: json.encode({'isReady': false}),
+      );
 
       return "SUCCESS:$riderPhone";
     } catch (e) {
@@ -194,16 +204,13 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     _startAlertAndTimer();
   }
 
-  // टाइमर और लगातार हैप्टिक वाइब्रेशन शुरू करने का लॉजिक
   void _startAlertAndTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _secondsElapsed++;
-      });
+      setState(() => _secondsElapsed++);
     });
 
     _vibrationTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      HapticFeedback.heavyImpact(); // जोरदार वाइब्रेशन झटका
+      HapticFeedback.heavyImpact();
     });
   }
 
@@ -220,7 +227,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     return '${minutes.toString().padLeft(2, '0')}:${remSec.toString().padLeft(2, '0')}';
   }
 
-  // व्हाट्सएप पर आर्डर भेजने का फंक्शन
   Future<void> _sendDetailsToWhatsApp() async {
     String shopName = widget.orderDetails['shopName'] ?? CakeDatabase.bakeryShop['shopName'];
     String pickupAddr = widget.orderDetails['pickupAddress'] ?? CakeDatabase.bakeryShop['address'];
@@ -259,7 +265,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.red[900], // अर्जेंट लुक के लिए लाल रंग
+      backgroundColor: Colors.red[900],
       appBar: AppBar(
         title: const Text("🚨 नया आर्डर अलर्ट", style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.red[800],
@@ -274,8 +280,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
               style: TextStyle(color: Colors.white70, fontSize: 18),
             ),
             const SizedBox(height: 10),
-            
-            // ⏱️ बड़े अक्षरों में चलने वाला टाइमर
             Text(
               _formatTime(_secondsElapsed),
               style: const TextStyle(
@@ -286,8 +290,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // 📍 दुकान और ग्राहक का पता फ्लैश करने वाला कार्ड
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -304,13 +306,11 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const Divider(thickness: 2),
                       const SizedBox(height: 10),
-                      
                       const Text("🟢 पिकअप एड्रेस (दुकान):",
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
                       Text(widget.orderDetails['pickupAddress'] ?? CakeDatabase.bakeryShop['address'],
                           style: const TextStyle(fontSize: 16)),
                       const SizedBox(height: 20),
-
                       const Text("🔴 डिलीवरी एड्रेस (ग्राहक):",
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
                       Text(widget.orderDetails['deliveryAddress'] ?? 'डिफ़ॉल्ट पता',
@@ -324,8 +324,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // ✅ आर्डर स्वीकार करने और WhatsApp पर भेजने का बटन
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
@@ -335,7 +333,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
               onPressed: () {
                 _vibrationTimer?.cancel();
                 _timer?.cancel();
-                _sendDetailsToWhatsApp(); // WhatsApp पर एड्रेस भेजने का ट्रिगर
+                _sendDetailsToWhatsApp();
                 Navigator.pop(context);
               },
               child: const Text(
