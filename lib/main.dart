@@ -3,6 +3,7 @@ import 'database_models.dart';
 import 'marketplace_buyer_view.dart';
 import 'cart_and_orders_view.dart';
 import 'image_picker_helper.dart';
+import 'rider_delivery_view.dart'; // 🛵 राइडर और डिलीवरी वाला पेज इम्पोर्ट कर दिया है
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -37,9 +38,11 @@ class CakeMainHubScreen extends StatefulWidget {
 class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
   int _selectedTabIndex = 0;
 
+  // 🛵 यहाँ 4 मुख्य टैब सेट कर दिए गए हैं (0: Shop, 1: Vendor, 2: Delivery Rider, 3: Cart & Orders)
   final List<Widget> _tabScreens = [
     const MarketplaceBuyerView(),
     const VendorAuthAndPortalView(),
+    const RiderRegistrationScreen(), // 🛵 यहाँ राइडर रजिस्ट्रेशन और डैशबोर्ड स्क्रीन आ गई
     const CartAndOrdersView(),
   ];
 
@@ -103,9 +106,9 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
           ),
         ),
       ),
-      body: IndexedStack(index: _selectedTabIndex > 2 ? 2 : _selectedTabIndex, children: _tabScreens),
+      body: IndexedStack(index: _selectedTabIndex > 3 ? 3 : _selectedTabIndex, children: _tabScreens),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedTabIndex > 2 ? 2 : _selectedTabIndex,
+        currentIndex: _selectedTabIndex > 3 ? 3 : _selectedTabIndex,
         selectedItemColor: Colors.green.shade700,
         unselectedItemColor: Colors.grey,
         backgroundColor: Colors.white,
@@ -114,6 +117,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
         items: [
           const BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Shop'),
           const BottomNavigationBarItem(icon: Icon(Icons.admin_panel_settings_outlined), label: 'Vendor'),
+          const BottomNavigationBarItem(icon: Icon(Icons.delivery_dining), label: 'Delivery'), // 🛵 यहाँ डिलीवरी का बटन पक्का लग गया है
           BottomNavigationBarItem(
             icon: Stack(
               children: [
@@ -218,10 +222,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
         'phone': regPhoneCtrl.text.trim(),
         'address': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
         'pass': regPass1Ctrl.text.trim(),
-        'status': 'pending', // pending या approved
+        'status': 'pending',
       };
 
-      // Firebase में पेंडिंग दुकान सेव करें
       await http.post(
         Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json'),
         body: json.encode(shopData),
@@ -496,7 +499,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // 5: एडमिन अप्रूवल पैनल (Firebase से डेटा लोड करेगा)
     return Column(
       children: [
         Container(
@@ -558,7 +560,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                                   child: ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                                     onPressed: () async {
-                                      // डेटाबेस में स्टेटस को 'approved' कर देगा
                                       await http.patch(
                                         Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests/${shop['firebaseKey']}.json'),
                                         body: json.encode({'status': 'approved'}),
