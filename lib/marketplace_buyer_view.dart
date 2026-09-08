@@ -14,11 +14,11 @@ class MarketplaceBuyerView extends StatefulWidget {
 class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   String selectedCategory = 'All';
   bool _isLoadingCloud = false;
+  String _errorMessage = '';
   
-  // 🔍 सर्च और हाइपरलोकल फिल्टर के लिए कंट्रोलर और वेरिएबल
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  final String _targetCity = 'Faridabad'; // केवल फरीदाबाद के लिए रेस्ट्रिक्शन
+  final String _targetCity = 'faridabad';
 
   final List<String> categories = ['All', 'Fresh Fruits', 'Vegetables', 'Organic Items', 'Daily Essentials'];
 
@@ -28,37 +28,35 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     _loadInstantDataAndFetch();
   }
 
-  // ⚡ 0 सेकंड में लोड करने के लिए लोकल डेटा पहले दिखाओ, फिर क्लाउड से सिंक करो
   Future<void> _loadInstantDataAndFetch() async {
-    // 1. पहले लोकल मेमोरी से तुरंत प्रोडक्ट्स लोड करके स्क्रीन दिखाओ (0 Sec Load)
-    await CakeDatabase.loadInventoryLocally();
-    if (mounted) setState(() {});
-
-    // 2. इसके बाद बैकग्राउंड में क्लाउड/फायरबेस से ताज़ा डेटा खींचकर अपडेट करो
+    try {
+      await CakeDatabase.loadInventoryLocally();
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint("Local load error: $e");
+    }
     _fetchShopProfileAndProducts();
   }
 
   Future<void> _fetchShopProfileAndProducts() async {
     if (CakeDatabase.productInventory.isEmpty) {
-      setState(() => _isLoadingCloud = true);
+      if (mounted) setState(() => _isLoadingCloud = true);
     }
     
     try {
-      final shopRes = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json'));
+      final shopRes = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json')).timeout(const Duration(seconds: 10));
       if (shopRes.statusCode == 200 && shopRes.body != 'null' && shopRes.body.isNotEmpty) {
         var decodedShop = json.decode(shopRes.body);
-        if (decodedShop is Map) {
-          if (mounted) {
-            setState(() {
-              CakeDatabase.bakeryShop = Map<String, dynamic>.from(
-                decodedShop.map((key, value) => MapEntry(key.toString(), value))
-              );
-            });
-          }
+        if (decodedShop is Map && mounted) {
+          setState(() {
+            CakeDatabase.bakeryShop = Map<String, dynamic>.from(
+              decodedShop.map((key, value) => MapEntry(key.toString(), value))
+            );
+          });
         }
       }
 
-      final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/products.json'));
+      final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/products.json')).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
         var decodedProducts = json.decode(response.body);
         List<Map<String, dynamic>> fetchedList = [];
@@ -76,68 +74,71 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
         }
         
         CakeDatabase.productInventory = fetchedList.reversed.toList();
-        
-        // 🚀 नया डेटा आते ही उसे लोकल स्टोरेज में भी सेव कर लो ताकि अगली बार और तेज़ खुले
         await CakeDatabase.saveInventoryLocally();
 
-        if (mounted) setState(() {});
+        if (mounted) setState(() => _errorMessage = '');
       }
     } catch (e) {
-      debugPrint("Error: $e");
+      debugPrint("Cloud fetch error: $e");
+      if (mounted) setState(() => _errorMessage = 'सर्वर कनेक्ट करने में समस्या');
     } finally {
       if (mounted) setState(() => _isLoadingCloud = false);
     }
   }
 
   void _addToCart(Map<String, dynamic> prod, double qty) {
-    if (CakeDatabase.bakeryShop['isOpen'] == false) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ दुकान अभी बंद है!'), backgroundColor: Colors.red));
-      return;
-    }
-    setState(() {
-      CakeDatabase.cartItems.add({
-        'name': prod['name'],
-        'price': prod['price'],
-        'unit': prod['unit'] ?? 'Kg',
-        'qty': qty,
-        'image': prod['image'] ?? '',
-        'shopName': CakeDatabase.bakeryShop['shopName'],
+    try {
+      if (CakeDatabase.bakeryShop['isOpen'] == false) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ दुकान अभी बंद है!'), backgroundColor: Colors.red));
+        return;
+      }
+      setState(() {
+        CakeDatabase.cartItems.add({
+          'name': prod['name'] ?? 'Item',
+          'price': prod['price'] ?? 0.0,
+          'unit': prod['unit'] ?? 'Kg',
+          'qty': qty,
+          'image': prod['image'] ?? '',
+          'shopName': CakeDatabase.bakeryShop['shopName'] ?? 'Shop',
+        });
       });
-    });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🛒 ${prod['name']} कार्ट में जुड़ गया!'), backgroundColor: Colors.green));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🛒 ${prod['name']} कार्ट में जुड़ गया!'), backgroundColor: Colors.green));
+    } catch (e) {
+      debugPrint("Add to cart error: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     var shop = CakeDatabase.bakeryShop;
     
-    // 📍 हाइपरलोकल चेक: अगर दुकान फरीदाबाद के बाहर की है तो प्रोडक्ट्स नहीं दिखेंगे
-    String shopAddress = (shop['address'] ?? 'Faridabad').toString();
-    bool isLocalFaridabadShop = shopAddress.toLowerCase().contains(_targetCity.toLowerCase());
+    // 📍 सेफ हाइपरलोकल चेकिंग (अगर एड्रेस खाली भी हो तो भी ऐप क्रैश या ब्लैक नहीं होगा)
+    String shopAddress = (shop['address'] ?? 'Faridabad').toString().toLowerCase();
+    bool isLocalFaridabadShop = shopAddress.contains(_targetCity) || shopAddress.isEmpty;
 
-    // 🔍 कैटेगरी, सर्च और फरीदाबाद लोकेशन के हिसाब से फ़िल्टरिंग
-    var filtered = CakeDatabase.productInventory.where((p) {
-      if (!isLocalFaridabadShop) return false; 
-
-      bool matchesCategory = (selectedCategory == 'All' || p['category'] == selectedCategory);
-      
-      String productName = (p['name'] ?? '').toString().toLowerCase();
-      bool matchesSearch = productName.contains(_searchQuery.toLowerCase());
-
-      return matchesCategory && matchesSearch;
-    }).toList();
+    var filtered = <Map<String, dynamic>>[];
+    try {
+      filtered = CakeDatabase.productInventory.where((p) {
+        if (!isLocalFaridabadShop) return false; 
+        bool matchesCategory = (selectedCategory == 'All' || p['category'] == selectedCategory);
+        String productName = (p['name'] ?? '').toString().toLowerCase();
+        bool matchesSearch = productName.contains(_searchQuery.toLowerCase());
+        return matchesCategory && matchesSearch;
+      }).toList();
+    } catch (e) {
+      debugPrint("Filtering error: $e");
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA), 
       body: ListView(
         padding: const EdgeInsets.all(10),
         children: [
-          // 🔍 शानदार सर्च बार (Search Bar)
           TextField(
             controller: _searchController,
             onChanged: (val) => setState(() => _searchQuery = val),
             decoration: InputDecoration(
-              hintText: 'फल, सब्ज़ी या आइटम खोजें (फरीदाबाद 5km)...',
+              hintText: 'फल, सब्ज़ी या आइटम खोजें (फरीदाबाद)...',
               prefixIcon: const Icon(Icons.search, color: Colors.green),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
@@ -165,7 +166,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
           ),
           const SizedBox(height: 10),
 
-          // दुकान बैनर कार्ड
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -195,7 +195,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                           children: [
                             Text(shop['shopName'] ?? 'Tarun Fruit & Vegetable Shop', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 13)),
                             const SizedBox(height: 2),
-                            Text('📍 ${shop['address'] ?? 'Faridabad (5km Range)'}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                            Text('📍 ${shop['address'] ?? 'Faridabad'}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
                           ],
                         ),
                       ),
@@ -208,7 +208,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
           ),
           const SizedBox(height: 10),
           
-          // कैटेगरी चॉइस चिप्स
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -230,17 +229,18 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
             ),
           ),
           if (_isLoadingCloud) const LinearProgressIndicator(color: Colors.green),
+          if (_errorMessage.isNotEmpty) Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(_errorMessage, style: const TextStyle(color: Colors.red, fontSize: 11)),
+          ),
           const SizedBox(height: 10),
 
-          // प्रोडक्ट्स ग्रिड व्यू
           filtered.isEmpty
               ? Padding(
                   padding: const EdgeInsets.all(40),
                   child: Center(
                     child: Text(
-                      !isLocalFaridabadShop 
-                          ? '⚠️ यह दुकान फरीदाबाद के बाहर की है, इसलिए यहाँ नहीं दिखेगी।' 
-                          : 'कोई प्रोडक्ट नहीं मिला',
+                      !isLocalFaridabadShop ? '⚠️ यह दुकान फरीदाबाद के बाहर की है।' : 'कोई प्रोडक्ट नहीं मिला',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.black45, fontSize: 13),
                     ),
@@ -308,7 +308,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text('₹${prod['price']}', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    Text('₹${prod['price'] ?? 0}', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
                                     SizedBox(
                                       height: 28,
                                       child: OutlinedButton(
