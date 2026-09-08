@@ -182,12 +182,16 @@ class DeliveryDispatcherManager {
 }
 
 
-// 📱 3. राइडर का डैशबोर्ड और अलर्ट स्क्रीन
+// 📱 3. राइडर का डैशबोर्ड और अलर्ट स्क्रीन (सेफ डेटा और फिक्सड UI के साथ)
 class RiderDeliveryScreen extends StatefulWidget {
   final Map<String, dynamic> orderDetails;
   final String riderPhone;
 
-  const RiderDeliveryScreen({Key? key, required this.orderDetails, required this.riderPhone}) : super(key: key);
+  const RiderDeliveryScreen({
+    Key? key, 
+    this.orderDetails = const {}, 
+    this.riderPhone = '9971968060'
+  }) : super(key: key);
 
   @override
   _RiderDeliveryScreenState createState() => _RiderDeliveryScreenState();
@@ -201,12 +205,17 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   @override
   void initState() {
     super.initState();
-    _startAlertAndTimer();
+    // अगर आर्डर मौजूद है तभी टाइमर और वाइब्रेशन चालू करें
+    if (widget.orderDetails.isNotEmpty) {
+      _startAlertAndTimer();
+    }
   }
 
   void _startAlertAndTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() => _secondsElapsed++);
+      if (mounted) {
+        setState(() => _secondsElapsed++);
+      }
     });
 
     _vibrationTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
@@ -228,13 +237,13 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   }
 
   Future<void> _sendDetailsToWhatsApp() async {
-    String shopName = widget.orderDetails['shopName'] ?? CakeDatabase.bakeryShop['shopName'];
-    String pickupAddr = widget.orderDetails['pickupAddress'] ?? CakeDatabase.bakeryShop['address'];
+    String shopName = widget.orderDetails['shopName'] ?? CakeDatabase.bakeryShop['shopName'] ?? 'Viziag Mart';
+    String pickupAddr = widget.orderDetails['pickupAddress'] ?? CakeDatabase.bakeryShop['address'] ?? 'Faridabad';
     String customerName = widget.orderDetails['customerName'] ?? 'कस्टमर';
     String customerPhone = widget.orderDetails['customerPhone'] ?? '';
     String deliveryAddr = widget.orderDetails['deliveryAddress'] ?? 'पता उपलब्ध नहीं';
     String orderId = widget.orderDetails['orderId'] ?? '101';
-    String totalAmount = widget.orderDetails['totalAmount'] ?? '0';
+    String totalAmount = widget.orderDetails['totalAmount']?.toString() ?? '0';
 
     String message = '''
 🚨 *नया डिलीवरी आर्डर मिला है!* 🚨
@@ -254,7 +263,8 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 समय पर डिलीवरी पूरी करें! 🚀
 ''';
 
-    String formattedPhone = widget.riderPhone.startsWith('+') ? widget.riderPhone : '+91${widget.riderPhone}';
+    String targetPhone = widget.riderPhone.isEmpty ? '9971968060' : widget.riderPhone;
+    String formattedPhone = targetPhone.startsWith('+') ? targetPhone : '+91$targetPhone';
     String url = "https://wa.me/$formattedPhone?text=${Uri.encodeComponent(message)}";
 
     if (await canLaunchUrl(Uri.parse(url))) {
@@ -264,85 +274,108 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool hasOrder = widget.orderDetails.isNotEmpty;
+
     return Scaffold(
-      backgroundColor: Colors.red[900],
+      backgroundColor: hasOrder ? Colors.red[900] : Colors.grey[100],
       appBar: AppBar(
-        title: const Text("🚨 नया आर्डर अलर्ट", style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.red[800],
+        title: const Text("राइडर डैशबोर्ड", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.green[700],
+        automaticallyImplyLeading: false,
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const Text(
-              "ऑर्डर आए हुए समय हो गया:",
-              style: TextStyle(color: Colors.white70, fontSize: 18),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _formatTime(_secondsElapsed),
-              style: const TextStyle(
-                color: Colors.yellowAccent,
-                fontSize: 60,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2.0,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("📦 आर्डर ID: #${widget.orderDetails['orderId'] ?? '01'}",
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const Divider(thickness: 2),
-                      const SizedBox(height: 10),
-                      const Text("🟢 पिकअप एड्रेस (दुकान):",
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
-                      Text(widget.orderDetails['pickupAddress'] ?? CakeDatabase.bakeryShop['address'],
-                          style: const TextStyle(fontSize: 16)),
-                      const SizedBox(height: 20),
-                      const Text("🔴 डिलीवरी एड्रेस (ग्राहक):",
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
-                      Text(widget.orderDetails['deliveryAddress'] ?? 'डिफ़ॉल्ट पता',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
-                      Text("👤 ग्राहक नाम: ${widget.orderDetails['customerName'] ?? 'Tarun Kumar'}"),
-                      Text("📞 फोन नंबर: ${widget.orderDetails['customerPhone'] ?? '9971968060'}"),
-                    ],
+        child: hasOrder
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text(
+                    "🚨 नया आर्डर आया हुआ है:",
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
+                  const SizedBox(height: 5),
+                  Text(
+                    _formatTime(_secondsElapsed),
+                    style: const TextStyle(
+                      color: Colors.yellowAccent,
+                      fontSize: 50,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("📦 आर्डर ID: #${widget.orderDetails['orderId'] ?? 'N/A'}",
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            const Divider(thickness: 2),
+                            const SizedBox(height: 10),
+                            const Text("🟢 पिकअप एड्रेस (दुकान):",
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
+                            Text(widget.orderDetails['pickupAddress'] ?? CakeDatabase.bakeryShop['address'] ?? 'Faridabad',
+                                style: const TextStyle(fontSize: 16)),
+                            const SizedBox(height: 15),
+                            const Text("🔴 डिलीवरी एड्रेस (ग्राहक):",
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
+                            Text(widget.orderDetails['deliveryAddress'] ?? 'पता नहीं मिला',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 10),
+                            Text("👤 ग्राहक नाम: ${widget.orderDetails['customerName'] ?? 'Tarun Kumar'}"),
+                            Text("📞 फोन नंबर: ${widget.orderDetails['customerPhone'] ?? '9971968060'}"),
+                            const SizedBox(height: 10),
+                            Text("💰 कुल राशि: ₹${widget.orderDetails['totalAmount'] ?? '0'}"),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      minimumSize: const Size(double.infinity, 55),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      _vibrationTimer?.cancel();
+                      _timer?.cancel();
+                      _sendDetailsToWhatsApp();
+                    },
+                    child: const Text(
+                      "आर्डर स्वीकार करें & WhatsApp पर भेजें",
+                      style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              )
+            : Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.delivery_dining, size: 80, color: Colors.green[700]),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "स्वागत है, राइडर पार्टनर!",
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      "फिलहाल कोई नया आर्डर नहीं है।\nवेंडर द्वारा आर्डर 'Dispatch' होने पर यहीं दिखाई देगा।",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                minimumSize: const Size(double.infinity, 55),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () {
-                _vibrationTimer?.cancel();
-                _timer?.cancel();
-                _sendDetailsToWhatsApp();
-                Navigator.pop(context);
-              },
-              child: const Text(
-                "आर्डर स्वीकार करें & WhatsApp पर भेजें",
-                style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
