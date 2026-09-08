@@ -1,4 +1,4 @@
-                           import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'database_models.dart';
@@ -14,6 +14,11 @@ class MarketplaceBuyerView extends StatefulWidget {
 class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   String selectedCategory = 'All';
   bool _isLoadingCloud = false;
+  
+  // 🔍 सर्च और हाइपरलोकल फिल्टर के लिए कंट्रोलर और वेरिएबल
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  final String _targetCity = 'Faridabad'; // केवल फरीदाबाद के लिए रेस्ट्रिक्शन
 
   final List<String> categories = ['All', 'Fresh Fruits', 'Vegetables', 'Organic Items', 'Daily Essentials'];
 
@@ -83,14 +88,62 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 
   @override
   Widget build(BuildContext context) {
-    var filtered = CakeDatabase.productInventory.where((p) => selectedCategory == 'All' || p['category'] == selectedCategory).toList();
     var shop = CakeDatabase.bakeryShop;
+    
+    // 📍 हाइपरलोकल चेक: अगर दुकान फरीदाबाद के बाहर की है तो प्रोडक्ट्स नहीं दिखेंगे
+    String shopAddress = (shop['address'] ?? 'Faridabad').toString();
+    bool isLocalFaridabadShop = shopAddress.toLowerCase().contains(_targetCity.toLowerCase());
+
+    // 🔍 कैटेगरी, सर्च और फरीदाबाद लोकेशन के हिसाब से फ़िल्टरिंग
+    var filtered = CakeDatabase.productInventory.where((p) {
+      if (!isLocalFaridabadShop) return false; // गुड़गांव या अन्य बाहर की दुकानें हाइड हो जाएंगी
+
+      bool matchesCategory = (selectedCategory == 'All' || p['category'] == selectedCategory);
+      
+      String productName = (p['name'] ?? '').toString().toLowerCase();
+      bool matchesSearch = productName.contains(_searchQuery.toLowerCase());
+
+      return matchesCategory && matchesSearch;
+    }).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA), // एकदम साफ़ क्लीन वाइट बैकग्राउंड
+      backgroundColor: const Color(0xFFF8F9FA), 
       body: ListView(
         padding: const EdgeInsets.all(10),
         children: [
+          // 🔍 शानदार सर्च बार (Search Bar) यहाँ जोड़ा गया है
+          TextField(
+            controller: _searchController,
+            onChanged: (val) => setState(() => _searchQuery = val),
+            decoration: InputDecoration(
+              hintText: 'फल, सब्ज़ी या आइटम खोजें (फरीदाबाद 5km)...',
+              prefixIcon: const Icon(Icons.search, color: Colors.green),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          _searchQuery = '';
+                        });
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
           // दुकान बैनर कार्ड
           Container(
             decoration: BoxDecoration(
@@ -121,7 +174,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                           children: [
                             Text(shop['shopName'] ?? 'Tarun Fruit & Vegetable Shop', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87, fontSize: 13)),
                             const SizedBox(height: 2),
-                            Text('📍 ${shop['address'] ?? 'Faridabad'}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                            Text('📍 ${shop['address'] ?? 'Faridabad (5km Range)'}', style: const TextStyle(fontSize: 10, color: Colors.black54)),
                           ],
                         ),
                       ),
@@ -133,7 +186,8 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
             ),
           ),
           const SizedBox(height: 10),
-          // कैटेगरी चॉइस चिप्स (वाइट थीम)
+          
+          // कैटेगरी चॉइस चिप्स
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -156,9 +210,21 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
           ),
           if (_isLoadingCloud) const LinearProgressIndicator(color: Colors.green),
           const SizedBox(height: 10),
-          // ब्लिंकईट जैसी परफेक्ट 2-कॉलम ग्रिड व्यू (वाइट कार्ड्स)
+
+          // प्रोडक्ट्स ग्रिड व्यू
           filtered.isEmpty
-              ? const Padding(padding: EdgeInsets.all(40), child: Center(child: Text('कोई प्रोडक्ट नहीं मिला', style: TextStyle(color: Colors.black45))))
+              ? Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Center(
+                    child: Text(
+                      !isLocalFaridabadShop 
+                          ? '⚠️ यह दुकान फरीदाबाद के बाहर (जैसे गुड़गांव) की है, इसलिए यहाँ नहीं दिखेगी।' 
+                          : 'कोई प्रोडक्ट नहीं मिला',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.black45, fontSize: 13),
+                    ),
+                  ),
+                )
               : GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -173,7 +239,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                     var prod = filtered[index];
                     return Container(
                       decoration: BoxDecoration(
-                        color: Colors.white, // साफ़ सफ़ेद कार्ड
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.grey.shade200, width: 1),
                         boxShadow: [
@@ -250,4 +316,3 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
     );
   }
 }
-    
