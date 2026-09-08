@@ -842,9 +842,14 @@ class _VendorOrdersTabState extends State<VendorOrdersTab> {
   Future<void> _updateStatus(String firebaseKey, String newStatus) async {
     await http.patch(
       Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$firebaseKey.json'),
-      body: json.encode({'status': newStatus}),
+      body: json.encode({'status': newStatus, 'orderStatus': newStatus}),
     );
     _fetchOrders();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('✅ आर्डर स्टेटस अपडेट हो गया: $newStatus'), backgroundColor: Colors.green),
+      );
+    }
   }
 
   @override
@@ -868,19 +873,57 @@ class _VendorOrdersTabState extends State<VendorOrdersTab> {
                   itemCount: allOrders.length,
                   itemBuilder: (context, index) {
                     var ord = allOrders[index];
+                    String firebaseKey = ord['firebaseKey'] ?? '';
+                    String currentStatus = ord['status'] ?? ord['orderStatus'] ?? 'Pending ⏳';
+
                     return Card(
                       margin: const EdgeInsets.all(8),
-                      child: ListTile(
-                        title: Text('ग्राहक: ${ord['customerName']} (${ord['customerPhone']})', style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold)),
-                        subtitle: Text('पता: ${ord['customerAddress']}\nकुल राशि: ₹${ord['grandTotal']?.toInt()}\nस्टेटस: ${ord['status']}', style: const TextStyle(color: Colors.black87)),
-                        isThreeLine: true,
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (val) => _updateStatus(ord['firebaseKey'], val),
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(value: 'Accepted ✅', child: Text('Accept')),
-                            const PopupMenuItem(value: 'Dispatched 🚚', child: Text('Dispatch')),
-                            const PopupMenuItem(value: 'Delivered 🎉', child: Text('Deliver')),
-                            const PopupMenuItem(value: 'Cancelled ❌', child: Text('Cancel')),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('ग्राहक: ${ord['customerName']} (${ord['customerPhone']})', 
+                                style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text('पता: ${ord['customerAddress'] ?? ord['deliveryAddress'] ?? 'N/A'}', 
+                                style: const TextStyle(color: Colors.black87, fontSize: 13)),
+                            Text('कुल राशि: ₹${(ord['grandTotal'] ?? ord['totalAmount'])?.toInt()}', 
+                                style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text('स्टेटस: $currentStatus', 
+                                style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 10),
+                            
+                            // 🚀 वेंडर डैशबोर्ड पर डायरेक्ट 'सेंड टू डिलीवरी' बटन और अन्य विकल्प
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blue.shade700,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    icon: const Icon(Icons.delivery_dining, size: 16),
+                                    label: const Text('सेंड टू डिलीवरी', style: TextStyle(fontSize: 12)),
+                                    onPressed: () => _updateStatus(firebaseKey, 'Out for Delivery 🛵'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                PopupMenuButton<String>(
+                                  onSelected: (val) => _updateStatus(firebaseKey, val),
+                                  itemBuilder: (context) => [
+                                    const PopupMenuItem(value: 'Accepted ✅', child: Text('Accept')),
+                                    const PopupMenuItem(value: 'Dispatched 🚚', child: Text('Dispatch')),
+                                    const PopupMenuItem(value: 'Out for Delivery 🛵', child: Text('Send to Delivery Dashboard')),
+                                    const PopupMenuItem(value: 'Delivered 🎉', child: Text('Deliver')),
+                                    const PopupMenuItem(value: 'Cancelled ❌', child: Text('Cancel')),
+                                  ],
+                                  child: const Chip(
+                                    label: Text('अन्य विकल्प ⚙️', style: TextStyle(fontSize: 11)),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
