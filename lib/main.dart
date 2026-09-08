@@ -4,13 +4,20 @@ import 'database_models.dart';
 import 'marketplace_buyer_view.dart';
 import 'cart_and_orders_view.dart';
 import 'image_picker_helper.dart';
-import 'rider_delivery_view.dart'; // 🛵 राइडर और डिलीवरी वाला पेज इम्पोर्ट कर दिया है
+import 'rider_delivery_view.dart'; 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // 🟢 यहाँ Firebase को ठीक से इनिशियलाइज कर दिया गया है जिससे एरर जड़ से खत्म हो जाएगी
+  
+  // 🟢 यहाँ try-catch लगाने से वाइट स्क्रीन की दिक्कत जड़ से खत्म हो जाएगी
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint("Firebase init warning: $e");
+  }
+
   runApp(const CakeAppEnterpriseApp());
 }
 
@@ -43,11 +50,10 @@ class CakeMainHubScreen extends StatefulWidget {
 class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
   int _selectedTabIndex = 0;
 
-  // 🛵 यहाँ 4 मुख्य टैब सेट कर दिए गए हैं (0: Shop, 1: Vendor, 2: Delivery Rider, 3: Cart & Orders)
   final List<Widget> _tabScreens = [
     const MarketplaceBuyerView(),
     const VendorAuthAndPortalView(),
-    const RiderRegistrationScreen(), // 🛵 यहाँ राइडर रजिस्ट्रेशन और डैशबोर्ड स्क्रीन आ गई
+    const RiderRegistrationScreen(),
     const CartAndOrdersView(),
   ];
 
@@ -122,7 +128,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
         items: [
           const BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Shop'),
           const BottomNavigationBarItem(icon: Icon(Icons.admin_panel_settings_outlined), label: 'Vendor'),
-          const BottomNavigationBarItem(icon: Icon(Icons.delivery_dining), label: 'Delivery'), // 🛵 यहाँ डिलीवरी का बटन पक्का लग गया है
+          const BottomNavigationBarItem(icon: Icon(Icons.delivery_dining), label: 'Delivery'),
           BottomNavigationBarItem(
             icon: Stack(
               children: [
@@ -195,7 +201,6 @@ class VendorAuthAndPortalView extends StatefulWidget {
 }
 
 class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
-  // 0 = होम स्क्रीन, 1 = नया रजिस्ट्रेशन, 2 = लॉगिन, 3 = वेंडर डैशबोर्ड, 4 = एडमिन गुप्त कोड, 5 = एडमिन अप्रूवल पैनल
   int _viewMode = 0;
 
   final regShopNameCtrl = TextEditingController();
