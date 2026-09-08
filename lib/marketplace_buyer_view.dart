@@ -25,21 +25,36 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   @override
   void initState() {
     super.initState();
+    _loadInstantDataAndFetch();
+  }
+
+  // ⚡ 0 सेकंड में लोड करने के लिए लोकल डेटा पहले दिखाओ, फिर क्लाउड से सिंक करो
+  Future<void> _loadInstantDataAndFetch() async {
+    // 1. पहले लोकल मेमोरी से तुरंत प्रोडक्ट्स लोड करके स्क्रीन दिखाओ (0 Sec Load)
+    await CakeDatabase.loadInventoryLocally();
+    if (mounted) setState(() {});
+
+    // 2. इसके बाद बैकग्राउंड में क्लाउड/फायरबेस से ताज़ा डेटा खींचकर अपडेट करो
     _fetchShopProfileAndProducts();
   }
 
   Future<void> _fetchShopProfileAndProducts() async {
-    setState(() => _isLoadingCloud = true);
+    if (CakeDatabase.productInventory.isEmpty) {
+      setState(() => _isLoadingCloud = true);
+    }
+    
     try {
       final shopRes = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json'));
       if (shopRes.statusCode == 200 && shopRes.body != 'null' && shopRes.body.isNotEmpty) {
         var decodedShop = json.decode(shopRes.body);
         if (decodedShop is Map) {
-          setState(() {
-            CakeDatabase.bakeryShop = Map<String, dynamic>.from(
-              decodedShop.map((key, value) => MapEntry(key.toString(), value))
-            );
-          });
+          if (mounted) {
+            setState(() {
+              CakeDatabase.bakeryShop = Map<String, dynamic>.from(
+                decodedShop.map((key, value) => MapEntry(key.toString(), value))
+              );
+            });
+          }
         }
       }
 
@@ -59,7 +74,13 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
             }
           });
         }
-        setState(() => CakeDatabase.productInventory = fetchedList.reversed.toList());
+        
+        CakeDatabase.productInventory = fetchedList.reversed.toList();
+        
+        // 🚀 नया डेटा आते ही उसे लोकल स्टोरेज में भी सेव कर लो ताकि अगली बार और तेज़ खुले
+        await CakeDatabase.saveInventoryLocally();
+
+        if (mounted) setState(() {});
       }
     } catch (e) {
       debugPrint("Error: $e");
@@ -96,7 +117,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 
     // 🔍 कैटेगरी, सर्च और फरीदाबाद लोकेशन के हिसाब से फ़िल्टरिंग
     var filtered = CakeDatabase.productInventory.where((p) {
-      if (!isLocalFaridabadShop) return false; // गुड़गांव या अन्य बाहर की दुकानें हाइड हो जाएंगी
+      if (!isLocalFaridabadShop) return false; 
 
       bool matchesCategory = (selectedCategory == 'All' || p['category'] == selectedCategory);
       
@@ -111,7 +132,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
       body: ListView(
         padding: const EdgeInsets.all(10),
         children: [
-          // 🔍 शानदार सर्च बार (Search Bar) यहाँ जोड़ा गया है
+          // 🔍 शानदार सर्च बार (Search Bar)
           TextField(
             controller: _searchController,
             onChanged: (val) => setState(() => _searchQuery = val),
@@ -218,7 +239,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                   child: Center(
                     child: Text(
                       !isLocalFaridabadShop 
-                          ? '⚠️ यह दुकान फरीदाबाद के बाहर (जैसे गुड़गांव) की है, इसलिए यहाँ नहीं दिखेगी।' 
+                          ? '⚠️ यह दुकान फरीदाबाद के बाहर की है, इसलिए यहाँ नहीं दिखेगी।' 
                           : 'कोई प्रोडक्ट नहीं मिला',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.black45, fontSize: 13),
