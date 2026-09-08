@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'database_models.dart';
 import 'marketplace_buyer_view.dart';
 import 'cart_and_orders_view.dart';
@@ -7,7 +8,11 @@ import 'rider_delivery_view.dart'; // 🛵 राइडर और डिली�
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-void main() => runApp(const CakeAppEnterpriseApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(); // 🟢 यहाँ Firebase को ठीक से इनिशियलाइज कर दिया गया है जिससे एरर जड़ से खत्म हो जाएगी
+  runApp(const CakeAppEnterpriseApp());
+}
 
 class CakeAppEnterpriseApp extends StatelessWidget {
   const CakeAppEnterpriseApp({super.key});
