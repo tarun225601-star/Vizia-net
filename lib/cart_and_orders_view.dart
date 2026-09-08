@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'database_models.dart';
 import 'image_picker_helper.dart';
+import 'rider_delivery_view.dart'; // RiderDispatchManager के लिए
 
 class CartAndOrdersView extends StatefulWidget {
   const CartAndOrdersView({super.key});
@@ -48,10 +49,12 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
       'orderId': 'ord_${DateTime.now().millisecondsSinceEpoch}',
       'customerName': CakeDatabase.currentCustomerName,
       'customerPhone': CakeDatabase.currentUserPhone,
-      'customerAddress': CakeDatabase.currentDeliveryAddress,
+      'deliveryAddress': CakeDatabase.currentDeliveryAddress,
+      'pickupAddress': CakeDatabase.bakeryShop['address'] ?? 'Faridabad',
+      'shopName': CakeDatabase.bakeryShop['shopName'] ?? 'Viziag Mart',
       'items': CakeDatabase.cartItems,
-      'grandTotal': grandTotal,
-      'status': 'Pending ⏳',
+      'totalAmount': grandTotal,
+      'orderStatus': 'Pending ⏳',
       'orderTime': DateTime.now().toIso8601String(),
     };
 
@@ -64,6 +67,37 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
       }
     } finally {
       if (mounted) setState(() => _isCheckingOut = false);
+    }
+  }
+
+  // 🚀 वेंडर द्वारा राइडर असाइन और डिस्पैच करने का फंक्शन
+  Future<void> _assignRiderToOrder(String orderKey, Map<String, dynamic> orderData) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator(color: Colors.amber)),
+    );
+
+    String response = await DeliveryDispatcherManager.dispatchOrderToAvailableRider(orderKey, orderData);
+
+    if (mounted) Navigator.pop(context);
+
+    if (mounted) {
+      if (response.startsWith("SUCCESS")) {
+        String riderPhone = response.split(":")[1];
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("🎉 राइडर बुक हो गया! (फोन: $riderPhone)"), backgroundColor: Colors.green),
+        );
+        _fetchCustomerOrders();
+      } else if (response == "NO_RIDER_AVAILABLE") {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("⚠️ कोई राइडर फ्री नहीं है! पहले 'राइडर रजिस्ट्रेशन' से राइडर जोड़ें।"), backgroundColor: Colors.orange),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ एरर: $response"), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -151,13 +185,43 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                         itemCount: _customerOrders.length,
                         itemBuilder: (context, index) {
                           var ord = _customerOrders[index];
+                          String firebaseKey = ord['firebaseKey'] ?? '';
+                          String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending';
+
                           return Card(
                             color: const Color(0xFF1E293B),
                             margin: const EdgeInsets.all(8),
-                            child: ListTile(
-                              title: Text('आर्डर #${ord['orderId']} - ₹${ord['grandTotal']?.toInt()}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                              subtitle: Text('स्टेटस: ${ord['status']}\nपता: ${ord['customerAddress']}'),
-                              isThreeLine: true,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('आर्डर #${ord['orderId']} - ₹${(ord['grandTotal'] ?? ord['totalAmount'])?.toInt()}', 
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                  const SizedBox(height: 5),
+                                  Text('स्टेटस: $status', style: const TextStyle(color: Colors.amberAccent)),
+                                  Text('पता: ${ord['customerAddress'] ?? ord['deliveryAddress'] ?? 'पता उपलब्ध नहीं'}', 
+                                      style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                                  const SizedBox(height: 10),
+                                  
+                                  // 🚀 यहाँ हर आर्डर के नीचे 'राइडर बुक करें' का बटन जोड़ दिया गया है
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 40,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green[700],
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      icon: const Icon(Icons.delivery_dining, size: 18),
+                                      label: const Text('राइडर बुक करें & डिस्पैच करें'),
+                                      onPressed: () {
+                                        _assignRiderToOrder(firebaseKey, ord);
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         },
