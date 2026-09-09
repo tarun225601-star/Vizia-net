@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'database_models.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -35,7 +34,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   int _secondsElapsed = 0;
   Timer? _timer;
   Timer? _vibrationTimer;
-  Timer? _pollingTimer;
+  StreamSubscription<DatabaseEvent>? _orderSubscription;
 
   @override
   void initState() {
@@ -53,8 +52,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         _isRegistered = true;
         _isCheckingSession = false;
       });
-      // 🟢 ऐप खुलते ही तुरंत लोकल कैश्ड आर्डर दिखाओ ताकि लोडिंग न दिखे
-      _loadCachedOrdersAndPoll();
+      _loadCachedOrderAndListen();
     } else {
       setState(() {
         _isRegistered = false;
@@ -63,8 +61,8 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     }
   }
 
-  // 1️⃣ पहले लोकल स्टोरेज से तुरंत डेटा दिखाओ (बिना लोडिंग टाइम के)
-  Future<void> _loadCachedOrdersAndPoll() async {
+  // 1️⃣ पहले लोकल स्टोरेज से तुरंत डेटा दिखाओ ताकि लोडिंग न हो
+  Future<void> _loadCachedOrderAndListen() async {
     final prefs = await SharedPreferences.getInstance();
     String? cachedOrderJson = prefs.getString('cached_active_order_$_activeRiderPhone');
     if (cachedOrderJson != null) {
@@ -73,14 +71,14 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         if (mounted) {
           setState(() {
             _currentOrder = cachedMap;
-            _isLoadingOrder = false; // तुरंत लोडिंग खत्म
+            _isLoadingOrder = false;
           });
         }
       } catch (_) {}
     }
     
-    // फिर बैकग्राउंड में सर्वर से लेटेस्ट आर्डर चेक करो
-    _startOrderPolling();
+    // 2️⃣ अब Firebase का रियलटाइम लिसनर चालू करो (बिना किसी टाइमर/एमबी बर्बादी के)
+    _startRealtimeOrderListener();
   }
 
   Future<void> _registerRider() async {
@@ -100,10 +98,8 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
           'isReady': true,
         };
 
-        await http.post(
-          Uri.parse('${CakeDatabase.firebaseRestUrl}/riders.json'),
-          body: json.encode(riderData),
-        );
+        DatabaseReference ref = FirebaseDatabase.instance.ref('riders').push();
+        await ref.set(riderData);
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('saved_rider_phone', phone);
@@ -116,7 +112,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
             _isRegistered = true;
             _isLoading = false;
           });
-          _loadCachedOrdersAndPoll();
+          _loadCachedOrderAndListen();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("🎉 राइडर सफलतापर्वक रजिस्टर हो गया!")),
           );
@@ -132,26 +128,18 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     }
   }
 
-  void _startOrderPolling() {
-    _fetchAssignedOrder();
-    _pollingTimer?.cancel();
-    // हर 5 सेकंड में सिर्फ बैकग्राउंड सिंक (हल्का फेच)
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      _fetchAssignedOrder();
-    });
-  }
+  // 🟢 ब्लिंकइट जैसा रियलटाइम लिसनर (जब डेटा बदलेगा, तभी एमबी खर्च होगी और अपडेट होगा)
+  void _startRealtimeOrderListener() {
+    _orderSubscription?.cancel();
+    DatabaseReference ordersRef = FirebaseDatabase.instance.ref('orders');
 
-  Future<void> _fetchAssignedOrder() async {
-    if (_activeRiderPhone.isEmpty) return;
+    _orderSubscription = ordersRef.onValue.listen((event) {
+      final data = event.snapshot.value;
+      Map<String, dynamic>? activeOrder;
 
-    try {
-      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
-      if (res.statusCode == 200 && res.body != 'null' && res.body.isNotEmpty) {
-        Map<String, dynamic> orders = json.decode(res.body);
-        Map<String, dynamic>? activeOrder;
-
-        orders.forEach((key, val) {
-          if (val != null) {
+      if (data != null && data is Map) {
+        data.forEach((key, val) {
+          if (val != null && val is Map) {
             String status = val['orderStatus'] ?? val['status'] ?? '';
             String rPhone = val['riderPhone'] ?? val['phone'] ?? '';
             
@@ -161,40 +149,33 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
             }
           }
         });
-
-        if (mounted) {
-          setState(() {
-            bool wasEmpty = _currentOrder.isEmpty;
-            _currentOrder = activeOrder ?? {};
-            _isLoadingOrder = false;
-
-            if (wasEmpty && _currentOrder.isNotEmpty) {
-              _startAlertAndTimer();
-            } else if (_currentOrder.isEmpty) {
-              _stopAlertAndTimer();
-            }
-          });
-
-          // 🟢 लोकल स्टोरेज में तुरंत सेव करो ताकि अगली बार बिना लोडिंग के दिखे
-          final prefs = await SharedPreferences.getInstance();
-          if (_currentOrder.isNotEmpty) {
-            prefs.setString('cached_active_order_$_activeRiderPhone', json.encode(_currentOrder));
-          } else {
-            prefs.remove('cached_active_order_$_activeRiderPhone');
-          }
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _currentOrder = {};
-            _isLoadingOrder = false;
-          });
-        }
       }
-    } catch (e) {
+
       if (mounted) {
-        setState(() => _isLoadingOrder = false);
+        setState(() {
+          bool wasEmpty = _currentOrder.isEmpty;
+          _currentOrder = activeOrder ?? {};
+          _isLoadingOrder = false;
+
+          if (wasEmpty && _currentOrder.isNotEmpty) {
+            _startAlertAndTimer();
+          } else if (_currentOrder.isEmpty) {
+            _stopAlertAndTimer();
+          }
+        });
+
+        // लोकल स्टोरेज में सेव करें
+        _saveOrderToCache();
       }
+    });
+  }
+
+  Future<void> _saveOrderToCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_currentOrder.isNotEmpty) {
+      prefs.setString('cached_active_order_$_activeRiderPhone', json.encode(_currentOrder));
+    } else {
+      prefs.remove('cached_active_order_$_activeRiderPhone');
     }
   }
 
@@ -220,7 +201,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   @override
   void dispose() {
     _stopAlertAndTimer();
-    _pollingTimer?.cancel();
+    _orderSubscription?.cancel();
     _nameController.dispose();
     _phoneController.dispose();
     _vehicleController.dispose();
@@ -242,7 +223,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     String orderId = _currentOrder['orderId'] ?? _currentOrder['orderKey']?.toString().substring(1) ?? '101';
 
     String message = '''
-🛵 *Porter स्टाइल डिलीवरी आर्डर (5 किमी के अंदर)* 🛵
+🛵 *डिफ़ॉल्ट डिलीवरी आर्डर* 🛵
 
 📦 *ऑर्डर आईडी:* #$orderId
 💵 *राइडर कमाई:* ₹40 फिक्स
@@ -251,7 +232,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 • दुकान: $shopName
 • पता: $pickupAddr
 
-🔴 *2. ड्रॉप (यहाँ माल पहुँचाएं - Max 5 KM):*
+🔴 *2. ड्रॉप (यहाँ माल पहुँचाएं):*
 • ग्राहक: $customerName
 • फोन: $customerPhone
 • पता: $deliveryAddr
@@ -292,7 +273,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
               child: ListView(
                 children: [
                   const Text(
-                    "अपने डिलीवरी पार्टनर को यहाँ जोड़ें (डेटा लोकल सेव रहेगा):",
+                    "अपने डिलीवरी पार्टनर को यहाँ जोड़ें:",
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
                   ),
                   const SizedBox(height: 20),
@@ -305,14 +286,14 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                   TextFormField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(labelText: "मोबाइल नंबर (WhatsApp के लिए)", border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone)),
+                    decoration: const InputDecoration(labelText: "मोबाइल नंबर", border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone)),
                     validator: (value) => value!.length < 10 ? 'सही मोबाइल नंबर दर्ज करें' : null,
                   ),
                   const SizedBox(height: 15),
                   TextFormField(
                     controller: _vehicleController,
-                    decoration: const InputDecoration(labelText: "गाड़ी/बाइक का नंबर (जैसे DL01AB1234)", border: OutlineInputBorder(), prefixIcon: Icon(Icons.directions_bike)),
-                    validator: (value) => value!.isEmpty ? 'गाड़ी का नंबर दर्ज करना अनिवार्य है' : null,
+                    decoration: const InputDecoration(labelText: "गाड़ी/बाइक नंबर", border: OutlineInputBorder(), prefixIcon: Icon(Icons.directions_bike)),
+                    validator: (value) => value!.isEmpty ? 'गाड़ी का नंबर दर्ज करें' : null,
                   ),
                   const SizedBox(height: 30),
                   SizedBox(
@@ -339,15 +320,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         title: Text("राइडर डैशबोर्ड ($_activeRiderPhone)", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         backgroundColor: Colors.green[700],
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: () {
-              setState(() => _isLoadingOrder = true);
-              _fetchAssignedOrder();
-            },
-          )
-        ],
       ),
       body: _isLoadingOrder
           ? const Center(child: CircularProgressIndicator(color: Colors.green))
@@ -359,25 +331,13 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           const Text(
-                            "🚨 नया डिलीवरी आर्डर (5 KM एरिया)! उठाइए:",
+                            "🚨 नया डिलीवरी आर्डर आया है!",
                             style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 5),
                           Text(
                             _formatTime(_secondsElapsed),
                             style: const TextStyle(color: Colors.yellowAccent, fontSize: 45, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                            decoration: BoxDecoration(color: Colors.green.shade800, borderRadius: BorderRadius.circular(10)),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text("💰 राइडर कमाई: ₹40 फिक्स", style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-                                Text("📍 दायरा: < 5 KM", style: TextStyle(color: Colors.yellowAccent, fontSize: 14, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
                           ),
                           const SizedBox(height: 10),
                           Expanded(
@@ -393,20 +353,16 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
                                     const Divider(thickness: 2),
                                     const SizedBox(height: 10),
-                                    const Text("🟢 1. यहाँ से माल उठाना है (Pickup):",
-                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
+                                    const Text("🟢 पिकअप पता:", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
                                     Text(_currentOrder['pickupAddress'] ?? _currentOrder['address'] ?? 'Faridabad',
                                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
                                     const SizedBox(height: 15),
-                                    const Text("🔴 2. यहाँ माल छोड़ना है (Delivery Address - 5 KM):",
-                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
-                                    Text(_currentOrder['deliveryAddress'] ?? _currentOrder['address'] ?? 'Faridabad Sector 15A',
+                                    const Text("🔴 डिलीवरी पता:", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
+                                    Text(_currentOrder['deliveryAddress'] ?? _currentOrder['address'] ?? 'Faridabad',
                                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
                                     const SizedBox(height: 10),
-                                    Text("👤 ग्राहक नाम: ${_currentOrder['customerName'] ?? 'Tarun Kumar'}", style: const TextStyle(color: Colors.black87)),
-                                    Text("📞 फोन नंबर: ${_currentOrder['customerPhone'] ?? _currentOrder['phone'] ?? '9971968060'}", style: const TextStyle(color: Colors.black87)),
-                                    const SizedBox(height: 10),
-                                    Text("🛍️ कुल बिल राशि: ₹${_currentOrder['totalAmount'] ?? _currentOrder['total'] ?? '200'}", style: const TextStyle(color: Colors.black87)),
+                                    Text("👤 ग्राहक नाम: ${_currentOrder['customerName'] ?? 'Tarun'}", style: const TextStyle(color: Colors.black87)),
+                                    Text("📞 फोन: ${_currentOrder['customerPhone'] ?? _currentOrder['phone'] ?? ''}", style: const TextStyle(color: Colors.black87)),
                                   ],
                                 ),
                               ),
@@ -438,10 +394,10 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                             const SizedBox(height: 20),
                             const Text("स्वागत है, राइडर पार्टनर!", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87)),
                             const SizedBox(height: 8),
-                            Text(
-                              "रजिस्टर्ड नंबर: $_activeRiderPhone\nफिक्स कमाई: ₹40 प्रति डिलीवरी (5 KM एरिया)\nफिलहाल कोई नया आर्डर नहीं है, वेंडर द्वारा भेजते ही दिखाई देगा।",
+                            const Text(
+                              "रियलटाइम मोड एक्टिव है। नया आर्डर आते ही अपने आप स्क्रीन पर प्रकट हो जाएगा!",
                               textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 14, color: Colors.grey),
+                              style: TextStyle(fontSize: 14, color: Colors.grey),
                             ),
                           ],
                         ),
