@@ -53,7 +53,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
   final List<Widget> _tabScreens = [
     const MarketplaceBuyerView(),
     const VendorAuthAndPortalView(),
-    const RiderRegistrationScreen(),
+    const RiderDeliveryScreen(),
     const CartAndOrdersView(),
   ];
 
