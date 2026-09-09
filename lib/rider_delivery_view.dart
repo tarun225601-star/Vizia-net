@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:convert'; // 👈 यह इम्पोर्ट जोड़ दिया गया है (एरर खत्म)
 import 'database_models.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -77,7 +78,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       } catch (_) {}
     }
     
-    // 2️⃣ अब Firebase का रियलटाइम लिसनर चालू करो (बिना किसी टाइमर/एमबी बर्बादी के)
+    // 2️⃣ अब Firebase का रियलटाइम लिसनर चालू करो
     _startRealtimeOrderListener();
   }
 
@@ -114,7 +115,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
           });
           _loadCachedOrderAndListen();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("🎉 राइडर सफलतापर्वक रजिस्टर हो गया!")),
+            const SnackBar(content: Text("🎉 राइडर सफलतापूर्वक रजिस्टर हो गया!")),
           );
         }
       } catch (e) {
@@ -128,7 +129,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     }
   }
 
-  // 🟢 ब्लिंकइट जैसा रियलटाइम लिसनर (जब डेटा बदलेगा, तभी एमबी खर्च होगी और अपडेट होगा)
+  // 🟢 रियलटाइम आर्डर लिसनर
   void _startRealtimeOrderListener() {
     _orderSubscription?.cancel();
     DatabaseReference ordersRef = FirebaseDatabase.instance.ref('orders');
