@@ -5,187 +5,15 @@ import 'database_models.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart'; // WhatsApp पर भेजने के लिए
+import 'package:shared_preferences/shared_preferences.dart';
 
-// 🚀 1. राइडर रजिस्ट्रेशन स्क्रीन (REST API आधारित)
-class RiderRegistrationScreen extends StatefulWidget {
-  const RiderRegistrationScreen({Key? key}) : super(key: key);
-
-  @override
-  _RiderRegistrationScreenState createState() => _RiderRegistrationScreenState();
-}
-
-class _RiderRegistrationScreenState extends State<RiderRegistrationScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _vehicleController = TextEditingController();
-  bool _isLoading = false;
-
-  Future<void> _registerRider() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
-      try {
-        String riderId = "rider_${DateTime.now().millisecondsSinceEpoch}";
-        
-        var riderData = {
-          'riderId': riderId,
-          'name': _nameController.text.trim(),
-          'phone': _phoneController.text.trim(),
-          'vehicleNumber': _vehicleController.text.trim().toUpperCase(),
-          'isReady': true,
-        };
-
-        await http.post(
-          Uri.parse('${CakeDatabase.firebaseRestUrl}/riders.json'),
-          body: json.encode(riderData),
-        );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("🎉 राइडर सफलतापूर्वक रजिस्टर हो गया!")),
-          );
-          Navigator.pop(context);
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("❌ एरर: $e")),
-          );
-        }
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text("राइडर रजिस्ट्रेशन (Viziag Mart)", style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.green[700],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              children: [
-                const Text(
-                  "अपने डिलीवरी पार्टनर को यहाँ जोड़ें:",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
-                ),
-                const SizedBox(height: 20),
-                
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: "राइडर का पूरा नाम",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  validator: (value) => value!.isEmpty ? 'कृपया नाम दर्ज करें' : null,
-                ),
-                const SizedBox(height: 15),
-
-                TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: "मोबाइल नंबर (WhatsApp के लिए)",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.phone),
-                  ),
-                  validator: (value) => value!.length < 10 ? 'सही मोबाइल नंबर दर्ज करें' : null,
-                ),
-                const SizedBox(height: 15),
-
-                TextFormField(
-                  controller: _vehicleController,
-                  decoration: const InputDecoration(
-                    labelText: "गाड़ी/बाइक का नंबर (जैसे DL01AB1234)",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.directions_bike),
-                  ),
-                  validator: (value) => value!.isEmpty ? 'गाड़ी का नंबर दर्ज करना अनिवार्य है' : null,
-                ),
-                const SizedBox(height: 30),
-
-                SizedBox(
-                  height: 50,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green[700]),
-                    onPressed: _isLoading ? null : _registerRider,
-                    child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text("राइडर रजिस्टर करें", style: TextStyle(fontSize: 18, color: Colors.white)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// 🚀 2. वेंडर डैशबोर्ड से 'Dispatch' करने का REST API लॉजिक
-class DeliveryDispatcherManager {
-  static Future<String> dispatchOrderToAvailableRider(String orderKey, Map<String, dynamic> orderData) async {
-    try {
-      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/riders.json'));
-      if (res.statusCode != 200 || res.body == 'null' || res.body.isEmpty) {
-        return "NO_RIDER_AVAILABLE";
-      }
-
-      Map<String, dynamic> data = json.decode(res.body);
-      String? matchedRiderFirebaseKey;
-      String riderPhone = '';
-      String vehicleNo = '';
-
-      data.forEach((key, val) {
-        if (val['isReady'] == true && matchedRiderFirebaseKey == null) {
-          matchedRiderFirebaseKey = key;
-          riderPhone = val['phone'] ?? '';
-          vehicleNo = val['vehicleNumber'] ?? '';
-        }
-      });
-
-      if (matchedRiderFirebaseKey == null) {
-        return "NO_RIDER_AVAILABLE";
-      }
-
-      await http.patch(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderKey.json'),
-        body: json.encode({
-          'riderPhone': riderPhone,
-          'vehicleNumber': vehicleNo,
-          'orderStatus': 'Out for Delivery',
-        }),
-      );
-
-      await http.patch(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/riders/$matchedRiderFirebaseKey.json'),
-        body: json.encode({'isReady': false}),
-      );
-
-      return "SUCCESS:$riderPhone";
-    } catch (e) {
-      return "ERROR: $e";
-    }
-  }
-}
-
-// 📱 3. राइडर का डैशबोर्ड व्यू (Porter स्टाइल - ₹40 फिक्स, 5KM दायरा और सुरक्षित Null Handling)
+// 🚀 मुख्य राइडर व्यू (बॉटम नेविगेशन के अंदर ब्लैक स्क्रीन की समस्या खत्म)
 class RiderDeliveryScreen extends StatefulWidget {
   final String riderPhone;
 
   const RiderDeliveryScreen({
     Key? key, 
-    this.riderPhone = '9971968060',
+    this.riderPhone = '',
   }) : super(key: key);
 
   @override
@@ -193,8 +21,20 @@ class RiderDeliveryScreen extends StatefulWidget {
 }
 
 class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
+  // रजिस्ट्रेशन फॉर्म के लिए कंट्रोलर्स
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _vehicleController = TextEditingController();
+  
+  bool _isCheckingSession = true;
+  bool _isRegistered = false;
+  bool _isLoading = false;
+
+  // डैशबोर्ड के लिए वेरिएबल्स
   Map<String, dynamic> _currentOrder = {};
   bool _isLoadingOrder = true;
+  String _activeRiderPhone = '';
   int _secondsElapsed = 0;
   Timer? _timer;
   Timer? _vibrationTimer;
@@ -203,13 +43,92 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   @override
   void initState() {
     super.initState();
+    _checkSavedRider();
+  }
+
+  // 🟢 चेक करें कि क्या राइडर पहले से सेव है
+  Future<void> _checkSavedRider() async {
+    final prefs = await SharedPreferences.getInstance();
+    String savedPhone = prefs.getString('saved_rider_phone') ?? '';
+
+    if (savedPhone.isNotEmpty) {
+      setState(() {
+        _activeRiderPhone = savedPhone;
+        _isRegistered = true;
+        _isCheckingSession = false;
+      });
+      _startOrderPolling();
+    } else {
+      setState(() {
+        _isRegistered = false;
+        _isCheckingSession = false;
+      });
+    }
+  }
+
+  // 🟢 राइडर रजिस्टर और लोकल सेव करने का लॉजिक
+  Future<void> _registerRider() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+      try {
+        String riderId = "rider_${DateTime.now().millisecondsSinceEpoch}";
+        String phone = _phoneController.text.trim();
+        String vehicleNumber = _vehicleController.text.trim().toUpperCase();
+        String name = _nameController.text.trim();
+        
+        var riderData = {
+          'riderId': riderId,
+          'name': name,
+          'phone': phone,
+          'vehicleNumber': vehicleNumber,
+          'isReady': true,
+        };
+
+        // Firebase पर रजिस्टर करें
+        await http.post(
+          Uri.parse('${CakeDatabase.firebaseRestUrl}/riders.json'),
+          body: json.encode(riderData),
+        );
+
+        // लोकल मेमोरी में सेव करें
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('saved_rider_phone', phone);
+        await prefs.setString('saved_rider_name', name);
+        await prefs.setString('saved_vehicle_number', vehicleNumber);
+
+        if (mounted) {
+          setState(() {
+            _activeRiderPhone = phone;
+            _isRegistered = true;
+            _isLoading = false;
+          });
+          _startOrderPolling();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("🎉 राइडर सफलतापर्वक रजिस्टर हो गया!")),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("❌ एरर: $e")),
+          );
+        }
+      }
+    }
+  }
+
+  void _startOrderPolling() {
     _fetchAssignedOrder();
+    _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
       _fetchAssignedOrder();
     });
   }
 
   Future<void> _fetchAssignedOrder() async {
+    if (_activeRiderPhone.isEmpty) return;
+
     try {
       final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
       if (res.statusCode == 200 && res.body != 'null' && res.body.isNotEmpty) {
@@ -218,7 +137,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 
         orders.forEach((key, val) {
           if (val['orderStatus'] == 'Out for Delivery' && 
-              val['riderPhone'].toString().trim() == widget.riderPhone.trim()) {
+              val['riderPhone'].toString().trim() == _activeRiderPhone.trim()) {
             activeOrder = val;
             activeOrder!['orderKey'] = key;
           }
@@ -275,6 +194,9 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   void dispose() {
     _stopAlertAndTimer();
     _pollingTimer?.cancel();
+    _nameController.dispose();
+    _phoneController.dispose();
+    _vehicleController.dispose();
     super.dispose();
   }
 
@@ -310,7 +232,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 समय पर सुरक्षित डिलीवरी करें! 🚀
 ''';
 
-    String targetPhone = widget.riderPhone.isEmpty ? '9971968060' : widget.riderPhone;
+    String targetPhone = _activeRiderPhone.isEmpty ? '9971968060' : _activeRiderPhone;
     String formattedPhone = targetPhone.startsWith('+') ? targetPhone : '+91$targetPhone';
     String url = "https://wa.me/$formattedPhone?text=${Uri.encodeComponent(message)}";
 
@@ -321,12 +243,93 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isCheckingSession) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: Colors.green)),
+      );
+    }
+
+    // 1️⃣ अगर राइडर रजिस्टर नहीं है, तो फॉर्म दिखाएं (ब्लैक स्क्रीन नहीं आएगी)
+    if (!_isRegistered) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text("राइडर रजिस्ट्रेशन (Viziag Mart)", style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.green[700],
+          automaticallyImplyLeading: false,
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                children: [
+                  const Text(
+                    "अपने डिलीवरी पार्टनर को यहाँ जोड़ें (डेटा लोकल सेव रहेगा):",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: "राइडर का पूरा नाम",
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    validator: (value) => value!.isEmpty ? 'कृपया नाम दर्ज करें' : null,
+                  ),
+                  const SizedBox(height: 15),
+
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: "मोबाइल नंबर (WhatsApp के लिए)",
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.phone),
+                    ),
+                    validator: (value) => value!.length < 10 ? 'सही मोबाइल नंबर दर्ज करें' : null,
+                  ),
+                  const SizedBox(height: 15),
+
+                  TextFormField(
+                    controller: _vehicleController,
+                    decoration: const InputDecoration(
+                      labelText: "गाड़ी/बाइक का नंबर (जैसे DL01AB1234)",
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.directions_bike),
+                    ),
+                    validator: (value) => value!.isEmpty ? 'गाड़ी का नंबर दर्ज करना अनिवार्य है' : null,
+                  ),
+                  const SizedBox(height: 30),
+
+                  SizedBox(
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green[700]),
+                      onPressed: _isLoading ? null : _registerRider,
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text("राइडर रजिस्टर करें", style: TextStyle(fontSize: 18, color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 2️⃣ अगर रजिस्टर है, तो सीधा राइडर डैशबोर्ड दिखाएं
     bool hasOrder = _currentOrder.isNotEmpty;
 
     return Scaffold(
       backgroundColor: hasOrder ? Colors.red[900] : Colors.white,
       appBar: AppBar(
-        title: const Text("राइडर डैशबोर्ड (Porter स्टाइल)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text("राइडर डैशबोर्ड ($_activeRiderPhone)", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         backgroundColor: Colors.green[700],
         automaticallyImplyLeading: false,
         actions: [
@@ -443,10 +446,10 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
                             ),
                             const SizedBox(height: 8),
-                            const Text(
-                              "फिक्स कमाई: ₹40 प्रति डिलीवरी (5 KM एरिया)\nफिलहाल कोई नया आर्डर नहीं है, वेंडर द्वारा भेजते ही दिखाई देगा।",
+                            Text(
+                              "रजिस्टर्ड नंबर: $_activeRiderPhone\nफिक्स कमाई: ₹40 प्रति डिलीवरी (5 KM एरिया)\nफिलहाल कोई नया आर्डर नहीं है, वेंडर द्वारा भेजते ही दिखाई देगा।",
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 14, color: Colors.grey),
+                              style: const TextStyle(fontSize: 14, color: Colors.grey),
                             ),
                           ],
                         ),
