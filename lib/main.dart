@@ -200,7 +200,7 @@ class VendorAuthAndPortalView extends StatefulWidget {
 }
 
 class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
-  int _viewMode = 0; // 0: Home, 1: Register, 2: Login, 3: Dashboard, 4: Master Admin Login, 5: Master Panel
+  int _viewMode = 0;
 
   final regShopNameCtrl = TextEditingController();
   final regPhoneCtrl = TextEditingController();
@@ -378,6 +378,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             const SizedBox(height: 5),
             const Text('बिना एडमिन अप्रूवल के कोई भी वेंडर लॉगिन नहीं कर सकता', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
             const SizedBox(height: 40),
+            
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -389,6 +390,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               ),
             ),
             const SizedBox(height: 15),
+
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -399,6 +401,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                 label: const Text('वेंडर लॉगिन (Existing Vendor Login)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ),
+
             const Spacer(),
             const Divider(),
             TextButton.icon(
@@ -467,11 +470,11 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
                 onPressed: _isLoading ? null : _loginVendor,
-                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('लॉगिन करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('लॉगिन करें ➔', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
             const SizedBox(height: 10),
-            TextButton(onPressed: () => setState(() => _viewMode = 0), child: const Text('← वापस जाएं')),
+            TextButton(onPressed: () => setState(() => _viewMode = 0), child: const Text('← वापस जाएं', style: TextStyle(color: Colors.grey))),
           ],
         ),
       );
@@ -628,5 +631,376 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
         ],
       ),
     );
+  }
+}
+// [ऊपर वाले कोड के बाद का बचा हुआ पूरा हिस्सा - MarketplaceBuyerView, CartAndOrdersView, RiderDeliveryScreen, और CakeDatabase]
+
+class MarketplaceBuyerView extends StatefulWidget {
+  const MarketplaceBuyerView({super.key});
+
+  @override
+  State<MarketplaceBuyerView> createState() => _MarketplaceBuyerViewState();
+}
+
+class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
+  String _selectedCategory = 'All';
+  String _searchQuery = '';
+
+  @override
+  Widget build(Context context) {
+    return Column(
+      children: [
+        // Search & Filter Bar
+        Container(
+          padding: const EdgeInsets.all(12),
+          color: Colors.white,
+          child: Column(
+            children: [
+              TextField(
+                onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
+                decoration: InputDecoration(
+                  hintText: 'फ्रूट्स, सब्जियां या अन्य सामान खोजें...',
+                  prefixIcon: const Icon(Icons.search, color: Colors.green),
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: ['All', 'Fruits & Veg', 'Bakery & Sweets', 'Dairy & Eggs', 'Snacks & Drinks'].map((cat) {
+                    bool isSelected = _selectedCategory == cat;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(cat),
+                        selected: isSelected,
+                        selectedColor: Colors.green.shade700,
+                        labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 12),
+                        onSelected: (selected) => setState(() => _selectedCategory = cat),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Product Catalog FutureBuilder
+        Expanded(
+          child: FutureBuilder<http.Response>(
+            future: http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/products.json')),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: Colors.green));
+              }
+              if (!snapshot.hasData || snapshot.data?.body == 'null' || snapshot.data?.body.isEmpty == true) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.store_mall_directory_outlined, size: 60, color: Colors.grey.shade400),
+                      const SizedBox(height: 10),
+                      const Text('अभी कोई प्रोडक्ट उपलब्ध नहीं है!', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                );
+              }
+
+              Map<String, dynamic> data = json.decode(snapshot.data!.body);
+              List<Map<String, dynamic>> products = [];
+              data.forEach((key, val) {
+                if (val != null) {
+                  var p = Map<String, dynamic>.from(val);
+                  p['id'] = key;
+                  products.add(p);
+                }
+              });
+
+              // Filter by category & search query
+              var filteredProducts = products.where((p) {
+                bool matchesCategory = _selectedCategory == 'All' || p['category'] == _selectedCategory;
+                bool matchesSearch = (p['name'] ?? '').toString().toLowerCase().contains(_searchQuery);
+                return matchesCategory && matchesSearch;
+              }).toList();
+
+              if (filteredProducts.isEmpty) {
+                return const Center(child: Text('कोई प्रोडक्ट नहीं मिला!', style: TextStyle(color: Colors.grey)));
+              }
+
+              return GridView.builder(
+                padding: const EdgeInsets.all(12),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.72,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: filteredProducts.length,
+                itemBuilder: (context, index) {
+                  var product = filteredProducts[index];
+                  return Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                            child: buildShopOrProdImage(product['image'], double.infinity, double.infinity, Icons.fastfood),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(product['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              const SizedBox(height: 2),
+                              Text('₹${product['price']}', style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w900, fontSize: 14)),
+                              const SizedBox(height: 6),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 32,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white, padding: EdgeInsets.zero),
+                                  onPressed: () {
+                                    setState(() {
+                                      CakeDatabase.addToCart(product);
+                                    });
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('${product['name']} कार्ट में जोड़ दिया गया!'), duration: const Duration(seconds: 1)),
+                                    );
+                                  },
+                                  child: const Text('कार्ट में डालें', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class CartAndOrdersView extends StatefulWidget {
+  const CartAndOrdersView({super.key});
+
+  @override
+  State<CartAndOrdersView> createState() => _CartAndOrdersViewState();
+}
+
+class _CartAndOrdersViewState extends State<CartAndOrdersView> {
+  Future<void> _placeOrder() async {
+    if (CakeDatabase.cartItems.isEmpty) return;
+
+    double totalAmount = CakeDatabase.cartItems.fold(0, (sum, item) => sum + ((item['price'] as num?)?.toDouble() ?? 0) * ((item['qty'] as num?)?.toInt() ?? 1));
+
+    var orderData = {
+      'customerName': CakeDatabase.currentCustomerName,
+      'phone': CakeDatabase.currentUserPhone,
+      'address': CakeDatabase.currentDeliveryAddress,
+      'items': CakeDatabase.cartItems,
+      'total': totalAmount,
+      'status': 'Pending',
+      'time': DateTime.now().toString(),
+    };
+
+    try {
+      await http.post(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'),
+        body: json.encode(orderData),
+      );
+
+      setState(() {
+        CakeDatabase.cartItems.clear();
+      });
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('🎉 आर्डर सफल!'),
+            content: const Text('आपका आर्डर सफलतापूर्वक प्लेस हो गया है। जल्द ही डिलीवरी पार्टनर आपके पास पहुंचेगा।'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('ठीक है')),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('⚠️ आर्डर भेजने में त्रुटि: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    double totalAmount = CakeDatabase.cartItems.fold(0, (sum, item) => sum + ((item['price'] as num?)?.toDouble() ?? 0) * ((item['qty'] as num?)?.toInt() ?? 1));
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('🛒 आपकी शॉपिंग कार्ट', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Divider(),
+          Expanded(
+            child: CakeDatabase.cartItems.isEmpty
+                ? const Center(child: Text('कार्ट खाली है!', style: TextStyle(color: Colors.grey, fontSize: 15)))
+                : ListView.builder(
+                    itemCount: CakeDatabase.cartItems.length,
+                    itemBuilder: (context, index) {
+                      var item = CakeDatabase.cartItems[index];
+                      int qty = item['qty'] ?? 1;
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        child: ListTile(
+                          title: Text(item['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('मूल्य: ₹${item['price']} x $qty = ₹${(item['price'] * qty)}'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                                onPressed: () {
+                                  setState(() {
+                                    if (qty > 1) {
+                                      item['qty'] = qty - 1;
+                                    } else {
+                                      CakeDatabase.cartItems.removeAt(index);
+                                    }
+                                  });
+                                },
+                              ),
+                              Text('$qty', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              IconButton(
+                                icon: const Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
+                                onPressed: () {
+                                  setState(() {
+                                    item['qty'] = qty + 1;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          if (CakeDatabase.cartItems.isNotEmpty) ...[
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('कुल राशि (Total):', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text('₹$totalAmount', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.green.shade800)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+                onPressed: _placeOrder,
+                child: const Text('आर्डर कंफर्म करें (Place Order)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class RiderDeliveryScreen extends StatelessWidget {
+  const RiderDeliveryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: FutureBuilder<http.Response>(
+        future: http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json')),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          if (snapshot.data?.body == 'null' || snapshot.data?.body.isEmpty == true) {
+            return const Center(child: Text('कोई डिलीवरी आर्डर उपलब्ध नहीं है'));
+          }
+
+          Map<String, dynamic> data = json.decode(snapshot.data!.body);
+          List<MapEntry<String, dynamic>> orders = data.entries.toList();
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: orders.length,
+            itemBuilder: (context, index) {
+              var key = orders[index].key;
+              var val = orders[index].value;
+              return Card(
+                elevation: 2,
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text('आर्डर ID: ${key.substring(0, 6)}...', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                          const Spacer(),
+                          Chip(label: Text(val['status'] ?? 'Pending', style: const TextStyle(fontSize: 11, color: Colors.white)), backgroundColor: Colors.orange),
+                        ],
+                      ),
+                      const Divider(),
+                      Text('ग्राहका नाम: ${val['customerName']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text('मोबाइल: ${val['phone']}'),
+                      Text('पता: ${val['address']}'),
+                      const SizedBox(height: 6),
+                      Text('कुल राशि: ₹${val['total']}', style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class CakeDatabase {
+  static String firebaseRestUrl = "https://viziag-mart-default-rtdb.firebaseio.com";
+  static String currentCustomerName = "Tarun Kumar";
+  static String currentUserPhone = "9971968060";
+  static String currentDeliveryAddress = "Faridabad, Haryana";
+
+  static List<Map<String, dynamic>> cartItems = [];
+
+  static void addToCart(Map<String, dynamic> product) {
+    var existing = cartItems.firstWhere((item) => item['id'] == product['id'], orElse: () => {});
+    if (existing.isNotEmpty) {
+      existing['qty'] = (existing['qty'] ?? 1) + 1;
+    } else {
+      var newItem = Map<String, dynamic>.from(product);
+      newItem['qty'] = 1;
+      cartItems.add(newItem);
+    }
   }
 }
