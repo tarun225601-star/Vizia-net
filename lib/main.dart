@@ -7,7 +7,6 @@ import 'image_picker_helper.dart';
 import 'rider_delivery_view.dart'; 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -367,7 +366,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
   @override
   Widget build(BuildContext context) {
-    // 0: Portal Home
     if (_viewMode == 0) {
       return Padding(
         padding: const EdgeInsets.all(20),
@@ -380,7 +378,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             const SizedBox(height: 5),
             const Text('बिना एडमिन अप्रूवल के कोई भी वेंडर लॉगिन नहीं कर सकता', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
             const SizedBox(height: 40),
-            
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -392,7 +389,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               ),
             ),
             const SizedBox(height: 15),
-
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -403,7 +399,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                 label: const Text('वेंडर लॉगिन (Existing Vendor Login)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ),
-
             const Spacer(),
             const Divider(),
             TextButton.icon(
@@ -416,7 +411,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // 1: New Registration
     if (_viewMode == 1) {
       return Padding(
         padding: const EdgeInsets.all(20),
@@ -451,7 +445,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // 2: Vendor Login
     if (_viewMode == 2) {
       return Padding(
         padding: const EdgeInsets.all(20),
@@ -474,142 +467,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
                 onPressed: _isLoading ? null : _loginVendor,
-                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('लॉगिन करें ➔', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextButton(onPressed: () => setState(() => _viewMode = 0), child: const Text('← वापस जाएं', style: TextStyle(color: Colors.grey))),
-          ],
-        ),
-      );
-    }
-
-    // 3: Vendor Live Dashboard (Add Products & Manage Orders)
-    if (_viewMode == 3) {
-      return DefaultTabController(
-        length: 2,
-        child: Column(
-          children: [
-            Container(
-              color: Colors.green.shade50,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                children: [
-                  const Text('🟢 वेंडर डैशबोर्ड (लाइव)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => setState(() => _viewMode = 0),
-                    child: const Text('लॉग आउट', style: TextStyle(fontSize: 11, color: Colors.red)),
-                  ),
-                ],
-              ),
-            ),
-            const Material(
-              color: Colors.white,
-              child: TabBar(
-                labelColor: Colors.green,
-                unselectedLabelColor: Colors.grey,
-                indicatorColor: Colors.green,
-                tabs: [
-                  Tab(text: '📦 प्रोडक्ट्स जोड़ें'),
-                  Tab(text: '📋 आर्डर मैनेज करें'),
-                ],
-              ),
-            ),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  // Tab 1: Add Products with Image Picker
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: ListView(
-                      children: [
-                        const Text('नया सामान या फल/सब्जी जोड़े', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 15),
-                        TextField(controller: prodNameCtrl, decoration: const InputDecoration(labelText: 'आइटम का नाम (जैसे: ताज़ा सेब)', border: OutlineInputBorder())),
-                        const SizedBox(height: 12),
-                        TextField(controller: prodPriceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'कीमत प्रति किलो/पीस (₹)', border: OutlineInputBorder())),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
-                          value: _selectedCategory,
-                          decoration: const InputDecoration(labelText: 'कैटेगरी चुनें', border: OutlineInputBorder()),
-                          items: ['Fruits & Veg', 'Dairy & Bakery', 'Groceries', 'Snacks'].map((cat) {
-                            return DropdownMenuItem(value: cat, child: Text(cat));
-                          }).toList(),
-                          onChanged: (val) => setState(() => _selectedCategory = val ?? 'Fruits & Veg'),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(controller: prodDescCtrl, decoration: const InputDecoration(labelText: 'विवरण (Description / Quality Note)', border: OutlineInputBorder())),
-                        const SizedBox(height: 15),
-                        
-                        // Image Picker Section
-                        Row(
-                          children: [
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.grey.shade200, foregroundColor: Colors.black87),
-                              onPressed: () async {
-                                String? base64Img = await ImagePickerHelper.pickAndConvertToBase64();
-                                if (base64Img != null) {
-                                  setState(() => _productImageBase64 = base64Img);
-                                }
-                              },
-                              icon: const Icon(Icons.camera_alt),
-                              label: const Text('फोटो जोड़ें'),
-                            ),
-                            const SizedBox(width: 15),
-                            if (_productImageBase64.isNotEmpty)
-                              const Text('✅ फोटो जुड़ गई', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))
-                            else
-                              const Text('कोई फोटो नहीं', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                          ],
-                        ),
-                        const SizedBox(height: 25),
-
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                            onPressed: _isLoading ? null : _addNewProduct,
-                            child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('दुकान पर लाइव करें 🚀', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Tab 2: Manage Orders
-                  const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('ग्राहकों से मिलने वाले लाइव ऑर्डर्स यहाँ दिखेंगे और आप उन्हें स्वीकार कर सकेंगे।', textAlign: TextAlign.center))),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // 4: Admin Code Verification View
-    if (_viewMode == 4) {
-      return Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.admin_panel_settings, size: 70, color: Colors.green),
-            const SizedBox(height: 15),
-            const Text('🔒 मास्टर एडमिन लॉगिन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            const Text('केवल तरुण भाई के लिए विशेष गुप्त कोड', style: TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(height: 25),
-            TextField(controller: adminCodeCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'गुप्त कोड (Secret Code)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.key))),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                onPressed: _verifyAdminCode,
-                child: const Text('डैशबोर्ड खोलें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('लॉगिन करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ),
             ),
             const SizedBox(height: 10),
@@ -619,78 +477,156 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // 5: Master Admin Panel (Approve Pending Vendors)
-    return Column(
-      children: [
-        Container(
-          color: Colors.green.shade700,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              const Text('👑 मास्टर एडमिन पैनल (Faridabad Hub)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-              const Spacer(),
-              TextButton(
-                style: TextButton.styleFrom(foregroundColor: Colors.white),
-                onPressed: () => setState(() => _viewMode = 0),
-                child: const Text('बंद करें ✕'),
+    // 3: Vendor Dashboard (Products Add View)
+    if (_viewMode == 3) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: ListView(
+          children: [
+            Row(
+              children: [
+                const Text('📦 वेंडर डैशबोर्ड (प्रोडक्ट जोड़ें)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                IconButton(onPressed: () => setState(() => _viewMode = 0), icon: const Icon(Icons.logout, color: Colors.red)),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: 10),
+            TextField(controller: prodNameCtrl, decoration: const InputDecoration(labelText: 'प्रोडक्ट का नाम', border: OutlineInputBorder())),
+            const SizedBox(height: 15),
+            TextField(controller: prodPriceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'कीमत (₹)', border: OutlineInputBorder())),
+            const SizedBox(height: 15),
+            DropdownButtonFormField<String>(
+              value: _selectedCategory,
+              decoration: const InputDecoration(labelText: 'कैटेगरी', border: OutlineInputBorder()),
+              items: ['Fruits & Veg', 'Bakery & Sweets', 'Dairy & Eggs', 'Snacks & Drinks'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+              onChanged: (val) => setState(() => _selectedCategory = val ?? 'Fruits & Veg'),
+            ),
+            const SizedBox(height: 15),
+            TextField(controller: prodDescCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'प्रोडक्ट विवरण (Description)', border: OutlineInputBorder())),
+            const SizedBox(height: 15),
+            Center(
+              child: Column(
+                children: [
+                  buildShopOrProdImage(_productImageBase64, 100, 100, Icons.fastfood),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      String? base64Img = await pickAndConvertToBase64();
+                      if (base64Img != null) {
+                        setState(() => _productImageBase64 = base64Img);
+                      }
+                    },
+                    icon: const Icon(Icons.image),
+                    label: const Text('प्रोडक्ट फोटो चुनें'),
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+                onPressed: _isLoading ? null : _addNewProduct,
+                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('प्रोडक्ट लाइव करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 4: Master Admin Login
+    if (_viewMode == 4) {
+      return Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.admin_panel_settings, size: 65, color: Colors.green),
+            const SizedBox(height: 15),
+            const Text('👑 मास्टर एडमिन लॉगिन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 25),
+            TextField(controller: adminCodeCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'गुप्त कोड दर्ज करें (Admin Code)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.security))),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+                onPressed: _verifyAdminCode,
+                child: const Text('वेरिफाई करें', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(onPressed: () => setState(() => _viewMode = 0), child: const Text('← वापस जाएं')),
+          ],
+        ),
+      );
+    }
+
+    // 5: Master Panel (Approve pending vendors)
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('👑 मास्टर अप्रूवल पैनल', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              IconButton(onPressed: () => setState(() => _viewMode = 0), icon: const Icon(Icons.arrow_back)),
             ],
           ),
-        ),
-        Expanded(
-          child: FutureBuilder<http.Response>(
-            future: http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json')),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (!snapshot.hasData || snapshot.data!.body == 'null' || snapshot.data!.body.isEmpty) {
-                return const Center(child: Text('कोई नई वेंडर रिक्वेस्ट नहीं है।'));
-              }
+          const Text('यहाँ से नई दुकानों को अप्रूव करें:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          const Divider(),
+          Expanded(
+            child: FutureBuilder<http.Response>(
+              future: http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json')),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                if (snapshot.data?.body == 'null' || snapshot.data?.body.isEmpty == true) {
+                  return const Center(child: Text('कोई पेंडिंग रिक्वेस्ट नहीं है'));
+                }
+                Map<String, dynamic> data = json.decode(snapshot.data!.body);
+                List<MapEntry<String, dynamic>> items = data.entries.toList();
 
-              Map<String, dynamic> data = json.decode(snapshot.data!.body);
-              List<MapEntry<String, dynamic>> requests = data.entries.toList();
+                return ListView.builder(
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    var key = items[index].key;
+                    var val = items[index].value;
+                    String status = val['status'] ?? 'pending';
 
-              return ListView.builder(
-                itemCount: requests.length,
-                itemBuilder: (context, index) {
-                  String key = requests[index].key;
-                  var val = requests[index].value;
-                  String shopName = val['name'] ?? 'Unknown';
-                  String phone = val['phone'] ?? '';
-                  String address = val['address'] ?? '';
-                  String status = val['status'] ?? 'pending';
-
-                  return Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    child: ListTile(
-                      title: Text(shopName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text('📞 $phone\n📍 $address\nस्थिति: $status'),
-                      isThreeLine: true,
-                      trailing: status == 'pending'
-                          ? ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(70, 32)),
-                              onPressed: () async {
-                                await http.patch(
-                                  Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests/$key.json'),
-                                  body: json.encode({'status': 'approved'}),
-                                );
-                                setState(() {});
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान अप्रूव कर दी गई!')));
-                                }
-                              },
-                              child: const Text('Approve', style: TextStyle(fontSize: 12)),
-                            )
-                          : const Chip(label: Text('Approved', style: TextStyle(color: Colors.green, fontSize: 11))),
-                    ),
-                  );
-                },
-              );
-            },
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      child: ListTile(
+                        title: Text(val['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('📞 ${val['phone']} | पता: ${val['address']}\nस्थिति: $status'),
+                        isThreeLine: true,
+                        trailing: status == 'pending'
+                            ? ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(60, 32)),
+                                onPressed: () async {
+                                  await http.patch(
+                                    Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests/$key.json'),
+                                    body: json.encode({'status': 'approved'}),
+                                  );
+                                  setState(() {});
+                                },
+                                child: const Text('Approve', style: TextStyle(fontSize: 11)),
+                              )
+                            : const Chip(backgroundColor: Colors.greenAccent, label: Text('Approved', style: TextStyle(fontSize: 10))),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
