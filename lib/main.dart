@@ -647,7 +647,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   String _searchQuery = '';
 
   @override
-  Widget build(Context context) {
+  Widget build(BuildContext context) {
     return Column(
       children: [
         // Search & Filter Bar
