@@ -7,6 +7,7 @@ import 'image_picker_helper.dart';
 import 'rider_delivery_view.dart'; 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -245,7 +246,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('⏳ रिक्वेस्ट सबमिट हो गई'),
-            content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन (तरुण) द्वारा अप्रूव होने के बाद ही आप लॉगिन कर पाएंगे।'),
+            content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन द्वारा अप्रूव होने के बाद ही आप लॉगिन कर पाएंगे।'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -297,7 +298,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('⚠️ लॉगिन असफल (Not Approved)'),
-              content: const Text('आपकी दुकान अभी तक मास्टर एडमिन (तरुण) द्वारा अप्रूव नहीं की गई है! कृपया पहले अप्रूवल लें या सही डिटेल्स भरें।'),
+              content: const Text('आपकी दुकान अभी तक मास्टर एडमिन द्वारा अप्रूव नहीं की गई है! कृपया पहले अप्रूवल लें या सही डिटेल्स भरें।'),
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('ठीक है')),
               ],
