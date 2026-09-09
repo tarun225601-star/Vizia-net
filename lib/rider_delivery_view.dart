@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import 'dart:convert'; // 👈 यह इम्पोर्ट जोड़ दिया गया है (एरर खत्म)
-import 'database_models.dart';
+import 'dart:convert';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -62,7 +61,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     }
   }
 
-  // 1️⃣ पहले लोकल स्टोरेज से तुरंत डेटा दिखाओ ताकि लोडिंग न हो
   Future<void> _loadCachedOrderAndListen() async {
     final prefs = await SharedPreferences.getInstance();
     String? cachedOrderJson = prefs.getString('cached_active_order_$_activeRiderPhone');
@@ -78,7 +76,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       } catch (_) {}
     }
     
-    // 2️⃣ अब Firebase का रियलटाइम लिसनर चालू करो
     _startRealtimeOrderListener();
   }
 
@@ -129,7 +126,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     }
   }
 
-  // 🟢 रियलटाइम आर्डर लिसनर
   void _startRealtimeOrderListener() {
     _orderSubscription?.cancel();
     DatabaseReference ordersRef = FirebaseDatabase.instance.ref('orders');
@@ -165,7 +161,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
           }
         });
 
-        // लोकल स्टोरेज में सेव करें
         _saveOrderToCache();
       }
     });
@@ -216,8 +211,8 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   }
 
   Future<void> _sendDetailsToWhatsApp() async {
-    String shopName = _currentOrder['shopName'] ?? CakeDatabase.bakeryShop['shopName'] ?? 'Viziag Mart';
-    String pickupAddr = _currentOrder['pickupAddress'] ?? _currentOrder['address'] ?? CakeDatabase.bakeryShop['address'] ?? 'Faridabad';
+    String shopName = _currentOrder['shopName'] ?? 'Viziag Mart';
+    String pickupAddr = _currentOrder['pickupAddress'] ?? _currentOrder['address'] ?? 'Faridabad';
     String customerName = _currentOrder['customerName'] ?? 'कस्टमर';
     String customerPhone = _currentOrder['customerPhone'] ?? _currentOrder['phone'] ?? '';
     String deliveryAddr = _currentOrder['deliveryAddress'] ?? _currentOrder['address'] ?? 'पता उपलब्ध नहीं';
@@ -362,7 +357,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                                     Text(_currentOrder['deliveryAddress'] ?? _currentOrder['address'] ?? 'Faridabad',
                                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
                                     const SizedBox(height: 10),
-                                    Text("👤 ग्राहक नाम: ${_currentOrder['customerName'] ?? 'Tarun'}", style: const TextStyle(color: Colors.black87)),
+                                    Text("👤 ग्राहक नाम: ${_currentOrder['customerName'] ?? 'कस्टमर'}", style: const TextStyle(color: Colors.black87)),
                                     Text("📞 फोन: ${_currentOrder['customerPhone'] ?? _currentOrder['phone'] ?? ''}", style: const TextStyle(color: Colors.black87)),
                                   ],
                                 ),
