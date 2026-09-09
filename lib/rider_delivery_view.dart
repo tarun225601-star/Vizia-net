@@ -179,7 +179,7 @@ class DeliveryDispatcherManager {
   }
 }
 
-// 📱 3. राइडर का डैशबोर्ड (Porter स्टाइल - ₹40 फिक्स, 5KM दायरा और सुरक्षित UI)
+// 📱 3. राइडर का डैशबोर्ड व्यू (Porter स्टाइल - ₹40 फिक्स, 5KM दायरा और सुरक्षित Null Handling)
 class RiderDeliveryScreen extends StatefulWidget {
   final String riderPhone;
 
@@ -204,7 +204,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   void initState() {
     super.initState();
     _fetchAssignedOrder();
-    // हर 4 सेकंड में आर्डर चेक करता रहेगा ताकि वेंडर के भेजते ही घंटी बजे
     _pollingTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
       _fetchAssignedOrder();
     });
@@ -287,10 +286,10 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 
   Future<void> _sendDetailsToWhatsApp() async {
     String shopName = _currentOrder['shopName'] ?? CakeDatabase.bakeryShop['shopName'] ?? 'Viziag Mart';
-    String pickupAddr = _currentOrder['pickupAddress'] ?? CakeDatabase.bakeryShop['address'] ?? 'Faridabad';
+    String pickupAddr = _currentOrder['pickupAddress'] ?? _currentOrder['address'] ?? CakeDatabase.bakeryShop['address'] ?? 'Faridabad';
     String customerName = _currentOrder['customerName'] ?? 'कस्टमर';
-    String customerPhone = _currentOrder['customerPhone'] ?? '';
-    String deliveryAddr = _currentOrder['deliveryAddress'] ?? 'पता उपलब्ध नहीं';
+    String customerPhone = _currentOrder['customerPhone'] ?? _currentOrder['phone'] ?? '';
+    String deliveryAddr = _currentOrder['deliveryAddress'] ?? _currentOrder['address'] ?? 'पता उपलब्ध नहीं';
     String orderId = _currentOrder['orderId'] ?? '101';
 
     String message = '''
@@ -325,7 +324,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     bool hasOrder = _currentOrder.isNotEmpty;
 
     return Scaffold(
-      // ऑर्डर होने पर गहरा लाल, खाली होने पर साफ सफेद बैकग्राउंड (ब्लैक स्क्रीन कभी नहीं आएगी)
       backgroundColor: hasOrder ? Colors.red[900] : Colors.white,
       appBar: AppBar(
         title: const Text("राइडर डैशबोर्ड (Porter स्टाइल)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -365,7 +363,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                           ),
                           const SizedBox(height: 10),
                           
-                          // 💵 कमाई और दूरी का फिक्स कार्ड
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
@@ -400,18 +397,18 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                                     const SizedBox(height: 10),
                                     const Text("🟢 1. यहाँ से माल उठाना है (Pickup):",
                                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
-                                    Text(_currentOrder['pickupAddress'] ?? 'Faridabad',
+                                    Text(_currentOrder['pickupAddress'] ?? _currentOrder['address'] ?? 'Faridabad',
                                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
                                     const SizedBox(height: 15),
                                     const Text("🔴 2. यहाँ माल छोड़ना है (Delivery Address - 5 KM):",
                                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
-                                    Text(_currentOrder['deliveryAddress'] ?? 'पता नहीं मिला',
+                                    Text(_currentOrder['deliveryAddress'] ?? _currentOrder['address'] ?? 'पता नहीं मिला',
                                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
                                     const SizedBox(height: 10),
                                     Text("👤 ग्राहक नाम: ${_currentOrder['customerName'] ?? 'कस्टमर'}", style: const TextStyle(color: Colors.black87)),
-                                    Text("📞 फोन नंबर: ${_currentOrder['customerPhone'] ?? ''}", style: const TextStyle(color: Colors.black87)),
+                                    Text("📞 फोन नंबर: ${_currentOrder['customerPhone'] ?? _currentOrder['phone'] ?? ''}", style: const TextStyle(color: Colors.black87)),
                                     const SizedBox(height: 10),
-                                    Text("🛍️ कुल बिल राशि: ₹${_currentOrder['totalAmount'] ?? '0'}", style: const TextStyle(color: Colors.black87)),
+                                    Text("🛍️ कुल बिल राशि: ₹${_currentOrder['totalAmount'] ?? _currentOrder['total'] ?? '0'}", style: const TextStyle(color: Colors.black87)),
                                   ],
                                 ),
                               ),
