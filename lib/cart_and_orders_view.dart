@@ -19,16 +19,14 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
   @override
   void initState() {
     super.initState();
-    // 🚀 ऐप खुलते ही परमानेंट लोकल मेमोरी से पुराने ऑर्डर्स लोड कर लो (इंटरनेट खर्च 0 KB)
     CakeDatabase.loadOrdersLocally().then((_) {
       if (mounted) setState(() {});
     });
 
-    // 🟢 अब टाइमर हर 5 सेकंड में पूरा डेटा नहीं, बल्कि सिर्फ नया सिंगल ऑर्डर चेक करेगा (डेटा बचाने के लिए)
     _autoFetchTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       var newOrder = await CakeDatabase.fetchSingleLatestOrderOnly();
       if (newOrder != null && mounted) {
-        setState(() {}); // जैसे ही नया आर्डर आएगा, स्क्रीन अपने आप अपडेट हो जाएगी
+        setState(() {});
       }
     });
   }
@@ -39,11 +37,23 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
     super.dispose();
   }
 
-  // 🛒 आर्डर प्लेस करने का फंक्शन (Firebase पर भेजना)
+  // 🟢 सुरक्षित रूप से प्राइस और क्वांटिटी को कैलकुलेट करने का फंक्शन
+  double _calculateGrandTotal() {
+    double total = 0.0;
+    for (var item in CakeDatabase.cartItems) {
+      double price = double.tryParse(item['price']?.toString() ?? '0') ?? 0.0;
+      double qty = double.tryParse(item['qty']?.toString() ?? '1') ?? 1.0;
+      total += (price * qty);
+    }
+    return total;
+  }
+
+  // 🛒 आर्डर प्लेस करने का फंक्शन
   Future<void> _placeOrder() async {
     if (CakeDatabase.cartItems.isEmpty) return;
     setState(() => _isCheckingOut = true);
-    double grandTotal = CakeDatabase.cartItems.fold(0, (sum, item) => sum + ((item['price'] ?? 0.0) * (item['qty'] ?? 1.0)));
+    
+    double grandTotal = _calculateGrandTotal();
 
     var newOrder = {
       'orderId': 'ord_${DateTime.now().millisecondsSinceEpoch}',
@@ -68,7 +78,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
           CakeDatabase.cartItems.clear();
           CakeDatabase.localOrdersCache.insert(0, newOrder);
         });
-        await CakeDatabase.saveOrdersLocally(); // तुरंत लोकल सेव करें
+        await CakeDatabase.saveOrdersLocally();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🎉 आर्डर सफलतापूर्वक प्लेस हो गया!'), backgroundColor: Colors.green));
       }
     } finally {
@@ -78,7 +88,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
 
   @override
   Widget build(BuildContext context) {
-    double grandTotal = CakeDatabase.cartItems.fold(0, (sum, item) => sum + ((item['price'] ?? 0.0) * (item['qty'] ?? 1.0)));
+    double grandTotal = _calculateGrandTotal();
 
     return DefaultTabController(
       length: 2,
@@ -128,8 +138,8 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                                       borderRadius: BorderRadius.circular(6),
                                       child: buildShopOrProdImage(item['image'], 45, 45, Icons.fastfood),
                                     ),
-                                    title: Text(item['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                    subtitle: Text('₹${item['price']} x ${item['qty']} ${item['unit']}'),
+                                    title: Text(item['name'] ?? 'Item', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                    subtitle: Text('₹${item['price']} x ${item['qty']} ${item['unit'] ?? ''}'),
                                     trailing: IconButton(
                                       icon: const Icon(Icons.delete, color: Colors.red),
                                       onPressed: () => setState(() => CakeDatabase.cartItems.removeAt(index)),
@@ -159,7 +169,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                         ],
                       ),
                 
-                // आर्डर इतिहास टैब (लोकल मेमोरी से चलेगा, नेट खर्च नहीं होगा)
+                // आर्डर इतिहास टैब
                 CakeDatabase.localOrdersCache.isEmpty
                     ? const Center(child: Text('कोई पिछला आर्डर नहीं है', style: TextStyle(color: Colors.grey)))
                     : ListView.builder(
@@ -167,6 +177,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                         itemBuilder: (context, index) {
                           var ord = CakeDatabase.localOrdersCache[index];
                           String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending';
+                          var orderTotal = ord['grandTotal'] ?? ord['totalAmount'] ?? 0;
 
                           return Card(
                             color: const Color(0xFF1E293B),
@@ -176,7 +187,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('आर्डर #${ord['orderId']} - ₹${(ord['grandTotal'] ?? ord['totalAmount'])?.toInt()}', 
+                                  Text('आर्डर #${ord['orderId'] ?? ''} - ₹${orderTotal.toString()}', 
                                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                                   const SizedBox(height: 5),
                                   Text('स्टेटस: $status', style: const TextStyle(color: Colors.amberAccent)),
