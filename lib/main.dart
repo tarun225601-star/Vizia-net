@@ -18,34 +18,58 @@ class CakeDatabase {
 
   static List<Map<String, dynamic>> cartItems = [];
   
+  // Updated Catalog: Vegetables, Fruits & Grocery Items (No Food License items)
   static List<Map<String, dynamic>> localProductsCache = [
     {
-      'id': 'p1',
-      'name': 'Chocolate Truffle Cake',
-      'price': 499,
-      'shop': 'Faridabad Bakeries',
-      'category': 'Cakes',
-      'image': 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=500',
+      'id': 'g1',
+      'name': 'Fresh Potato (Aloo) - 1kg',
+      'price': 30,
+      'shop': 'Faridabad Fresh Mandi',
+      'category': 'Vegetables',
+      'image': 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=500',
     },
     {
-      'id': 'p2',
-      'name': 'Black Forest Cake',
-      'price': 399,
-      'shop': 'Sweet Treats Faridabad',
-      'category': 'Cakes',
-      'image': 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=500',
+      'id': 'g2',
+      'name': 'Fresh Onion (Pyaz) - 1kg',
+      'price': 40,
+      'shop': 'Faridabad Fresh Mandi',
+      'category': 'Vegetables',
+      'image': 'https://images.unsplash.com/photo-1508747703725-719777637510?w=500',
     },
     {
-      'id': 'p3',
-      'name': 'Red Velvet Luxury',
-      'price': 650,
-      'shop': 'Faridabad Bakeries',
-      'category': 'Special Cakes',
-      'image': 'https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=500',
+      'id': 'g3',
+      'name': 'Fresh Tomato (Tamatar) - 1kg',
+      'price': 35,
+      'shop': 'Green Sabzi Hub',
+      'category': 'Vegetables',
+      'image': 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=500',
+    },
+    {
+      'id': 'g4',
+      'name': 'Banana (Kela) - 1 Dozen',
+      'price': 60,
+      'shop': 'Daily Fruits Stalls',
+      'category': 'Fruits',
+      'image': 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=500',
+    },
+    {
+      'id': 'g5',
+      'name': 'Aashirvaad Atta - 5kg',
+      'price': 240,
+      'shop': 'Viziag Grocery Store',
+      'category': 'Grocery',
+      'image': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=500',
+    },
+    {
+      'id': 'g6',
+      'name': 'Fortune Basmati Rice - 1kg',
+      'price': 110,
+      'shop': 'Viziag Grocery Store',
+      'category': 'Grocery',
+      'image': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=500',
     }
   ];
 
-  // Load user profile & cart from SharedPreferences
   static Future<void> loadLocalData() async {
     final prefs = await SharedPreferences.getInstance();
     currentCustomerName = prefs.getString('cust_name') ?? 'Tarun Kumar';
@@ -63,7 +87,6 @@ class CakeDatabase {
     }
   }
 
-  // Save user profile & cart to SharedPreferences
   static Future<void> saveLocalData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('cust_name', currentCustomerName);
@@ -289,7 +312,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
             controller: _searchCtrl,
             onChanged: (val) => setState(() => _searchQuery = val),
             decoration: InputDecoration(
-              hintText: 'Search cakes, pastries or shops...',
+              hintText: 'Search vegetables, fruits or grocery...',
               prefixIcon: const Icon(Icons.search, color: Colors.grey),
               filled: true,
               fillColor: Colors.grey.shade100,
@@ -325,7 +348,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                                 product['image'],
                                 width: double.infinity,
                                 fit: BoxFit.cover,
-                                errorBuilder: (c, e, s) => Container(color: Colors.grey.shade300, child: const Icon(Icons.cake, color: Colors.grey)),
+                                errorBuilder: (c, e, s) => Container(color: Colors.grey.shade300, child: const Icon(Icons.shopping_basket, color: Colors.grey)),
                               ),
                             ),
                           ),
@@ -418,7 +441,6 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
         'timestamp': ServerValue.timestamp,
       };
 
-      // Push order to Firebase Realtime Database
       await FirebaseDatabase.instance.ref('orders').push().set(orderData);
 
       setState(() {
@@ -431,7 +453,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('🎉 Order Placed Successfully!'),
-            content: const Text('Your order has been sent to the vendor dashboard and saved locally.'),
+            content: const Text('Your grocery/vegetable order has been sent to the vendor dashboard and saved locally.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -476,7 +498,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
-                  leading: Image.network(item['image'] ?? '', width: 50, height: 50, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.cake)),
+                  leading: Image.network(item['image'] ?? '', width: 50, height: 50, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.shopping_basket)),
                   title: Text(item['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text('₹${item['price']} x ${item['qty']} = ₹${(item['price'] * item['qty'])}'),
                   trailing: Row(
@@ -543,7 +565,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
 }
 
 // =========================================================================
-// 5. VENDOR AUTH & PORTAL VIEW
+// 5. VENDOR AUTH, PORTAL & ADMIN APPROVAL VIEW
 // =========================================================================
 class VendorAuthAndPortalView extends StatefulWidget {
   const VendorAuthAndPortalView({super.key});
@@ -553,7 +575,7 @@ class VendorAuthAndPortalView extends StatefulWidget {
 }
 
 class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
-  int _viewMode = 0;
+  int _viewMode = 0; // 0: Home, 1: Register, 2: Login, 3: Vendor Dash, 4: Admin Code, 5: Admin Panel
 
   final regShopNameCtrl = TextEditingController();
   final regPhoneCtrl = TextEditingController();
@@ -566,6 +588,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
   final adminCodeCtrl = TextEditingController();
   bool _isLoading = false;
+
+  // Admin pending shops list storage
+  List<Map<String, dynamic>> _pendingShopsList = [];
 
   Future<void> _submitRegistration() async {
     if (regPhoneCtrl.text.trim().length < 10 || regShopNameCtrl.text.isEmpty) {
@@ -587,7 +612,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
         'status': 'pending',
       };
 
-      // Save registration request to Firebase REST backend
       await http.post(
         Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json'),
         body: json.encode(shopData),
@@ -665,10 +689,58 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
   void _verifyAdminCode() {
     if (adminCodeCtrl.text.trim() == 'tarun#1') {
-      setState(() => _viewMode = 5);
+      setState(() {
+        _viewMode = 5;
+      });
+      _fetchPendingShops();
       adminCodeCtrl.clear();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ गलत गुप्त कोड!'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ गलत गुप्त कोड! (सही कोड: tarun#1)'), backgroundColor: Colors.red));
+    }
+  }
+
+  // Fetch pending shops from Firebase for Admin Approval
+  Future<void> _fetchPendingShops() async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json'));
+      List<Map<String, dynamic>> loadedShops = [];
+
+      if (res.statusCode == 200 && res.body != 'null' && res.body.isNotEmpty) {
+        Map<String, dynamic> data = json.decode(res.body);
+        data.forEach((key, val) {
+          if (val['status'] == 'pending') {
+            loadedShops.add({
+              'id': key,
+              'name': val['name'] ?? '',
+              'phone': val['phone'] ?? '',
+              'address': val['address'] ?? '',
+              'status': val['status'] ?? 'pending',
+            });
+          }
+        });
+      }
+      setState(() {
+        _pendingShopsList = loadedShops;
+      });
+    } catch (e) {
+      debugPrint("Error fetching pending shops: $e");
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // Approve Shop function
+  Future<void> _approveShop(String shopKey) async {
+    try {
+      await http.patch(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests/$shopKey.json'),
+        body: json.encode({'status': 'approved'}),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान सफलतापूर्वक अप्रूव कर दी गई है!'), backgroundColor: Colors.green));
+      _fetchPendingShops(); // Refresh list
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     }
   }
 
@@ -684,7 +756,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             const SizedBox(height: 15),
             const Text('🛍️ वेंडर पोर्टल', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
-            const Text('बिना एडमिन अप्रूवल के कोई भी वेंडर लॉगिन नहीं कर सकता', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
+            const Text('सब्जी, फल और ग्रोसरी विक्रेता पंजीकरण और लॉगिन', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
             const SizedBox(height: 40),
             
             SizedBox(
@@ -822,7 +894,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             const Expanded(
               child: TabBarView(
                 children: [
-                  Center(child: Text('यहाँ वेंडर अपने प्रोडक्ट्स जोड़ सकता है')),
+                  Center(child: Text('यहाँ वेंडर अपनी सब्जी/ग्रोसरी के प्रोडक्ट्स जोड़ सकता है')),
                   Center(child: Text('यहाँ वेंडर को आने वाले ऑर्डर्स दिखेंगे')),
                 ],
               ),
@@ -842,7 +914,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             const SizedBox(height: 15),
             const Text('🔐 मास्टर एडमिन वेरिफिकेशन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 15),
-            TextField(controller: adminCodeCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'गुप्त कोड दर्ज करें (Admin Code)', border: OutlineInputBorder())),
+            TextField(controller: adminCodeCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'गुप्त कोड दर्ज करें (Admin Code: tarun#1)', border: OutlineInputBorder())),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -859,7 +931,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // Admin Dashboard for Approving Shops
+    // Admin Dashboard for Approving Shops (Fully Functional View Mode 5)
     return Column(
       children: [
         AppBar(
@@ -870,11 +942,53 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () => setState(() => _viewMode = 0),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _fetchPendingShops,
+              tooltip: 'Refresh Pending Shops',
+            ),
+          ],
         ),
-        const Expanded(
-          child: Center(
-            child: Text('Admin panel: Pending shops list and approval controls.'),
-          ),
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _pendingShopsList.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'कोई नई दुकान अप्रूवल के लिए पेंडिंग नहीं है!',
+                        style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(10),
+                      itemCount: _pendingShopsList.length,
+                      itemBuilder: (context, index) {
+                        var shop = _pendingShopsList[index];
+                        return Card(
+                          elevation: 2,
+                          margin: const EdgeInsets.only(bottom: 10),
+                          child: ListTile(
+                            leading: const CircleAvatar(
+                              backgroundColor: Colors.orange,
+                              child: Icon(Icons.store, color: Colors.white),
+                            ),
+                            title: Text(shop['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text('Phone: ${shop['phone']}\nAddress: ${shop['address']}'),
+                            isThreeLine: true,
+                            trailing: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                              ),
+                              onPressed: () => _approveShop(shop['id']),
+                              child: const Text('Approve'),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
         ),
       ],
     );
