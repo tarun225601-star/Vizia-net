@@ -1,24 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 // =========================================================================
-// 1. DATA MODELS & HYBRID STORAGE (Firebase + SharedPreferences)
+// 1. DATA MODELS & FIREBASE REST CONFIGURATION
 // =========================================================================
-class CakeDatabase {
-  static String firebaseRestUrl = 'https://viziag-mart-default-rtdb.firebaseio.com';
-  
+class ViziagDatabase {
+  static const String firebaseUrl = 'https://viziagmart-default-rtdb.firebaseio.com';
+
   static String currentCustomerName = 'Tarun Kumar';
   static String currentUserPhone = '9971968060';
   static String currentDeliveryAddress = 'Faridabad Hub, Haryana';
 
   static List<Map<String, dynamic>> cartItems = [];
-  
-  // Updated Catalog: Vegetables, Fruits & Grocery Items (No Food License items)
+  static List<Map<String, dynamic>> vendorRequests = [];
+
+  // Sabzi, Fruits & Grocery Catalog (No food license items)
   static List<Map<String, dynamic>> localProductsCache = [
     {
       'id': 'g1',
@@ -70,45 +67,64 @@ class CakeDatabase {
     }
   ];
 
-  static Future<void> loadLocalData() async {
-    final prefs = await SharedPreferences.getInstance();
-    currentCustomerName = prefs.getString('cust_name') ?? 'Tarun Kumar';
-    currentUserPhone = prefs.getString('cust_phone') ?? '9971968060';
-    currentDeliveryAddress = prefs.getString('cust_addr') ?? 'Faridabad Hub, Haryana';
-
-    String? savedCart = prefs.getString('cart_items_json');
-    if (savedCart != null && savedCart.isNotEmpty) {
-      try {
-        List decoded = json.decode(savedCart);
-        cartItems = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
-      } catch (e) {
-        debugPrint('Error loading local cart: $e');
+  // Fetch Vendors from Firebase Realtime Database
+  static Future<void> fetchVendorsFromFirebase() async {
+    try {
+      final response = await http.get(Uri.parse('$firebaseUrl/vendor_requests.json'));
+      if (response.statusCode == 200 && response.body != 'null') {
+        Map<String, dynamic> data = json.decode(response.body);
+        List<Map<String, dynamic>> loadedList = [];
+        data.forEach((key, value) {
+          var mapVal = Map<String, dynamic>.from(value);
+          mapVal['firebaseKey'] = key; // Save push key for updating status
+          loadedList.add(mapVal);
+        });
+        vendorRequests = loadedList;
+      } else {
+        vendorRequests = [];
       }
+    } catch (e) {
+      debugPrint('Error fetching vendors: $e');
     }
   }
 
-  static Future<void> saveLocalData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('cust_name', currentCustomerName);
-    await prefs.setString('cust_phone', currentUserPhone);
-    await prefs.setString('cust_addr', currentDeliveryAddress);
-    await prefs.setString('cart_items_json', json.encode(cartItems));
+  // Register New Vendor to Firebase
+  static Future<bool> registerVendorToFirebase(Map<String, dynamic> vendorData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$firebaseUrl/vendor_requests.json'),
+        body: json.encode(vendorData),
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      debugPrint('Error registering vendor: $e');
+      return false;
+    }
+  }
+
+  // Update Vendor Status to Approved in Firebase
+  static Future<bool> updateVendorStatusInFirebase(String firebaseKey, String newStatus) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('$firebaseUrl/vendor_requests/$firebaseKey.json'),
+        body: json.encode({'status': newStatus}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error updating vendor status: $e');
+      return false;
+    }
   }
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp();
-  } catch (e) {
-    debugPrint("Firebase init warning: $e");
-  }
-  await CakeDatabase.loadLocalData();
-  runApp(const CakeAppEnterpriseApp());
+  await ViziagDatabase.fetchVendorsFromFirebase();
+  runApp(const ViziagMartApp());
 }
 
-class CakeAppEnterpriseApp extends StatelessWidget {
-  const CakeAppEnterpriseApp({super.key});
+class ViziagMartApp extends StatelessWidget {
+  const ViziagMartApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +137,7 @@ class CakeAppEnterpriseApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8F9FA),
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
       ),
-      home: const CakeMainHubScreen(),
+      home: const ViziagMainHubScreen(),
     );
   }
 }
@@ -129,25 +145,25 @@ class CakeAppEnterpriseApp extends StatelessWidget {
 // =========================================================================
 // 2. MAIN HUB SCREEN (Tabs Controller)
 // =========================================================================
-class CakeMainHubScreen extends StatefulWidget {
-  const CakeMainHubScreen({super.key});
+class ViziagMainHubScreen extends StatefulWidget {
+  const ViziagMainHubScreen({super.key});
 
   @override
-  State<CakeMainHubScreen> createState() => _CakeMainHubScreenState();
+  State<ViziagMainHubScreen> createState() => _ViziagMainHubScreenState();
 }
 
-class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
+class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
   int _selectedTabIndex = 0;
-
-  final List<Widget> _tabScreens = [
-    const MarketplaceBuyerView(),
-    const VendorAuthAndPortalView(),
-    const CartAndOrdersView(),
-  ];
 
   @override
   Widget build(BuildContext context) {
-    int totalCartCount = CakeDatabase.cartItems.fold(0, (sum, item) => sum + ((item['qty'] as num?)?.toInt() ?? 1));
+    int totalCartCount = ViziagDatabase.cartItems.fold(0, (sum, item) => sum + ((item['qty'] as num?)?.toInt() ?? 1));
+
+    final List<Widget> tabScreens = [
+      MarketplaceBuyerView(onCartChanged: () => setState(() {})),
+      const VendorAuthAndPortalView(),
+      CartAndOrdersView(onCartChanged: () => setState(() {})),
+    ];
 
     return Scaffold(
       appBar: PreferredSize(
@@ -190,7 +206,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
                       children: [
                         Icon(Icons.person_pin_circle, color: Colors.green.shade700, size: 15),
                         const SizedBox(width: 6),
-                        Text(CakeDatabase.currentCustomerName, style: const TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.bold)),
+                        Text(ViziagDatabase.currentCustomerName, style: const TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -205,7 +221,7 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
           ),
         ),
       ),
-      body: IndexedStack(index: _selectedTabIndex > 2 ? 2 : _selectedTabIndex, children: _tabScreens),
+      body: IndexedStack(index: _selectedTabIndex > 2 ? 2 : _selectedTabIndex, children: tabScreens),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedTabIndex > 2 ? 2 : _selectedTabIndex,
         selectedItemColor: Colors.green.shade700,
@@ -244,9 +260,9 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        final nameCtrl = TextEditingController(text: CakeDatabase.currentCustomerName);
-        final phoneCtrl = TextEditingController(text: CakeDatabase.currentUserPhone);
-        final addressCtrl = TextEditingController(text: CakeDatabase.currentDeliveryAddress);
+        final nameCtrl = TextEditingController(text: ViziagDatabase.currentCustomerName);
+        final phoneCtrl = TextEditingController(text: ViziagDatabase.currentUserPhone);
+        final addressCtrl = TextEditingController(text: ViziagDatabase.currentDeliveryAddress);
         return AlertDialog(
           title: const Text('Edit Profile & Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
           content: Column(
@@ -263,13 +279,12 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-              onPressed: () async {
+              onPressed: () {
                 setState(() {
-                  CakeDatabase.currentCustomerName = nameCtrl.text.trim();
-                  CakeDatabase.currentUserPhone = phoneCtrl.text.trim();
-                  CakeDatabase.currentDeliveryAddress = addressCtrl.text.trim();
+                  ViziagDatabase.currentCustomerName = nameCtrl.text.trim();
+                  ViziagDatabase.currentUserPhone = phoneCtrl.text.trim();
+                  ViziagDatabase.currentDeliveryAddress = addressCtrl.text.trim();
                 });
-                await CakeDatabase.saveLocalData();
                 Navigator.pop(context);
               },
               child: const Text('Save'),
@@ -285,7 +300,8 @@ class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
 // 3. MARKETPLACE BUYER VIEW (Shop & Products Catalog)
 // =========================================================================
 class MarketplaceBuyerView extends StatefulWidget {
-  const MarketplaceBuyerView({super.key});
+  final VoidCallback onCartChanged;
+  const MarketplaceBuyerView({super.key, required this.onCartChanged});
 
   @override
   State<MarketplaceBuyerView> createState() => _MarketplaceBuyerViewState();
@@ -297,7 +313,7 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 
   @override
   Widget build(BuildContext context) {
-    var filteredList = CakeDatabase.localProductsCache.where((item) {
+    var filteredList = ViziagDatabase.localProductsCache.where((item) {
       final name = item['name'].toString().toLowerCase();
       final shop = item['shop'].toString().toLowerCase();
       return name.contains(_searchQuery.toLowerCase()) || shop.contains(_searchQuery.toLowerCase());
@@ -369,10 +385,10 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                                       height: 28,
                                       child: ElevatedButton(
                                         style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 8)),
-                                        onPressed: () async {
+                                        onPressed: () {
                                           setState(() {
                                             bool found = false;
-                                            for (var cartItem in CakeDatabase.cartItems) {
+                                            for (var cartItem in ViziagDatabase.cartItems) {
                                               if (cartItem['id'] == product['id']) {
                                                 cartItem['qty'] = (cartItem['qty'] ?? 1) + 1;
                                                 found = true;
@@ -380,15 +396,13 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                                               }
                                             }
                                             if (!found) {
-                                              CakeDatabase.cartItems.add({...product, 'qty': 1});
+                                              ViziagDatabase.cartItems.add({...product, 'qty': 1});
                                             }
                                           });
-                                          await CakeDatabase.saveLocalData();
-                                          if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(content: Text('${product['name']} added to cart!'), duration: const Duration(milliseconds: 800)),
-                                            );
-                                          }
+                                          widget.onCartChanged();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('${product['name']} added to cart!'), duration: const Duration(milliseconds: 600)),
+                                          );
                                         },
                                         child: const Text('Add', style: TextStyle(fontSize: 11)),
                                       ),
@@ -413,68 +427,44 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 // 4. CART & ORDERS VIEW
 // =========================================================================
 class CartAndOrdersView extends StatefulWidget {
-  const CartAndOrdersView({super.key});
+  final VoidCallback onCartChanged;
+  const CartAndOrdersView({super.key, required this.onCartChanged});
 
   @override
   State<CartAndOrdersView> createState() => _CartAndOrdersViewState();
 }
 
 class _CartAndOrdersViewState extends State<CartAndOrdersView> {
-  bool _isCheckingOut = false;
-
   int get _cartTotal {
-    return CakeDatabase.cartItems.fold(0, (sum, item) => sum + ((item['price'] ?? 0) * (item['qty'] ?? 1) as int));
+    return ViziagDatabase.cartItems.fold(0, (sum, item) => sum + ((item['price'] ?? 0) * (item['qty'] ?? 1) as int));
   }
 
-  Future<void> _placeOrder() async {
-    if (CakeDatabase.cartItems.isEmpty) return;
-    setState(() => _isCheckingOut = true);
+  void _placeOrder() {
+    if (ViziagDatabase.cartItems.isEmpty) return;
 
-    try {
-      final orderData = {
-        'customerName': CakeDatabase.currentCustomerName,
-        'phone': CakeDatabase.currentUserPhone,
-        'address': CakeDatabase.currentDeliveryAddress,
-        'total': _cartTotal,
-        'status': 'Pending',
-        'items': CakeDatabase.cartItems,
-        'timestamp': ServerValue.timestamp,
-      };
+    setState(() {
+      ViziagDatabase.cartItems.clear();
+    });
+    widget.onCartChanged();
 
-      await FirebaseDatabase.instance.ref('orders').push().set(orderData);
-
-      setState(() {
-        CakeDatabase.cartItems.clear();
-      });
-      await CakeDatabase.saveLocalData();
-
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('🎉 Order Placed Successfully!'),
-            content: const Text('Your grocery/vegetable order has been sent to the vendor dashboard and saved locally.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('🎉 Order Placed Successfully!'),
+        content: const Text('Your grocery/vegetable order has been confirmed and sent to the hub.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
           ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Order failed: $e'), backgroundColor: Colors.red));
-      }
-    } finally {
-      if (mounted) setState(() => _isCheckingOut = false);
-    }
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (CakeDatabase.cartItems.isEmpty) {
+    if (ViziagDatabase.cartItems.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -492,9 +482,9 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(10),
-            itemCount: CakeDatabase.cartItems.length,
+            itemCount: ViziagDatabase.cartItems.length,
             itemBuilder: (context, index) {
-              var item = CakeDatabase.cartItems[index];
+              var item = ViziagDatabase.cartItems[index];
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
@@ -506,25 +496,25 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.remove_circle_outline, size: 20),
-                        onPressed: () async {
+                        onPressed: () {
                           setState(() {
                             if (item['qty'] > 1) {
                               item['qty']--;
                             } else {
-                              CakeDatabase.cartItems.removeAt(index);
+                              ViziagDatabase.cartItems.removeAt(index);
                             }
                           });
-                          await CakeDatabase.saveLocalData();
+                          widget.onCartChanged();
                         },
                       ),
                       Text('${item['qty']}', style: const TextStyle(fontWeight: FontWeight.bold)),
                       IconButton(
                         icon: const Icon(Icons.add_circle_outline, size: 20),
-                        onPressed: () async {
+                        onPressed: () {
                           setState(() {
                             item['qty']++;
                           });
-                          await CakeDatabase.saveLocalData();
+                          widget.onCartChanged();
                         },
                       ),
                     ],
@@ -552,8 +542,8 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                  onPressed: _isCheckingOut ? null : _placeOrder,
-                  child: _isCheckingOut ? const CircularProgressIndicator(color: Colors.white) : const Text('Place Order Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  onPressed: _placeOrder,
+                  child: const Text('Place Order Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 ),
               ),
             ],
@@ -565,7 +555,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
 }
 
 // =========================================================================
-// 5. VENDOR AUTH, PORTAL & ADMIN APPROVAL VIEW
+// 5. VENDOR AUTH, PORTAL & ADMIN APPROVAL VIEW (FIREBASE SYNCED)
 // =========================================================================
 class VendorAuthAndPortalView extends StatefulWidget {
   const VendorAuthAndPortalView({super.key});
@@ -576,6 +566,7 @@ class VendorAuthAndPortalView extends StatefulWidget {
 
 class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   int _viewMode = 0; // 0: Home, 1: Register, 2: Login, 3: Vendor Dash, 4: Admin Code, 5: Admin Panel
+  bool _isLoading = false;
 
   final regShopNameCtrl = TextEditingController();
   final regPhoneCtrl = TextEditingController();
@@ -585,12 +576,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
   final loginPhoneCtrl = TextEditingController();
   final loginPassCtrl = TextEditingController();
-
   final adminCodeCtrl = TextEditingController();
-  bool _isLoading = false;
-
-  // Admin pending shops list storage
-  List<Map<String, dynamic>> _pendingShopsList = [];
 
   Future<void> _submitRegistration() async {
     if (regPhoneCtrl.text.trim().length < 10 || regShopNameCtrl.text.isEmpty) {
@@ -603,26 +589,27 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     }
 
     setState(() => _isLoading = true);
-    try {
-      var shopData = {
-        'name': regShopNameCtrl.text.trim(),
-        'phone': regPhoneCtrl.text.trim(),
-        'address': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
-        'pass': regPass1Ctrl.text.trim(),
-        'status': 'pending',
-      };
 
-      await http.post(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json'),
-        body: json.encode(shopData),
-      );
+    var newShop = {
+      'name': regShopNameCtrl.text.trim(),
+      'phone': regPhoneCtrl.text.trim(),
+      'address': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
+      'pass': regPass1Ctrl.text.trim(),
+      'status': 'pending',
+    };
 
-      if (mounted) {
+    bool success = await ViziagDatabase.registerVendorToFirebase(newShop);
+    await ViziagDatabase.fetchVendorsFromFirebase();
+
+    setState(() => _isLoading = false);
+
+    if (mounted) {
+      if (success) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('⏳ रिक्वेस्ट सबमिट हो गई'),
-            content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन (तरुण) द्वारा अप्रूव होने के बाद ही आप लॉगिन कर पाएंगे।'),
+            content: const Text('आपकी दुकान Firebase पर रजिस्टर हो गई है। अब एडमिन पैनल (tarun#1) में जाकर इसे अप्रूव करें।'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -634,9 +621,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             ],
           ),
         );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ इंटरनेट या Firebase कनेक्शन एरर!'), backgroundColor: Colors.red));
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -650,102 +637,72 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     }
 
     setState(() => _isLoading = true);
-    try {
-      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json'));
-      bool isApproved = false;
+    await ViziagDatabase.fetchVendorsFromFirebase();
+    setState(() => _isLoading = false);
 
-      if (res.statusCode == 200 && res.body != 'null' && res.body.isNotEmpty) {
-        Map<String, dynamic> data = json.decode(res.body);
-        data.forEach((key, val) {
-          if (val['phone'] == phone && val['pass'] == pass && val['status'] == 'approved') {
-            isApproved = true;
-          }
-        });
+    bool isApproved = false;
+    for (var shop in ViziagDatabase.vendorRequests) {
+      if (shop['phone'] == phone && shop['pass'] == pass && shop['status'] == 'approved') {
+        isApproved = true;
+        break;
       }
+    }
 
-      if (isApproved) {
-        setState(() => _viewMode = 3);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ स्वागत है! वेंडर डैशबोर्ड खुल गया है।'), backgroundColor: Colors.green));
-        }
-      } else {
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('⚠️ लॉगिन असफल (Not Approved)'),
-              content: const Text('आपकी दुकान अभी तक मास्टर एडमिन (तरुण) द्वारा अप्रूव नहीं की गई है! कृपया पहले अप्रूवल लें या सही डिटेल्स भरें।'),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('ठीक है')),
-              ],
-            ),
-          );
-        }
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    if (isApproved) {
+      setState(() => _viewMode = 3);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ स्वागत है! वेंडर डैशबोर्ड लाइव है।'), backgroundColor: Colors.green));
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('⚠️ लॉगिन असफल (Not Approved)'),
+          content: const Text('आपकी दुकान अभी तक एडमिन द्वारा अप्रूव नहीं की गई है या पासवर्ड गलत है!'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('ठीक है')),
+          ],
+        ),
+      );
     }
   }
 
   void _verifyAdminCode() {
     if (adminCodeCtrl.text.trim() == 'tarun#1') {
-      setState(() {
-        _viewMode = 5;
-      });
-      _fetchPendingShops();
+      setState(() => _viewMode = 5);
       adminCodeCtrl.clear();
+      // Load latest pending requests from Firebase
+      _refreshAdminData();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ गलत गुप्त कोड! (सही कोड: tarun#1)'), backgroundColor: Colors.red));
     }
   }
 
-  // Fetch pending shops from Firebase for Admin Approval
-  Future<void> _fetchPendingShops() async {
+  Future<void> _refreshAdminData() async {
     setState(() => _isLoading = true);
-    try {
-      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json'));
-      List<Map<String, dynamic>> loadedShops = [];
-
-      if (res.statusCode == 200 && res.body != 'null' && res.body.isNotEmpty) {
-        Map<String, dynamic> data = json.decode(res.body);
-        data.forEach((key, val) {
-          if (val['status'] == 'pending') {
-            loadedShops.add({
-              'id': key,
-              'name': val['name'] ?? '',
-              'phone': val['phone'] ?? '',
-              'address': val['address'] ?? '',
-              'status': val['status'] ?? 'pending',
-            });
-          }
-        });
-      }
-      setState(() {
-        _pendingShopsList = loadedShops;
-      });
-    } catch (e) {
-      debugPrint("Error fetching pending shops: $e");
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    await ViziagDatabase.fetchVendorsFromFirebase();
+    setState(() => _isLoading = false);
   }
 
-  // Approve Shop function
-  Future<void> _approveShop(String shopKey) async {
-    try {
-      await http.patch(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests/$shopKey.json'),
-        body: json.encode({'status': 'approved'}),
-      );
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान सफलतापूर्वक अप्रूव कर दी गई है!'), backgroundColor: Colors.green));
-      _fetchPendingShops(); // Refresh list
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+  Future<void> _approveShop(String firebaseKey) async {
+    setState(() => _isLoading = true);
+    bool success = await ViziagDatabase.updateVendorStatusInFirebase(firebaseKey, 'approved');
+    await ViziagDatabase.fetchVendorsFromFirebase();
+    setState(() => _isLoading = false);
+
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान Firebase पर सफलतापूर्वक अप्रूव हो गई!'), backgroundColor: Colors.green));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ अप्रूवल अपडेट करने में दिक्कत आई।'), backgroundColor: Colors.red));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Colors.green));
+    }
+
     if (_viewMode == 0) {
       return Padding(
         padding: const EdgeInsets.all(20),
@@ -754,9 +711,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           children: [
             const Icon(Icons.storefront, size: 75, color: Colors.green),
             const SizedBox(height: 15),
-            const Text('🛍️ वेंडर पोर्टल', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text('🛍️ वेंडर पोर्टल (Firebase Live)', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
-            const Text('सब्जी, फल और ग्रोसरी विक्रेता पंजीकरण और लॉगिन', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
+            const Text('सब्जी, फल और ग्रोसरी विक्रेता पंजीकरण और लाइव एडमिन अप्रूवल', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
             const SizedBox(height: 40),
             
             SizedBox(
@@ -817,8 +774,8 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                onPressed: _isLoading ? null : _submitRegistration,
-                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('अप्रूवल के लिए सबमिट करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                onPressed: _submitRegistration,
+                child: const Text('फायरबेस पर सबमिट करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ),
             ),
             const SizedBox(height: 10),
@@ -838,7 +795,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             const SizedBox(height: 15),
             const Text('🔐 वेंडर लॉगिन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
-            const Text('पहले एडमिन से अप्रूव कराना अनिवार्य है', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text('एडमिन से अप्रूव होना अनिवार्य है', style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 25),
             TextField(controller: loginPhoneCtrl, keyboardType: TextInputType.phone, maxLength: 10, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), counterText: '', prefixIcon: Icon(Icons.phone))),
             const SizedBox(height: 15),
@@ -849,8 +806,8 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                onPressed: _isLoading ? null : _loginVendor,
-                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('लॉगिन करें ➔', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                onPressed: _loginVendor,
+                child: const Text('लॉगिन करें ➔', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
             const SizedBox(height: 10),
@@ -861,46 +818,28 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     }
 
     if (_viewMode == 3) {
-      return DefaultTabController(
-        length: 2,
-        child: Column(
-          children: [
-            Container(
-              color: Colors.green.shade50,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                children: [
-                  const Text('🟢 वेंडर डैशबोर्ड (लाइव)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => setState(() => _viewMode = 0),
-                    child: const Text('लॉग आउट', style: TextStyle(fontSize: 11, color: Colors.red)),
-                  ),
-                ],
-              ),
+      return Column(
+        children: [
+          Container(
+            color: Colors.green.shade50,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                const Text('🟢 वेंडर डैशबोर्ड (Firebase Live)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => setState(() => _viewMode = 0),
+                  child: const Text('लॉग आउट', style: TextStyle(fontSize: 12, color: Colors.red)),
+                ),
+              ],
             ),
-            const Material(
-              color: Colors.white,
-              child: TabBar(
-                labelColor: Colors.green,
-                unselectedLabelColor: Colors.grey,
-                indicatorColor: Colors.green,
-                tabs: [
-                  Tab(text: '📦 प्रोडक्ट्स जोड़ें'),
-                  Tab(text: '📋 ऑर्डर्स देखें'),
-                ],
-              ),
+          ),
+          const Expanded(
+            child: Center(
+              child: Text('यहाँ वेंडर अपनी सब्जी/ग्रोसरी के प्रोडक्ट्स और ऑर्डर्स मैनेज कर सकता है।', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
             ),
-            const Expanded(
-              child: TabBarView(
-                children: [
-                  Center(child: Text('यहाँ वेंडर अपनी सब्जी/ग्रोसरी के प्रोडक्ट्स जोड़ सकता है')),
-                  Center(child: Text('यहाँ वेंडर को आने वाले ऑर्डर्स दिखेंगे')),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
@@ -931,11 +870,13 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // Admin Dashboard for Approving Shops (Fully Functional View Mode 5)
+    // Admin Dashboard for Approving Shops from Firebase
+    var pendingList = ViziagDatabase.vendorRequests.where((s) => s['status'] == 'pending').toList();
+
     return Column(
       children: [
         AppBar(
-          title: const Text('Master Shop Approval Dashboard'),
+          title: const Text('Master Shop Approval (Live)'),
           backgroundColor: Colors.green.shade700,
           foregroundColor: Colors.white,
           leading: IconButton(
@@ -945,50 +886,47 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
-              onPressed: _fetchPendingShops,
-              tooltip: 'Refresh Pending Shops',
+              onPressed: _refreshAdminData,
             ),
           ],
         ),
         Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _pendingShopsList.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'कोई नई दुकान अप्रूवल के लिए पेंडिंग नहीं है!',
-                        style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(10),
-                      itemCount: _pendingShopsList.length,
-                      itemBuilder: (context, index) {
-                        var shop = _pendingShopsList[index];
-                        return Card(
-                          elevation: 2,
-                          margin: const EdgeInsets.only(bottom: 10),
-                          child: ListTile(
-                            leading: const CircleAvatar(
-                              backgroundColor: Colors.orange,
-                              child: Icon(Icons.store, color: Colors.white),
-                            ),
-                            title: Text(shop['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('Phone: ${shop['phone']}\nAddress: ${shop['address']}'),
-                            isThreeLine: true,
-                            trailing: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                              ),
-                              onPressed: () => _approveShop(shop['id']),
-                              child: const Text('Approve'),
-                            ),
+          child: pendingList.isEmpty
+              ? const Center(
+                  child: Text(
+                    'कोई नई दुकान अप्रूवल के लिए पेंडिंग नहीं है!',
+                    style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(10),
+                  itemCount: pendingList.length,
+                  itemBuilder: (context, index) {
+                    var shop = pendingList[index];
+                    return Card(
+                      elevation: 2,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: Colors.orange,
+                          child: Icon(Icons.store, color: Colors.white),
+                        ),
+                        title: Text(shop['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('Phone: ${shop['phone']}\nAddress: ${shop['address']}'),
+                        isThreeLine: true,
+                        trailing: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                           ),
-                        );
-                      },
-                    ),
+                          onPressed: () => _approveShop(shop['firebaseKey']),
+                          child: const Text('Approve'),
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
