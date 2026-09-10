@@ -11,7 +11,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Firebase इनिशियलाइजेशन पर फुलप्रूफ try-catch ताकी वाइट स्क्रीन का चांस न रहे
   try {
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp();
@@ -214,10 +213,10 @@ class MarketplaceTabScreen extends StatelessWidget {
     final cartState = Provider.of<CartState>(context);
 
     if (!shopState.shopOpen) {
-      return Center(
+      return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
+          children: [
             Icon(Icons.store_mall_directory, size: 70, color: Colors.redAccent),
             SizedBox(height: 12),
             Text('Shop is currently CLOSED!', style: TextStyle(fontSize: 20, color: Colors.redAccent, fontWeight: FontWeight.bold)),
@@ -233,7 +232,9 @@ class MarketplaceTabScreen extends StatelessWidget {
           return const Center(child: CircularProgressIndicator(color: Color(0xFFF59E0B)));
         }
         if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-          return const Center(child: Text('No products listed in marketplace.', style: TextStyle(color: Colors.grey)));
+          return const Center(
+            child: Text('No products listed yet. Add items from Vendor tab.', style: TextStyle(color: Colors.grey)),
+          );
         }
 
         try {
@@ -353,8 +354,11 @@ class _VendorDashboardTabState extends State<VendorDashboardTab> {
             child: StreamBuilder(
               stream: FirebaseDatabase.instance.ref('products').onValue,
               builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: Color(0xFFF59E0B)));
+                }
                 if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-                  return const Center(child: Text('Inventory is empty.'));
+                  return const Center(child: Text('Inventory is empty. Add products above.', style: TextStyle(color: Colors.grey)));
                 }
                 try {
                   Map map = snapshot.data!.snapshot.value as Map;
@@ -367,34 +371,37 @@ class _VendorDashboardTabState extends State<VendorDashboardTab> {
                       var item = map[k];
                       bool inStock = item['inStock'] ?? true;
 
-                      return ListTile(
-                        title: Text(item['name'] ?? '', style: const TextStyle(color: Colors.white)),
-                        subtitle: Text('₹${item['price']}', style: const TextStyle(color: Color(0xFFF59E0B))),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Switch(
-                              value: inStock,
-                              activeColor: const Color(0xFFF59E0B),
-                              onChanged: (val) {
-                                try {
-                                  FirebaseDatabase.instance.ref('products/$k').update({'inStock': val});
-                                } catch (e) {
-                                  debugPrint("Stock update error: $e");
-                                }
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () {
-                                try {
-                                  FirebaseDatabase.instance.ref('products/$k').remove();
-                                } catch (e) {
-                                  debugPrint("Delete error: $e");
-                                }
-                              },
-                            ),
-                          ],
+                      return Card(
+                        color: const Color(0xFF1E293B),
+                        child: ListTile(
+                          title: Text(item['name'] ?? '', style: const TextStyle(color: Colors.white)),
+                          subtitle: Text('₹${item['price']}', style: const TextStyle(color: Color(0xFFF59E0B))),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Switch(
+                                value: inStock,
+                                activeColor: const Color(0xFFF59E0B),
+                                onChanged: (val) {
+                                  try {
+                                    FirebaseDatabase.instance.ref('products/$k').update({'inStock': val});
+                                  } catch (e) {
+                                    debugPrint("Stock update error: $e");
+                                  }
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () {
+                                  try {
+                                    FirebaseDatabase.instance.ref('products/$k').remove();
+                                  } catch (e) {
+                                    debugPrint("Delete error: $e");
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -419,8 +426,11 @@ class RiderDeliveryTab extends StatelessWidget {
     return StreamBuilder(
       stream: FirebaseDatabase.instance.ref('orders').onValue,
       builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: Color(0xFFF59E0B)));
+        }
         if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-          return const Center(child: Text('No active delivery orders.'));
+          return const Center(child: Text('No active delivery orders found.', style: TextStyle(color: Colors.grey)));
         }
         try {
           Map map = snapshot.data!.snapshot.value as Map;
@@ -472,7 +482,6 @@ class CartCheckoutTab extends StatelessWidget {
 
   @override
   Widget build(context) {
-    final cartState = Provider.of<ShopState>(context); // Note: Fix context usage safe fallback if needed
     final cart = Provider.of<CartState>(context);
 
     if (cart.cartItems.isEmpty) {
