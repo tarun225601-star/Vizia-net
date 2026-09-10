@@ -1,130 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'database_models.dart';
+import 'marketplace_buyer_view.dart';
+import 'cart_and_orders_view.dart';
+import 'image_picker_helper.dart';
+import 'rider_delivery_view.dart'; 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-// =========================================================================
-// 1. DATA MODELS & FIREBASE REST CONFIGURATION
-// =========================================================================
-class ViziagDatabase {
-  static const String firebaseUrl = 'https://viziagmart-default-rtdb.firebaseio.com';
-
-  static String currentCustomerName = 'Tarun Kumar';
-  static String currentUserPhone = '9971968060';
-  static String currentDeliveryAddress = 'Faridabad Hub, Haryana';
-
-  static List<Map<String, dynamic>> cartItems = [];
-  static List<Map<String, dynamic>> vendorRequests = [];
-
-  // Sabzi, Fruits & Grocery Catalog (No food license items)
-  static List<Map<String, dynamic>> localProductsCache = [
-    {
-      'id': 'g1',
-      'name': 'Fresh Potato (Aloo) - 1kg',
-      'price': 30,
-      'shop': 'Faridabad Fresh Mandi',
-      'category': 'Vegetables',
-      'image': 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=500',
-    },
-    {
-      'id': 'g2',
-      'name': 'Fresh Onion (Pyaz) - 1kg',
-      'price': 40,
-      'shop': 'Faridabad Fresh Mandi',
-      'category': 'Vegetables',
-      'image': 'https://images.unsplash.com/photo-1508747703725-719777637510?w=500',
-    },
-    {
-      'id': 'g3',
-      'name': 'Fresh Tomato (Tamatar) - 1kg',
-      'price': 35,
-      'shop': 'Green Sabzi Hub',
-      'category': 'Vegetables',
-      'image': 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=500',
-    },
-    {
-      'id': 'g4',
-      'name': 'Banana (Kela) - 1 Dozen',
-      'price': 60,
-      'shop': 'Daily Fruits Stalls',
-      'category': 'Fruits',
-      'image': 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=500',
-    },
-    {
-      'id': 'g5',
-      'name': 'Aashirvaad Atta - 5kg',
-      'price': 240,
-      'shop': 'Viziag Grocery Store',
-      'category': 'Grocery',
-      'image': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=500',
-    },
-    {
-      'id': 'g6',
-      'name': 'Fortune Basmati Rice - 1kg',
-      'price': 110,
-      'shop': 'Viziag Grocery Store',
-      'category': 'Grocery',
-      'image': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=500',
-    }
-  ];
-
-  // Fetch Vendors from Firebase Realtime Database
-  static Future<void> fetchVendorsFromFirebase() async {
-    try {
-      final response = await http.get(Uri.parse('$firebaseUrl/vendor_requests.json'));
-      if (response.statusCode == 200 && response.body != 'null') {
-        Map<String, dynamic> data = json.decode(response.body);
-        List<Map<String, dynamic>> loadedList = [];
-        data.forEach((key, value) {
-          var mapVal = Map<String, dynamic>.from(value);
-          mapVal['firebaseKey'] = key; // Save push key for updating status
-          loadedList.add(mapVal);
-        });
-        vendorRequests = loadedList;
-      } else {
-        vendorRequests = [];
-      }
-    } catch (e) {
-      debugPrint('Error fetching vendors: $e');
-    }
-  }
-
-  // Register New Vendor to Firebase
-  static Future<bool> registerVendorToFirebase(Map<String, dynamic> vendorData) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$firebaseUrl/vendor_requests.json'),
-        body: json.encode(vendorData),
-      );
-      return response.statusCode == 200 || response.statusCode == 201;
-    } catch (e) {
-      debugPrint('Error registering vendor: $e');
-      return false;
-    }
-  }
-
-  // Update Vendor Status to Approved in Firebase
-  static Future<bool> updateVendorStatusInFirebase(String firebaseKey, String newStatus) async {
-    try {
-      final response = await http.patch(
-        Uri.parse('$firebaseUrl/vendor_requests/$firebaseKey.json'),
-        body: json.encode({'status': newStatus}),
-      );
-      return response.statusCode == 200;
-    } catch (e) {
-      debugPrint('Error updating vendor status: $e');
-      return false;
-    }
-  }
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await ViziagDatabase.fetchVendorsFromFirebase();
-  runApp(const ViziagMartApp());
+  
+  // 🟢 यहाँ try-catch लगाने से वाइट स्क्रीन की दिक्कत जड़ से खत्म हो जाएगी
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint("Firebase init warning: $e");
+  }
+
+  runApp(const CakeAppEnterpriseApp());
 }
 
-class ViziagMartApp extends StatelessWidget {
-  const ViziagMartApp({super.key});
+class CakeAppEnterpriseApp extends StatelessWidget {
+  const CakeAppEnterpriseApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -137,33 +35,31 @@ class ViziagMartApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8F9FA),
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
       ),
-      home: const ViziagMainHubScreen(),
+      home: const CakeMainHubScreen(),
     );
   }
 }
 
-// =========================================================================
-// 2. MAIN HUB SCREEN (Tabs Controller)
-// =========================================================================
-class ViziagMainHubScreen extends StatefulWidget {
-  const ViziagMainHubScreen({super.key});
+class CakeMainHubScreen extends StatefulWidget {
+  const CakeMainHubScreen({super.key});
 
   @override
-  State<ViziagMainHubScreen> createState() => _ViziagMainHubScreenState();
+  State<CakeMainHubScreen> createState() => _CakeMainHubScreenState();
 }
 
-class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
+class _CakeMainHubScreenState extends State<CakeMainHubScreen> {
   int _selectedTabIndex = 0;
+
+  final List<Widget> _tabScreens = [
+    const MarketplaceBuyerView(),
+    const VendorAuthAndPortalView(),
+    const RiderDeliveryScreen(),
+    const CartAndOrdersView(),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    int totalCartCount = ViziagDatabase.cartItems.fold(0, (sum, item) => sum + ((item['qty'] as num?)?.toInt() ?? 1));
-
-    final List<Widget> tabScreens = [
-      MarketplaceBuyerView(onCartChanged: () => setState(() {})),
-      const VendorAuthAndPortalView(),
-      CartAndOrdersView(onCartChanged: () => setState(() {})),
-    ];
+    int totalCartCount = CakeDatabase.cartItems.fold(0, (sum, item) => sum + ((item['qty'] as num?)?.toInt() ?? 1));
 
     return Scaffold(
       appBar: PreferredSize(
@@ -206,7 +102,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
                       children: [
                         Icon(Icons.person_pin_circle, color: Colors.green.shade700, size: 15),
                         const SizedBox(width: 6),
-                        Text(ViziagDatabase.currentCustomerName, style: const TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.bold)),
+                        Text(CakeDatabase.currentCustomerName, style: const TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -221,9 +117,9 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
           ),
         ),
       ),
-      body: IndexedStack(index: _selectedTabIndex > 2 ? 2 : _selectedTabIndex, children: tabScreens),
+      body: IndexedStack(index: _selectedTabIndex > 3 ? 3 : _selectedTabIndex, children: _tabScreens),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedTabIndex > 2 ? 2 : _selectedTabIndex,
+        currentIndex: _selectedTabIndex > 3 ? 3 : _selectedTabIndex,
         selectedItemColor: Colors.green.shade700,
         unselectedItemColor: Colors.grey,
         backgroundColor: Colors.white,
@@ -232,6 +128,7 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
         items: [
           const BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Shop'),
           const BottomNavigationBarItem(icon: Icon(Icons.admin_panel_settings_outlined), label: 'Vendor'),
+          const BottomNavigationBarItem(icon: Icon(Icons.delivery_dining), label: 'Delivery'),
           BottomNavigationBarItem(
             icon: Stack(
               children: [
@@ -260,9 +157,9 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        final nameCtrl = TextEditingController(text: ViziagDatabase.currentCustomerName);
-        final phoneCtrl = TextEditingController(text: ViziagDatabase.currentUserPhone);
-        final addressCtrl = TextEditingController(text: ViziagDatabase.currentDeliveryAddress);
+        final nameCtrl = TextEditingController(text: CakeDatabase.currentCustomerName);
+        final phoneCtrl = TextEditingController(text: CakeDatabase.currentUserPhone);
+        final addressCtrl = TextEditingController(text: CakeDatabase.currentDeliveryAddress);
         return AlertDialog(
           title: const Text('Edit Profile & Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
           content: Column(
@@ -281,9 +178,9 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
               onPressed: () {
                 setState(() {
-                  ViziagDatabase.currentCustomerName = nameCtrl.text.trim();
-                  ViziagDatabase.currentUserPhone = phoneCtrl.text.trim();
-                  ViziagDatabase.currentDeliveryAddress = addressCtrl.text.trim();
+                  CakeDatabase.currentCustomerName = nameCtrl.text.trim();
+                  CakeDatabase.currentUserPhone = phoneCtrl.text.trim();
+                  CakeDatabase.currentDeliveryAddress = addressCtrl.text.trim();
                 });
                 Navigator.pop(context);
               },
@@ -296,267 +193,6 @@ class _ViziagMainHubScreenState extends State<ViziagMainHubScreen> {
   }
 }
 
-// =========================================================================
-// 3. MARKETPLACE BUYER VIEW (Shop & Products Catalog)
-// =========================================================================
-class MarketplaceBuyerView extends StatefulWidget {
-  final VoidCallback onCartChanged;
-  const MarketplaceBuyerView({super.key, required this.onCartChanged});
-
-  @override
-  State<MarketplaceBuyerView> createState() => _MarketplaceBuyerViewState();
-}
-
-class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
-  final TextEditingController _searchCtrl = TextEditingController();
-  String _searchQuery = '';
-
-  @override
-  Widget build(BuildContext context) {
-    var filteredList = ViziagDatabase.localProductsCache.where((item) {
-      final name = item['name'].toString().toLowerCase();
-      final shop = item['shop'].toString().toLowerCase();
-      return name.contains(_searchQuery.toLowerCase()) || shop.contains(_searchQuery.toLowerCase());
-    }).toList();
-
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          color: Colors.white,
-          child: TextField(
-            controller: _searchCtrl,
-            onChanged: (val) => setState(() => _searchQuery = val),
-            decoration: InputDecoration(
-              hintText: 'Search vegetables, fruits or grocery...',
-              prefixIcon: const Icon(Icons.search, color: Colors.grey),
-              filled: true,
-              fillColor: Colors.grey.shade100,
-              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 10),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-            ),
-          ),
-        ),
-        Expanded(
-          child: filteredList.isEmpty
-              ? const Center(child: Text('No products found matching your search.', style: TextStyle(color: Colors.grey)))
-              : GridView.builder(
-                  padding: const EdgeInsets.all(10),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.72,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                  itemCount: filteredList.length,
-                  itemBuilder: (context, index) {
-                    var product = filteredList[index];
-                    return Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-                              child: Image.network(
-                                product['image'],
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (c, e, s) => Container(color: Colors.grey.shade300, child: const Icon(Icons.shopping_basket, color: Colors.grey)),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(product['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                const SizedBox(height: 2),
-                                Text(product['shop'], style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
-                                const SizedBox(height: 6),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('₹${product['price']}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade700, fontSize: 13)),
-                                    SizedBox(
-                                      height: 28,
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 8)),
-                                        onPressed: () {
-                                          setState(() {
-                                            bool found = false;
-                                            for (var cartItem in ViziagDatabase.cartItems) {
-                                              if (cartItem['id'] == product['id']) {
-                                                cartItem['qty'] = (cartItem['qty'] ?? 1) + 1;
-                                                found = true;
-                                                break;
-                                              }
-                                            }
-                                            if (!found) {
-                                              ViziagDatabase.cartItems.add({...product, 'qty': 1});
-                                            }
-                                          });
-                                          widget.onCartChanged();
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text('${product['name']} added to cart!'), duration: const Duration(milliseconds: 600)),
-                                          );
-                                        },
-                                        child: const Text('Add', style: TextStyle(fontSize: 11)),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-}
-
-// =========================================================================
-// 4. CART & ORDERS VIEW
-// =========================================================================
-class CartAndOrdersView extends StatefulWidget {
-  final VoidCallback onCartChanged;
-  const CartAndOrdersView({super.key, required this.onCartChanged});
-
-  @override
-  State<CartAndOrdersView> createState() => _CartAndOrdersViewState();
-}
-
-class _CartAndOrdersViewState extends State<CartAndOrdersView> {
-  int get _cartTotal {
-    return ViziagDatabase.cartItems.fold(0, (sum, item) => sum + ((item['price'] ?? 0) * (item['qty'] ?? 1) as int));
-  }
-
-  void _placeOrder() {
-    if (ViziagDatabase.cartItems.isEmpty) return;
-
-    setState(() {
-      ViziagDatabase.cartItems.clear();
-    });
-    widget.onCartChanged();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('🎉 Order Placed Successfully!'),
-        content: const Text('Your grocery/vegetable order has been confirmed and sent to the hub.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (ViziagDatabase.cartItems.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 10),
-            Text('Your cart is empty!', style: TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(10),
-            itemCount: ViziagDatabase.cartItems.length,
-            itemBuilder: (context, index) {
-              var item = ViziagDatabase.cartItems[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 10),
-                child: ListTile(
-                  leading: Image.network(item['image'] ?? '', width: 50, height: 50, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.shopping_basket)),
-                  title: Text(item['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('₹${item['price']} x ${item['qty']} = ₹${(item['price'] * item['qty'])}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline, size: 20),
-                        onPressed: () {
-                          setState(() {
-                            if (item['qty'] > 1) {
-                              item['qty']--;
-                            } else {
-                              ViziagDatabase.cartItems.removeAt(index);
-                            }
-                          });
-                          widget.onCartChanged();
-                        },
-                      ),
-                      Text('${item['qty']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_outline, size: 20),
-                        onPressed: () {
-                          setState(() {
-                            item['qty']++;
-                          });
-                          widget.onCartChanged();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(15),
-          color: Colors.white,
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Total Amount:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text('₹$_cartTotal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                  onPressed: _placeOrder,
-                  child: const Text('Place Order Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// =========================================================================
-// 5. VENDOR AUTH, PORTAL & ADMIN APPROVAL VIEW (FIREBASE SYNCED)
-// =========================================================================
 class VendorAuthAndPortalView extends StatefulWidget {
   const VendorAuthAndPortalView({super.key});
 
@@ -565,8 +201,7 @@ class VendorAuthAndPortalView extends StatefulWidget {
 }
 
 class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
-  int _viewMode = 0; // 0: Home, 1: Register, 2: Login, 3: Vendor Dash, 4: Admin Code, 5: Admin Panel
-  bool _isLoading = false;
+  int _viewMode = 0;
 
   final regShopNameCtrl = TextEditingController();
   final regPhoneCtrl = TextEditingController();
@@ -576,7 +211,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
   final loginPhoneCtrl = TextEditingController();
   final loginPassCtrl = TextEditingController();
+
   final adminCodeCtrl = TextEditingController();
+  bool _isLoading = false;
 
   Future<void> _submitRegistration() async {
     if (regPhoneCtrl.text.trim().length < 10 || regShopNameCtrl.text.isEmpty) {
@@ -589,27 +226,26 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     }
 
     setState(() => _isLoading = true);
+    try {
+      var shopData = {
+        'name': regShopNameCtrl.text.trim(),
+        'phone': regPhoneCtrl.text.trim(),
+        'address': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
+        'pass': regPass1Ctrl.text.trim(),
+        'status': 'pending',
+      };
 
-    var newShop = {
-      'name': regShopNameCtrl.text.trim(),
-      'phone': regPhoneCtrl.text.trim(),
-      'address': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
-      'pass': regPass1Ctrl.text.trim(),
-      'status': 'pending',
-    };
+      await http.post(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json'),
+        body: json.encode(shopData),
+      );
 
-    bool success = await ViziagDatabase.registerVendorToFirebase(newShop);
-    await ViziagDatabase.fetchVendorsFromFirebase();
-
-    setState(() => _isLoading = false);
-
-    if (mounted) {
-      if (success) {
+      if (mounted) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('⏳ रिक्वेस्ट सबमिट हो गई'),
-            content: const Text('आपकी दुकान Firebase पर रजिस्टर हो गई है। अब एडमिन पैनल (tarun#1) में जाकर इसे अप्रूव करें।'),
+            content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन (तरुण) द्वारा अप्रूव होने के बाद ही आप लॉगिन कर पाएंगे।'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -621,9 +257,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             ],
           ),
         );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ इंटरनेट या Firebase कनेक्शन एरर!'), backgroundColor: Colors.red));
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -637,31 +273,40 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     }
 
     setState(() => _isLoading = true);
-    await ViziagDatabase.fetchVendorsFromFirebase();
-    setState(() => _isLoading = false);
+    try {
+      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json'));
+      bool isApproved = false;
 
-    bool isApproved = false;
-    for (var shop in ViziagDatabase.vendorRequests) {
-      if (shop['phone'] == phone && shop['pass'] == pass && shop['status'] == 'approved') {
-        isApproved = true;
-        break;
+      if (res.statusCode == 200 && res.body != 'null' && res.body.isNotEmpty) {
+        Map<String, dynamic> data = json.decode(res.body);
+        data.forEach((key, val) {
+          if (val['phone'] == phone && val['pass'] == pass && val['status'] == 'approved') {
+            isApproved = true;
+          }
+        });
       }
-    }
 
-    if (isApproved) {
-      setState(() => _viewMode = 3);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ स्वागत है! वेंडर डैशबोर्ड लाइव है।'), backgroundColor: Colors.green));
-    } else {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('⚠️ लॉगिन असफल (Not Approved)'),
-          content: const Text('आपकी दुकान अभी तक एडमिन द्वारा अप्रूव नहीं की गई है या पासवर्ड गलत है!'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('ठीक है')),
-          ],
-        ),
-      );
+      if (isApproved) {
+        setState(() => _viewMode = 3);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ स्वागत है! वेंडर डैशबोर्ड खुल गया है।'), backgroundColor: Colors.green));
+        }
+      } else {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('⚠️ लॉगिन असफल (Not Approved)'),
+              content: const Text('आपकी दुकान अभी तक मास्टर एडमिन (तरुण) द्वारा अप्रूव नहीं की गई है! कृपया पहले अप्रूवल लें या सही डिटेल्स भरें।'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('ठीक है')),
+              ],
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -669,40 +314,13 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     if (adminCodeCtrl.text.trim() == 'tarun#1') {
       setState(() => _viewMode = 5);
       adminCodeCtrl.clear();
-      // Load latest pending requests from Firebase
-      _refreshAdminData();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ गलत गुप्त कोड! (सही कोड: tarun#1)'), backgroundColor: Colors.red));
-    }
-  }
-
-  Future<void> _refreshAdminData() async {
-    setState(() => _isLoading = true);
-    await ViziagDatabase.fetchVendorsFromFirebase();
-    setState(() => _isLoading = false);
-  }
-
-  Future<void> _approveShop(String firebaseKey) async {
-    setState(() => _isLoading = true);
-    bool success = await ViziagDatabase.updateVendorStatusInFirebase(firebaseKey, 'approved');
-    await ViziagDatabase.fetchVendorsFromFirebase();
-    setState(() => _isLoading = false);
-
-    if (mounted) {
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान Firebase पर सफलतापूर्वक अप्रूव हो गई!'), backgroundColor: Colors.green));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ अप्रूवल अपडेट करने में दिक्कत आई।'), backgroundColor: Colors.red));
-      }
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ गलत गुप्त कोड!'), backgroundColor: Colors.red));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Colors.green));
-    }
-
     if (_viewMode == 0) {
       return Padding(
         padding: const EdgeInsets.all(20),
@@ -711,9 +329,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           children: [
             const Icon(Icons.storefront, size: 75, color: Colors.green),
             const SizedBox(height: 15),
-            const Text('🛍️ वेंडर पोर्टल (Firebase Live)', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text('🛍️ वेंडर पोर्टल', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
-            const Text('सब्जी, फल और ग्रोसरी विक्रेता पंजीकरण और लाइव एडमिन अप्रूवल', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
+            const Text('बिना एडमिन अप्रूवल के कोई भी वेंडर लॉगिन नहीं कर सकता', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
             const SizedBox(height: 40),
             
             SizedBox(
@@ -774,8 +392,8 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                onPressed: _submitRegistration,
-                child: const Text('फायरबेस पर सबमिट करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                onPressed: _isLoading ? null : _submitRegistration,
+                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('अप्रूवल के लिए सबमिट करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ),
             ),
             const SizedBox(height: 10),
@@ -795,7 +413,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             const SizedBox(height: 15),
             const Text('🔐 वेंडर लॉगिन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
-            const Text('एडमिन से अप्रूव होना अनिवार्य है', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text('पहले एडमिन से अप्रूव कराना अनिवार्य है', style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 25),
             TextField(controller: loginPhoneCtrl, keyboardType: TextInputType.phone, maxLength: 10, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), counterText: '', prefixIcon: Icon(Icons.phone))),
             const SizedBox(height: 15),
@@ -806,8 +424,8 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                onPressed: _loginVendor,
-                child: const Text('लॉगिन करें ➔', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                onPressed: _isLoading ? null : _loginVendor,
+                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('लॉगिन करें ➔', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
             const SizedBox(height: 10),
@@ -818,28 +436,49 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     }
 
     if (_viewMode == 3) {
-      return Column(
-        children: [
-          Container(
-            color: Colors.green.shade50,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                const Text('🟢 वेंडर डैशबोर्ड (Firebase Live)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
-                const Spacer(),
-                TextButton(
-                  onPressed: () => setState(() => _viewMode = 0),
-                  child: const Text('लॉग आउट', style: TextStyle(fontSize: 12, color: Colors.red)),
-                ),
-              ],
+      return DefaultTabController(
+        length: 3,
+        child: Column(
+          children: [
+            Container(
+              color: Colors.green.shade50,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                children: [
+                  const Text('🟢 वेंडर डैशबोर्ड (लाइव)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => setState(() => _viewMode = 0),
+                    child: const Text('लॉग आउट', style: TextStyle(fontSize: 11, color: Colors.red)),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Expanded(
-            child: Center(
-              child: Text('यहाँ वेंडर अपनी सब्जी/ग्रोसरी के प्रोडक्ट्स और ऑर्डर्स मैनेज कर सकता है।', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+            const Material(
+              color: Colors.white,
+              child: TabBar(
+                isScrollable: true,
+                labelColor: Colors.green,
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: Colors.green,
+                tabs: [
+                  Tab(text: '📦 प्रोडक्ट्स जोड़ें & मैनेज करें'),
+                  Tab(text: '📋 कस्टमर आर्डर्स'),
+                  Tab(text: '⚙️ दुकान सेटिंग्स'),
+                ],
+              ),
             ),
-          ),
-        ],
+            const Expanded(
+              child: TabBarView(
+                children: [
+                  VendorInventoryTab(),
+                  VendorOrdersTab(),
+                  VendorSettingsTab(),
+                ],
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -851,9 +490,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           children: [
             const Icon(Icons.admin_panel_settings, size: 65, color: Colors.green),
             const SizedBox(height: 15),
-            const Text('🔐 मास्टर एडमिन वेरिफिकेशन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 15),
-            TextField(controller: adminCodeCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'गुप्त कोड दर्ज करें (Admin Code: tarun#1)', border: OutlineInputBorder())),
+            const Text('🔐 मास्टर एडमिन लॉगिन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 25),
+            TextField(controller: adminCodeCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'गुप्त कोड (Secret Code)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.key))),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -861,72 +500,482 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
                 onPressed: _verifyAdminCode,
-                child: const Text('वेरीफाई करें', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('अप्रूवल पैनल खोलें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
-            TextButton(onPressed: () => setState(() => _viewMode = 0), child: const Text('← वापस जाएं')),
+            TextButton(onPressed: () => setState(() => _viewMode = 0), child: const Text('← वापस जाएं', style: TextStyle(color: Colors.grey))),
           ],
         ),
       );
     }
 
-    // Admin Dashboard for Approving Shops from Firebase
-    var pendingList = ViziagDatabase.vendorRequests.where((s) => s['status'] == 'pending').toList();
-
     return Column(
       children: [
-        AppBar(
-          title: const Text('Master Shop Approval (Live)'),
-          backgroundColor: Colors.green.shade700,
-          foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => setState(() => _viewMode = 0),
+        Container(
+          color: Colors.green.shade800,
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              const Icon(Icons.admin_panel_settings, color: Colors.white),
+              const SizedBox(width: 8),
+              const Text('शॉप अप्रूवल मास्टर डैशबोर्ड', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+              const Spacer(),
+              IconButton(icon: const Icon(Icons.logout, color: Colors.white), onPressed: () => setState(() => _viewMode = 0)),
+            ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _refreshAdminData,
-            ),
-          ],
         ),
         Expanded(
-          child: pendingList.isEmpty
-              ? const Center(
-                  child: Text(
-                    'कोई नई दुकान अप्रूवल के लिए पेंडिंग नहीं है!',
-                    style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(10),
+          child: FutureBuilder<http.Response>(
+            future: http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests.json')),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (!snapshot.hasData || snapshot.data!.body == 'null' || snapshot.data!.body.isEmpty) {
+                return const Center(child: Text('अप्रूवल के लिए कोई नई दुकान नहीं है', style: TextStyle(color: Colors.grey)));
+              }
+
+              try {
+                Map<String, dynamic> data = json.decode(snapshot.data!.body);
+                List<Map<String, dynamic>> pendingList = [];
+                data.forEach((key, val) {
+                  var shop = Map<String, dynamic>.from(val);
+                  shop['firebaseKey'] = key;
+                  if (shop['status'] == 'pending') {
+                    pendingList.add(shop);
+                  }
+                });
+
+                if (pendingList.isEmpty) {
+                  return const Center(child: Text('अप्रूवल के लिए कोई पेंडिंग दुकान नहीं है', style: TextStyle(color: Colors.grey)));
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(12),
                   itemCount: pendingList.length,
                   itemBuilder: (context, index) {
                     var shop = pendingList[index];
                     return Card(
-                      elevation: 2,
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: Colors.orange,
-                          child: Icon(Icons.store, color: Colors.white),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('🏪 ${shop['name']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text('मोबाइल: ${shop['phone']} | पता: ${shop['address']}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            const Divider(height: 20),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                                    onPressed: () async {
+                                      await http.patch(
+                                        Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests/${shop['firebaseKey']}.json'),
+                                        body: json.encode({'status': 'approved'}),
+                                      );
+                                      setState(() {});
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान स्थायी रूप से अप्रूव हो गई!'), backgroundColor: Colors.green));
+                                      }
+                                    },
+                                    icon: const Icon(Icons.check_circle, size: 16),
+                                    label: const Text('Approve'),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                    onPressed: () async {
+                                      await http.delete(Uri.parse('${CakeDatabase.firebaseRestUrl}/vendor_requests/${shop['firebaseKey']}.json'));
+                                      setState(() {});
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ दुकान डिलीट कर दी गई!'), backgroundColor: Colors.red));
+                                      }
+                                    },
+                                    icon: const Icon(Icons.delete, size: 16),
+                                    label: const Text('Delete'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        title: Text(shop['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Phone: ${shop['phone']}\nAddress: ${shop['address']}'),
-                        isThreeLine: true,
-                        trailing: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                    );
+                  },
+                );
+              } catch (_) {
+                return const Center(child: Text('डेटा लोड करने में त्रुटि'));
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class VendorInventoryTab extends StatefulWidget {
+  const VendorInventoryTab({super.key});
+
+  @override
+  State<VendorInventoryTab> createState() => _VendorInventoryTabState();
+}
+
+class _VendorInventoryTabState extends State<VendorInventoryTab> {
+  final nameCtrl = TextEditingController();
+  final priceCtrl = TextEditingController();
+  final unitCtrl = TextEditingController(text: 'Kg');
+  String category = 'Fresh Fruits';
+  String? itemImageBase64;
+  bool _isLoading = false;
+
+  Future<void> _addProduct() async {
+    if (nameCtrl.text.isEmpty || priceCtrl.text.isEmpty) return;
+    setState(() => _isLoading = true);
+    var newProd = {
+      'name': nameCtrl.text.trim(),
+      'price': double.tryParse(priceCtrl.text) ?? 0.0,
+      'category': category,
+      'unit': unitCtrl.text.trim().isEmpty ? 'Kg' : unitCtrl.text.trim(),
+      'image': itemImageBase64 ?? '',
+      'inStock': true,
+    };
+    await http.post(Uri.parse('${CakeDatabase.firebaseRestUrl}/products.json'), body: json.encode(newProd));
+    nameCtrl.clear();
+    priceCtrl.clear();
+    unitCtrl.text = 'Kg';
+    setState(() {
+      itemImageBase64 = null;
+      _isLoading = false;
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ प्रोडक्ट सफलतापूर्वक जुड़ गया!'), backgroundColor: Colors.green));
+    }
+  }
+
+  Future<void> _deleteProduct(String firebaseKey) async {
+    await http.delete(Uri.parse('${CakeDatabase.firebaseRestUrl}/products/$firebaseKey.json'));
+    setState(() {});
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ प्रोडक्ट डिलीट हो गया!')));
+  }
+
+  Future<void> _toggleStock(String firebaseKey, bool currentStatus) async {
+    await http.patch(
+      Uri.parse('${CakeDatabase.firebaseRestUrl}/products/$firebaseKey.json'),
+      body: json.encode({'inStock': !currentStatus}),
+    );
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('✨ नया आइटम जोड़ें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.green)),
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: () async {
+                    String? img = await pickAndConvertToBase64();
+                    if (img != null) setState(() => itemImageBase64 = img);
+                  },
+                  child: Container(
+                    height: 90,
+                    decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey.shade300)),
+                    child: itemImageBase64 == null
+                        ? const Center(child: Text('📷 आइटम फोटो अपलोड करें', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)))
+                        : ClipRRect(borderRadius: BorderRadius.circular(8), child: buildShopOrProdImage(itemImageBase64, 90, double.infinity, Icons.image)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'प्रोडक्ट का नाम', isDense: true)),
+                const SizedBox(height: 10),
+                TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'कीमत (₹)', isDense: true)),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: category,
+                  items: ['Fresh Fruits', 'Vegetables', 'Organic Items', 'Daily Essentials'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: (val) => setState(() => category = val!),
+                  decoration: const InputDecoration(labelText: 'कैटेगरी', isDense: true),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: unitCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'यूनिट (मात्रा इकाई - जैसे Kg, Box, Piece, Packet)',
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 15),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+                    onPressed: _isLoading ? null : _addProduct,
+                    child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('नया आइटम जोड़ें', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text('📋 आपके मौजूदा प्रोडक्ट्स (मैनेज करें)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87)),
+        const SizedBox(height: 10),
+        FutureBuilder<http.Response>(
+          future: http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/products.json')),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (!snapshot.hasData || snapshot.data!.body == 'null' || snapshot.data!.body.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.all(20),
+                child: Center(child: Text('कोई प्रोडक्ट उपलब्ध नहीं है', style: TextStyle(color: Colors.grey))),
+              );
+            }
+            try {
+              Map<String, dynamic> data = json.decode(snapshot.data!.body);
+              List<Map<String, dynamic>> items = [];
+              data.forEach((key, val) {
+                var item = Map<String, dynamic>.from(val);
+                item['firebaseKey'] = key;
+                items.add(item);
+              });
+              items = items.reversed.toList();
+
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  var p = items[index];
+                  bool inStock = p['inStock'] ?? true;
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    child: ListTile(
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: buildShopOrProdImage(p['image'], 45, 45, Icons.eco),
+                      ),
+                      title: Text(p['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text('₹${p['price']} / ${p['unit'] ?? 'Kg'}\nस्टेटस: ${inStock ? '🟢 In Stock' : '🔴 Out of Stock'}', style: const TextStyle(fontSize: 11)),
+                      isThreeLine: true,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Switch(
+                            value: inStock,
+                            activeColor: Colors.green,
+                            onChanged: (val) async {
+                              await _toggleStock(p['firebaseKey'], inStock);
+                              setState(() {});
+                            },
                           ),
-                          onPressed: () => _approveShop(shop['firebaseKey']),
-                          child: const Text('Approve'),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _deleteProduct(p['firebaseKey']),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            } catch (_) {
+              return const Text('डेटा लोड करने में त्रुटि');
+            }
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class VendorOrdersTab extends StatefulWidget {
+  const VendorOrdersTab({super.key});
+
+  @override
+  State<VendorOrdersTab> createState() => _VendorOrdersTabState();
+}
+
+class _VendorOrdersTabState extends State<VendorOrdersTab> {
+  List<Map<String, dynamic>> allOrders = [];
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchOrders();
+  }
+
+  Future<void> _fetchOrders() async {
+    setState(() => isLoading = true);
+    try {
+      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
+      if (res.statusCode == 200 && res.body != 'null' && res.body.isNotEmpty) {
+        Map<String, dynamic> data = json.decode(res.body);
+        List<Map<String, dynamic>> list = [];
+        data.forEach((key, val) {
+          var item = Map<String, dynamic>.from(val);
+          item['firebaseKey'] = key;
+          list.add(item);
+        });
+        setState(() => allOrders = list.reversed.toList());
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _updateStatus(String firebaseKey, String newStatus) async {
+    await http.patch(
+      Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$firebaseKey.json'),
+      body: json.encode({'status': newStatus}),
+    );
+    _fetchOrders();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+            onPressed: _fetchOrders,
+            icon: const Icon(Icons.sync),
+            label: const Text('आर्डर्स रिफ्रेश करें', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ),
+        if (isLoading) const LinearProgressIndicator(color: Colors.green),
+        Expanded(
+          child: allOrders.isEmpty
+              ? const Center(child: Text('कोई आर्डर नहीं आया है', style: TextStyle(color: Colors.grey)))
+              : ListView.builder(
+                  itemCount: allOrders.length,
+                  itemBuilder: (context, index) {
+                    var ord = allOrders[index];
+                    return Card(
+                      margin: const EdgeInsets.all(8),
+                      child: ListTile(
+                        title: Text('ग्राहक: ${ord['customerName']} (${ord['customerPhone']})', style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold)),
+                        subtitle: Text('पता: ${ord['customerAddress']}\nकुल राशि: ₹${ord['grandTotal']?.toInt()}\nस्टेटस: ${ord['status']}', style: const TextStyle(color: Colors.black87)),
+                        isThreeLine: true,
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (val) => _updateStatus(ord['firebaseKey'], val),
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(value: 'Accepted ✅', child: Text('Accept')),
+                            const PopupMenuItem(value: 'Dispatched 🚚', child: Text('Dispatch')),
+                            const PopupMenuItem(value: 'Delivered 🎉', child: Text('Deliver')),
+                            const PopupMenuItem(value: 'Cancelled ❌', child: Text('Cancel')),
+                          ],
                         ),
                       ),
                     );
                   },
                 ),
+        ),
+      ],
+    );
+  }
+}
+
+class VendorSettingsTab extends StatefulWidget {
+  const VendorSettingsTab({super.key});
+
+  @override
+  State<VendorSettingsTab> createState() => _VendorSettingsTabState();
+}
+
+class _VendorSettingsTabState extends State<VendorSettingsTab> {
+  final shopNameCtrl = TextEditingController(text: CakeDatabase.bakeryShop['shopName']);
+  final addressCtrl = TextEditingController(text: CakeDatabase.bakeryShop['address']);
+  bool isOpen = CakeDatabase.bakeryShop['isOpen'] ?? true;
+
+  Future<void> _saveSettings() async {
+    CakeDatabase.bakeryShop['shopName'] = shopNameCtrl.text;
+    CakeDatabase.bakeryShop['address'] = addressCtrl.text;
+    CakeDatabase.bakeryShop['isOpen'] = isOpen;
+    await http.put(Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json'), body: json.encode(CakeDatabase.bakeryShop));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान सेटिंग्स सेव हो गई!'), backgroundColor: Colors.green));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        Card(
+          color: isOpen ? Colors.green.shade50 : Colors.red.shade50,
+          child: SwitchListTile(
+            title: Text(isOpen ? '🟢 दुकान खुली (Open) है' : '🔴 दुकान बंद (Closed) है', style: TextStyle(fontWeight: FontWeight.bold, color: isOpen ? Colors.green.shade800 : Colors.red.shade800)),
+            subtitle: const Text('कस्टमर को आर्डर करने से रोकने या अनुमति देने के लिए टॉगल करें'),
+            value: isOpen,
+            activeColor: Colors.green,
+            onChanged: (val) => setState(() => isOpen = val),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            Column(
+              children: [
+                const Text('दुकान की फोटो', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                const SizedBox(height: 5),
+                GestureDetector(
+                  onTap: () async {
+                    String? img = await pickAndConvertToBase64();
+                    if (img != null) setState(() => CakeDatabase.bakeryShop['shopPhotoPath'] = img);
+                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: buildShopOrProdImage(CakeDatabase.bakeryShop['shopPhotoPath'], 70, 70, Icons.store),
+                  ),
+                ),
+              ],
+            ),
+            Column(
+              children: [
+                const Text('बैनर फोटो', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                const SizedBox(height: 5),
+                GestureDetector(
+                  onTap: () async {
+                    String? img = await pickAndConvertToBase64();
+                    if (img != null) setState(() => CakeDatabase.bakeryShop['bannerPhotoPath'] = img);
+                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: buildShopOrProdImage(CakeDatabase.bakeryShop['bannerPhotoPath'], 70, 120, Icons.image),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 15),
+        TextField(controller: shopNameCtrl, decoration: const InputDecoration(labelText: 'दुकान का नाम')),
+        TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'दुकान का पता')),
+        const SizedBox(height: 15),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+          onPressed: _saveSettings,
+          child: const Text('सेव करें', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
       ],
     );
