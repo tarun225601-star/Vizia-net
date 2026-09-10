@@ -14,46 +14,32 @@ class CartAndOrdersView extends StatefulWidget {
 
 class _CartAndOrdersViewState extends State<CartAndOrdersView> {
   bool _isCheckingOut = false;
-  List<Map<String, dynamic>> _customerOrders = [];
   Timer? _autoFetchTimer;
 
   @override
   void initState() {
     super.initState();
-    _fetchCustomerOrders();
-    
-    // 🚀 हर 5 सेकंड में आर्डर ऑटोमैटिक फेच करने का टाइमर
-    _autoFetchTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (mounted) {
-        _fetchCustomerOrders();
+    // 🚀 ऐप खुलते ही परमानेंट लोकल मेमोरी से पुराने ऑर्डर्स लोड कर लो (इंटरनेट खर्च 0 KB)
+    CakeDatabase.loadOrdersLocally().then((_) {
+      if (mounted) setState(() {});
+    });
+
+    // 🟢 अब टाइमर हर 5 सेकंड में पूरा डेटा नहीं, बल्कि सिर्फ नया सिंगल ऑर्डर चेक करेगा (डेटा बचाने के लिए)
+    _autoFetchTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      var newOrder = await CakeDatabase.fetchSingleLatestOrderOnly();
+      if (newOrder != null && mounted) {
+        setState(() {}); // जैसे ही नया आर्डर आएगा, स्क्रीन अपने आप अपडेट हो जाएगी
       }
     });
   }
 
   @override
   void dispose() {
-    _autoFetchTimer?.cancel(); // पेज बंद होने पर टाइमर रोक दें
+    _autoFetchTimer?.cancel(); 
     super.dispose();
   }
 
-  Future<void> _fetchCustomerOrders() async {
-    try {
-      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
-      if (res.statusCode == 200 && res.body != 'null' && res.body.isNotEmpty) {
-        Map<String, dynamic> data = json.decode(res.body);
-        List<Map<String, dynamic>> list = [];
-        data.forEach((key, val) {
-          var item = Map<String, dynamic>.from(val);
-          if (item['customerPhone'] == CakeDatabase.currentUserPhone) {
-            item['firebaseKey'] = key;
-            list.add(item);
-          }
-        });
-        if (mounted) setState(() => _customerOrders = list.reversed.toList());
-      }
-    } catch (_) {}
-  }
-
+  // 🛒 आर्डर प्लेस करने का फंक्शन (Firebase पर भेजना)
   Future<void> _placeOrder() async {
     if (CakeDatabase.cartItems.isEmpty) return;
     setState(() => _isCheckingOut = true);
@@ -73,10 +59,16 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
     };
 
     try {
-      final res = await http.post(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'), body: json.encode(newOrder));
+      final res = await http.post(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/customer_orders.json'), 
+        body: json.encode(newOrder)
+      );
       if (res.statusCode == 200 || res.statusCode == 201) {
-        setState(() => CakeDatabase.cartItems.clear());
-        _fetchCustomerOrders();
+        setState(() {
+          CakeDatabase.cartItems.clear();
+          CakeDatabase.localOrdersCache.insert(0, newOrder);
+        });
+        await CakeDatabase.saveOrdersLocally(); // तुरंत लोकल सेव करें
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🎉 आर्डर सफलतापूर्वक प्लेस हो गया!'), backgroundColor: Colors.green));
       }
     } finally {
@@ -106,7 +98,10 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.sync, color: Color(0xFFF59E0B)),
-                  onPressed: _fetchCustomerOrders,
+                  onPressed: () async {
+                    await CakeDatabase.fetchSingleLatestOrderOnly();
+                    setState(() {});
+                  },
                   tooltip: 'आर्डर रिफ्रेश करें',
                 ),
               ],
@@ -115,6 +110,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
           Expanded(
             child: TabBarView(
               children: [
+                // कार्ट टैब
                 CakeDatabase.cartItems.isEmpty
                     ? const Center(child: Text('आपका कार्ट खाली है', style: TextStyle(color: Colors.grey)))
                     : Column(
@@ -162,12 +158,14 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                           ),
                         ],
                       ),
-                _customerOrders.isEmpty
+                
+                // आर्डर इतिहास टैब (लोकल मेमोरी से चलेगा, नेट खर्च नहीं होगा)
+                CakeDatabase.localOrdersCache.isEmpty
                     ? const Center(child: Text('कोई पिछला आर्डर नहीं है', style: TextStyle(color: Colors.grey)))
                     : ListView.builder(
-                        itemCount: _customerOrders.length,
+                        itemCount: CakeDatabase.localOrdersCache.length,
                         itemBuilder: (context, index) {
-                          var ord = _customerOrders[index];
+                          var ord = CakeDatabase.localOrdersCache[index];
                           String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending';
 
                           return Card(
