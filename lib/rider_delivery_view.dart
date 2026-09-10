@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'database_models.dart'; // सुनिश्चित करें कि आपकी डेटाबेस फाइल का नाम यही हो
+import 'database_models.dart';
 
 class RiderDeliveryScreen extends StatefulWidget {
   const RiderDeliveryScreen({super.key});
@@ -33,10 +33,11 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         List<Map<String, dynamic>> loadedOrders = [];
 
         data.forEach((key, value) {
-          var order = Map<String, dynamic>.from(value);
-          order['orderId'] = key;
-          // यहाँ राइडर अपने लिए पेंडिंग या डिलेवरी वाले ऑर्डर्स देख सकता है
-          loadedOrders.add(order);
+          if (value is Map) {
+            var order = Map<String, dynamic>.from(value);
+            order['orderId'] = key;
+            loadedOrders.add(order);
+          }
         });
 
         if (mounted) {
@@ -57,7 +58,10 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     try {
       await http.patch(
         Uri.parse('${CakeDatabase.firebaseRestUrl}/customer_orders/$orderId.json'),
-        body: json.encode({'status': newStatus}),
+        body: json.encode({
+          'orderStatus': newStatus,
+          'status': newStatus, // दोनों की अपडेट कर देंगे ताकि कहीं मिस न हो
+        }),
       );
       
       if (mounted) {
@@ -114,11 +118,15 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                     itemBuilder: (context, index) {
                       var order = _activeOrders[index];
                       String orderId = order['orderId'] ?? '';
-                      String customerName = order['customerName'] ?? CakeDatabase.currentCustomerName;
-                      String phone = order['phone'] ?? CakeDatabase.currentUserPhone;
-                      String address = order['address'] ?? CakeDatabase.currentDeliveryAddress;
-                      String status = order['status'] ?? 'Pending';
+                      
+                      // 🔍 सभी संभावित कीज़ (Keys) को चेक करने का फॉलबैक लॉजिक ताकि null न आए
+                      String customerName = order['customerName'] ?? order['name'] ?? CakeDatabase.currentCustomerName;
+                      String phone = order['customerPhone'] ?? order['phone'] ?? CakeDatabase.currentUserPhone;
+                      String address = order['deliveryAddress'] ?? order['customerAddress'] ?? order['address'] ?? CakeDatabase.currentDeliveryAddress;
+                      String status = order['orderStatus'] ?? order['status'] ?? 'Pending ⏳';
+                      
                       var items = order['items'] as List<dynamic>? ?? [];
+                      double totalAmount = (order['totalAmount'] ?? order['grandTotal'] ?? 0.0).toDouble();
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -132,14 +140,14 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                               Row(
                                 children: [
                                   Text(
-                                    '📦 Order ID: ${orderId.substring(0, orderId.length > 6 ? 6 : orderId.length)}',
+                                    '📦 Order ID: ${orderId.length > 8 ? orderId.substring(0, 8) : orderId}',
                                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green.shade800),
                                   ),
                                   const Spacer(),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: status == 'Delivered' ? Colors.green.shade100 : Colors.orange.shade100,
+                                      color: status.contains('Delivered') ? Colors.green.shade100 : Colors.orange.shade100,
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -147,7 +155,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
-                                        color: status == 'Delivered' ? Colors.green.shade800 : Colors.orange.shade800,
+                                        color: status.contains('Delivered') ? Colors.green.shade800 : Colors.orange.shade800,
                                       ),
                                     ),
                                   ),
@@ -158,11 +166,10 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                                 children: [
                                   const Icon(Icons.person, size: 15, color: Colors.grey),
                                   const SizedBox(width: 6),
-                                  Text(customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                  const SizedBox(width: 15),
+                                  Expanded(child: Text(customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
                                   const Icon(Icons.phone, size: 15, color: Colors.grey),
                                   const SizedBox(width: 6),
-                                  Text(phone, style: const TextStyle(fontSize: 13)),
+                                  Text(phone, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                                 ],
                               ),
                               const SizedBox(height: 8),
@@ -179,10 +186,35 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 10),
-                              Text(
-                                'कुल आइटम्स: ${items.length}',
-                                style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
+                              const Divider(height: 16),
+                              // 🛒 आर्डर किए गए आइटम्स की लिस्ट और उनकी कीमत दिखाने के लिए
+                              const Text('खरीदे गए आइटम्स:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black54)),
+                              const SizedBox(height: 4),
+                              ...items.map((item) {
+                                var mapItem = item is Map ? item : {};
+                                String itemName = mapItem['name'] ?? 'Item';
+                                double itemPrice = (mapItem['price'] ?? 0.0).toDouble();
+                                double itemQty = (mapItem['qty'] ?? 1.0).toDouble();
+                                String itemUnit = mapItem['unit'] ?? 'Kg';
+                                
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 2),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(child: Text('• $itemName ($itemQty $itemUnit)', style: const TextStyle(fontSize: 12, color: Colors.black87))),
+                                      Text('₹${(itemPrice * itemQty).toInt()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                );
+                              }),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('कुल राशि: ₹${totalAmount.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green)),
+                                  Text('कुल आइटम्स: ${items.length}', style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),
+                                ],
                               ),
                               const SizedBox(height: 12),
                               Row(
@@ -190,7 +222,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                                 children: [
                                   OutlinedButton.icon(
                                     style: OutlinedButton.styleFrom(foregroundColor: Colors.orange.shade800),
-                                    onPressed: () => _updateOrderStatus(orderId, 'Out for Delivery'),
+                                    onPressed: () => _updateOrderStatus(orderId, 'Out for Delivery 🚴‍♂️'),
                                     icon: const Icon(Icons.directions_bike, size: 14),
                                     label: const Text('Out for Delivery', style: TextStyle(fontSize: 11)),
                                   ),
@@ -200,7 +232,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                                       backgroundColor: Colors.green.shade700,
                                       foregroundColor: Colors.white,
                                     ),
-                                    onPressed: () => _updateOrderStatus(orderId, 'Delivered'),
+                                    onPressed: () => _updateOrderStatus(orderId, 'Delivered 🎉'),
                                     icon: const Icon(Icons.check_circle, size: 14),
                                     label: const Text('Delivered', style: TextStyle(fontSize: 11)),
                                   ),
