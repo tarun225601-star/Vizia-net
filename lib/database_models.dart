@@ -100,11 +100,13 @@ class CakeDatabase {
         
         data.forEach((key, value) {
           latestKey = key;
-          latestValue = Map<String, dynamic>.from(value);
+          if (value != null) {
+            latestValue = Map<String, dynamic>.from(value);
+          }
         });
 
         if (latestKey != null && latestValue != null) {
-          // 🟢 यहाँ '!' लगाकर null safety एरर हमेशा के लिए खत्म कर दी गई है
+          // 🟢 सुरक्षित तरीके से आर्डर आईडी सेट करना
           latestValue!['orderId'] = latestKey;
 
           bool alreadyExists = localOrdersCache.any((ord) => ord['orderId'] == latestKey);
