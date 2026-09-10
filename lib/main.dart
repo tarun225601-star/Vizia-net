@@ -866,7 +866,7 @@ class _AdminApprovalPortalViewState extends State<AdminApprovalPortalView> {
                       padding: const EdgeInsets.all(12),
                       children: pendingShops.entries.map((entry) {
                         String key = entry.key;
-                        var val = entry.val;
+                        var val = entry.value;
                         String name = SafeHelper.getString(val['name']);
                         String phone = SafeHelper.getString(val['phone']);
                         String status = SafeHelper.getString(val['status'], fallback: 'pending');
