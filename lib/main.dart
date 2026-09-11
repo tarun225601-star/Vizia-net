@@ -923,6 +923,7 @@ class VendorSettingsTab extends StatefulWidget {
 }
 
 class _VendorSettingsTabState extends State<VendorSettingsTab> {
+
   final shopNameCtrl = TextEditingController(text: CakeDatabase.bakeryShop['shopName']);
   final addressCtrl = TextEditingController(text: CakeDatabase.bakeryShop['address']);
   bool isOpen = CakeDatabase.bakeryShop['isOpen'] ?? true;
