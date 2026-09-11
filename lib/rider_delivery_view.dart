@@ -20,12 +20,12 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     _fetchAssignedOrders();
   }
 
-  // लाइव ऑर्डर्स को फायरबेस से फेच करने का मेथड
+  // लाइव ऑर्डर्स को फायरबेस के /orders.json से फेच करने का मेथड
   Future<void> _fetchAssignedOrders() async {
     setState(() => _isLoading = true);
     try {
       final response = await http.get(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/customer_orders.json'),
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'),
       );
 
       if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
@@ -57,10 +57,10 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   Future<void> _updateOrderStatus(String orderId, String newStatus) async {
     try {
       await http.patch(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/customer_orders/$orderId.json'),
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderId.json'),
         body: json.encode({
           'orderStatus': newStatus,
-          'status': newStatus, // दोनों की अपडेट कर देंगे ताकि कहीं मिस न हो
+          'status': newStatus,
         }),
       );
       
@@ -119,17 +119,22 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                       var order = _activeOrders[index];
                       String orderId = order['orderId'] ?? '';
                       
-                      // 🔍 सभी संभावित कीज़ (Keys) को चेक करने का फॉलबैक लॉजिक ताकि null न आए
+                      // ग्राहक डिटेल्स
                       String customerName = order['customerName'] ?? order['name'] ?? CakeDatabase.currentCustomerName;
                       String phone = order['customerPhone'] ?? order['phone'] ?? CakeDatabase.currentUserPhone;
-                      String address = order['deliveryAddress'] ?? order['customerAddress'] ?? order['address'] ?? CakeDatabase.currentDeliveryAddress;
+                      String deliveryAddress = order['deliveryAddress'] ?? order['customerAddress'] ?? order['address'] ?? CakeDatabase.currentDeliveryAddress;
+                      
+                      // 🏪 पिकअप (शॉप) एड्रेस और नाम फेच करने का लॉजिक
+                      String shopName = order['shopName'] ?? 'Tarun Fruit & Vegetable Shop';
+                      String pickupAddress = order['shopAddress'] ?? order['pickupAddress'] ?? 'Sector 15A, Faridabad';
+
                       String status = order['orderStatus'] ?? order['status'] ?? 'Pending ⏳';
                       
                       var items = order['items'] as List<dynamic>? ?? [];
                       double totalAmount = (order['totalAmount'] ?? order['grandTotal'] ?? 0.0).toDouble();
 
                       return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
+                        margin: const EdgeInsets.only(bottom: 14),
                         elevation: 2,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         child: Padding(
@@ -162,32 +167,68 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                                 ],
                               ),
                               const Divider(height: 16),
-                              Row(
-                                children: [
-                                  const Icon(Icons.person, size: 15, color: Colors.grey),
-                                  const SizedBox(width: 6),
-                                  Expanded(child: Text(customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                                  const Icon(Icons.phone, size: 15, color: Colors.grey),
-                                  const SizedBox(width: 6),
-                                  Text(phone, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                                ],
+
+                              // 🏪 1. पिकअप लोकेशन (दुकान का पता)
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.blue.shade200, width: 1),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.store, size: 15, color: Colors.blue),
+                                        const SizedBox(width: 6),
+                                        Expanded(child: Text('पिकअप (Shop): $shopName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue))),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 21),
+                                      child: Text(pickupAddress, style: const TextStyle(fontSize: 11, color: Colors.black87)),
+                                    ),
+                                  ],
+                                ),
                               ),
                               const SizedBox(height: 8),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Icon(Icons.location_on, size: 15, color: Colors.redAccent),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      address,
-                                      style: const TextStyle(fontSize: 12, color: Colors.black87),
+
+                              // 🏠 2. डिलीवरी लोकेशन (ग्राहक का पता)
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.red.shade200, width: 1),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.person_pin_circle, size: 15, color: Colors.redAccent),
+                                        const SizedBox(width: 6),
+                                        Expanded(child: Text('डिलीवरी (Customer): $customerName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.redAccent))),
+                                        const Icon(Icons.phone, size: 14, color: Colors.grey),
+                                        const SizedBox(width: 4),
+                                        Text(phone, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ],
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(height: 4),
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 21),
+                                      child: Text(deliveryAddress, style: const TextStyle(fontSize: 11, color: Colors.black87)),
+                                    ),
+                                  ],
+                                ),
                               ),
+
                               const Divider(height: 16),
-                              // 🛒 आर्डर किए गए आइटम्स की लिस्ट और उनकी कीमत दिखाने के लिए
+
+                              // 🛒 आर्डर किए गए आइटम्स की लिस्ट
                               const Text('खरीदे गए आइटम्स:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black54)),
                               const SizedBox(height: 4),
                               ...items.map((item) {
