@@ -92,6 +92,17 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ दुकान अभी बंद है!'), backgroundColor: Colors.red));
         return;
       }
+
+      // 🔍 वेंडर का फोन नंबर और डेटा मैच करके सही दुकान का पता उठाने का लॉजिक
+      String prodVendorPhone = prod['vendorPhone'] ?? prod['phone'] ?? '';
+      String shopAddress = CakeDatabase.bakeryShop['address'] ?? 'sector 15a ajronda sabji mandi faridabad';
+      String shopName = CakeDatabase.bakeryShop['shopName'] ?? 'tarun fruit shop';
+
+      if (prodVendorPhone.isNotEmpty && prodVendorPhone != 'Admin') {
+        shopName = prod['shopName'] ?? shopName;
+        shopAddress = prod['shopAddress'] ?? shopAddress;
+      }
+
       setState(() {
         CakeDatabase.cartItems.add({
           'name': prod['name'] ?? 'Item',
@@ -99,9 +110,9 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
           'unit': prod['unit'] ?? 'Kg',
           'qty': qty,
           'image': prod['image'] ?? '',
-          'shopName': CakeDatabase.bakeryShop['shopName'] ?? 'Tarun Fruit & Vegetable Shop',
-          'shopAddress': CakeDatabase.bakeryShop['address'] ?? 'Faridabad',
-          'vendorPhone': prod['vendorPhone'] ?? 'Admin',
+          'shopName': shopName,
+          'shopAddress': shopAddress,
+          'vendorPhone': prodVendorPhone,
         });
       });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🛒 ${prod['name']} कार्ट में जुड़ गया!'), backgroundColor: Colors.green));
