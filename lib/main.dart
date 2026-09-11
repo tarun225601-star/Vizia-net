@@ -229,7 +229,8 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       var shopData = {
         'name': regShopNameCtrl.text.trim(),
         'phone': regPhoneCtrl.text.trim(),
-        'address': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
+        'shopAddress': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
+          'address': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
         'pass': regPass1Ctrl.text.trim(),
         'status': 'pending',
       };
