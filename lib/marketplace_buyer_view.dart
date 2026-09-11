@@ -99,7 +99,9 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
           'unit': prod['unit'] ?? 'Kg',
           'qty': qty,
           'image': prod['image'] ?? '',
-          'shopName': CakeDatabase.bakeryShop['shopName'] ?? 'Shop',
+          'shopName': CakeDatabase.bakeryShop['shopName'] ?? 'Tarun Fruit & Vegetable Shop',
+          'shopAddress': CakeDatabase.bakeryShop['address'] ?? 'Faridabad',
+          'vendorPhone': prod['vendorPhone'] ?? 'Admin',
         });
       });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🛒 ${prod['name']} कार्ट में जुड़ गया!'), backgroundColor: Colors.green));
@@ -112,7 +114,6 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   Widget build(BuildContext context) {
     var shop = CakeDatabase.bakeryShop;
     
-    // 📍 सेफ हाइपरलोकल चेकिंग (अगर एड्रेस खाली भी हो तो भी ऐप क्रैश या ब्लैक नहीं होगा)
     String shopAddress = (shop['address'] ?? 'Faridabad').toString().toLowerCase();
     bool isLocalFaridabadShop = shopAddress.contains(_targetCity) || shopAddress.isEmpty;
 
