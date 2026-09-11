@@ -888,16 +888,16 @@ class _VendorOrdersTabState extends State<VendorOrdersTab> {
             const PopupMenuItem(value: 'Dispatched', child: Text('Dispatched 🚚')),
             const PopupMenuItem(value: 'Delivered', child: Text('Delivered 🎉')),
             const PopupMenuItem(value: 'Cancelled', child: Text('Cancelled ❌')),
-          ],
-        ),
-      ),
-    
+                          ],
+              ),
+            ),
+          ); // यह Card को बंद करता है
+        },
+      ), // यह ListView.builder को बंद करता है
+    ); // यह Expanded को बंद करता है
+  } // यह build method को बंद करता है
+} // यह _VendorOrdersTabState क्लास को पूरी तरह बंद करता है
 
-                       
-      }
-)
-)
-);
 class VendorSettingsTab extends StatefulWidget {
   const VendorSettingsTab({super.key});
 
