@@ -847,56 +847,73 @@ class _VendorOrdersTabState extends State<VendorOrdersTab> {
     _fetchOrders();
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
             onPressed: _fetchOrders,
-            icon: const Icon(Icons.sync),
-            label: const Text('आर्डर्स रिफ्रेश करें', style: TextStyle(fontWeight: FontWeight.bold)),
+            icon: const Icon(Icons.sync, color: Colors.white),
+            label: const Text('ऑर्डर्स रिफ्रेश करें', style: TextStyle(color: Colors.white)),
           ),
         ),
-        if (isLoading) const LinearProgressIndicator(color: Colors.green),
         Expanded(
-          child: allOrders.isEmpty
-              ? const Center(child: Text('कोई आर्डर नहीं आया है', style: TextStyle(color: Colors.grey)))
-              : ListView.builder(
-                  itemCount: allOrders.length,
-                  itemBuilder: (context, index) {
-                        var ord = allOrders[index];
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('vendors')
+                .doc(widget.vendorId)
+                .collection('orders')
+                .orderBy('timestamp', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return const Center(child: Text('कोई ऑर्डर नहीं मिला'));
+              }
+              var orders = snapshot.data!.docs;
+              return ListView.builder(
+                itemCount: orders.length,
+                itemBuilder: (context, index) {
+                  var ord = orders[index].data() as Map<String, dynamic>;
+                  String orderId = orders[index].id;
+                  String custName = ord['customerName'] ?? 'ग्राहक';
+                  String address = ord['deliveryAddress'] ?? 'पता उपलब्ध नहीं';
+                  var total = ord['totalAmount'] ?? 0;
+                  String status = ord['orderStatus'] ?? 'pending';
 
-    String custName = ord['customerName'] ?? ord['name'] ?? 'ग्राहक';
-    String custPhone = ord['customerPhone'] ?? ord['phone'] ?? '';
-    String address = ord['deliveryAddress'] ?? ord['customerAddress'] ?? ord['address'] ?? 'पता उपलब्ध नहीं';
-    var total = ord['totalAmount'] ?? ord['grandTotal'] ?? ord['total'] ?? 0;
-    String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending';
+                  return Card(
+                    margin: const EdgeInsets.all(8),
+                    child: ListTile(
+                      title: Text('ग्राहक: $custName (कुल: ₹$total)'),
+                      subtitle: Text('पता: $address\nस्थिति: $status', maxLines: 3),
+                      isThreeLine: true,
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (val) => _updateStatus(orderId, val),
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(value: 'Pending', child: Text('Pending')),
+                          const PopupMenuItem(value: 'Processing', child: Text('Processing')),
+                          const PopupMenuItem(value: 'Completed', child: Text('Completed')),
+                          const PopupMenuItem(value: 'Cancelled', child: Text('Cancelled')),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
 
-    return Card(
-      margin: const EdgeInsets.all(8),
-      child: ListTile(
-        title: Text('ग्राहक: $custName ($custPhone)'),
-        subtitle: Text('पता: $address\nकुल राशि: ₹$total\nस्टेटस: $status'),
-        isThreeLine: true,
-        trailing: PopupMenuButton<String>(
-          onSelected: (val) => _updateStatus(ord['firebaseKey'] ?? '', val),
-          itemBuilder: (context) => [
-            const PopupMenuItem(value: 'Accepted', child: Text('Accepted ✅')),
-            const PopupMenuItem(value: 'Dispatched', child: Text('Dispatched 🚚')),
-            const PopupMenuItem(value: 'Delivered', child: Text('Delivered 🎉')),
-            const PopupMenuItem(value: 'Cancelled', child: Text('Cancelled ❌')),
-                          ],
-              ),
-            ),
-          ); // यह Card को बंद करता है
-        },
-      ), // यह ListView.builder को बंद करता है
-    ); // यह Expanded को बंद करता है
-  } // यह build method को बंद करता है
-} // यह _VendorOrdersTabState क्लास को पूरी तरह बंद करता है
+class VendorSettingsTab extends StatefulWidget {
 
 class VendorSettingsTab extends StatefulWidget {
   const VendorSettingsTab({super.key});
