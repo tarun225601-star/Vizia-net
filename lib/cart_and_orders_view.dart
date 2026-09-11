@@ -37,7 +37,6 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
     super.dispose();
   }
 
-  // 🟢 सुरक्षित रूप से प्राइस और क्वांटिटी को कैलकुलेट करने का फंक्शन
   double _calculateGrandTotal() {
     double total = 0.0;
     for (var item in CakeDatabase.cartItems) {
@@ -48,29 +47,29 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
     return total;
   }
 
-  // 🛒 आर्डर प्लेस करने का फंक्शन
   Future<void> _placeOrder() async {
     if (CakeDatabase.cartItems.isEmpty) return;
     setState(() => _isCheckingOut = true);
     
     double grandTotal = _calculateGrandTotal();
 
+    // 🟢 यहाँ पाथ '/orders.json' कर दिया गया है ताकि वेंडर को तुरंत आर्डर मिले
     var newOrder = {
       'orderId': 'ord_${DateTime.now().millisecondsSinceEpoch}',
       'customerName': CakeDatabase.currentCustomerName,
       'customerPhone': CakeDatabase.currentUserPhone,
-      'deliveryAddress': CakeDatabase.currentDeliveryAddress,
-      'pickupAddress': CakeDatabase.bakeryShop['address'] ?? 'Faridabad',
+      'customerAddress': CakeDatabase.currentDeliveryAddress.isEmpty ? 'पता उपलब्ध नहीं' : CakeDatabase.currentDeliveryAddress,
       'shopName': CakeDatabase.bakeryShop['shopName'] ?? 'Viziag Mart',
       'items': CakeDatabase.cartItems,
+      'grandTotal': grandTotal,
       'totalAmount': grandTotal,
-      'orderStatus': 'Pending ⏳',
+      'status': 'Pending',
       'orderTime': DateTime.now().toIso8601String(),
     };
 
     try {
       final res = await http.post(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/customer_orders.json'), 
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'), 
         body: json.encode(newOrder)
       );
       if (res.statusCode == 200 || res.statusCode == 201) {
@@ -120,7 +119,6 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
           Expanded(
             child: TabBarView(
               children: [
-                // कार्ट टैब
                 CakeDatabase.cartItems.isEmpty
                     ? const Center(child: Text('आपका कार्ट खाली है', style: TextStyle(color: Colors.grey)))
                     : Column(
@@ -169,14 +167,13 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                         ],
                       ),
                 
-                // आर्डर इतिहास टैब
                 CakeDatabase.localOrdersCache.isEmpty
                     ? const Center(child: Text('कोई पिछला आर्डर नहीं है', style: TextStyle(color: Colors.grey)))
                     : ListView.builder(
                         itemCount: CakeDatabase.localOrdersCache.length,
                         itemBuilder: (context, index) {
                           var ord = CakeDatabase.localOrdersCache[index];
-                          String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending';
+                          String status = ord['status'] ?? ord['orderStatus'] ?? 'Pending';
                           var orderTotal = ord['grandTotal'] ?? ord['totalAmount'] ?? 0;
 
                           return Card(
