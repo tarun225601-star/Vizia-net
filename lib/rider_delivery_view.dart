@@ -25,28 +25,26 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   final _regVehicleController = TextEditingController();
   final _regPasswordController = TextEditingController();
 
-  final _adminCodeController = TextEditingController();
-
   List<Map<String, dynamic>> _activeOrders = [];
   List<Map<String, dynamic>> _pendingRiders = [];
 
-  // 1. राइडर या एडमिन लॉगिन चेक
+  // 1. लॉगिन चेक (मोबाइल नंबर + पासवर्ड या आपका गुप्त एडमिन पासवर्ड)
   Future<void> _loginRider() async {
     String phone = _phoneController.text.trim();
     String password = _passwordController.text.trim();
 
     if (phone.isEmpty || password.isEmpty) {
-      _showMsg('कृपया फोन नंबर और पासवर्ड भरें!', Colors.red);
+      _showMsg('कृपया मोबाइल नंबर और पासवर्ड दर्ज करें!', Colors.red);
       return;
     }
 
-    // अगर एडमिन गुप्त कोड से लॉगिन करना चाहे
-    if (phone == 'admin' && password == 'tarun#1') {
+    // यहाँ आप अपना मोबाइल नंबर और नीचे गुप्त पासवर्ड 'tarun#1' डालेंगे तो एडमिन पैनल खुलेगा
+    if (password == 'tarun#1') {
       setState(() {
         _isAdminLoggedIn = true;
         _isLoggedIn = true;
       });
-      _showMsg('👑 मास्टर एडमिन लॉगिन सफल!', Colors.green);
+      _showMsg('👑 एडमिन पैनल लॉगिन सफल!', Colors.green);
       _fetchPendingRiders();
       return;
     }
@@ -81,7 +79,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
           _showMsg('⏳ आपका अकाउंट अभी एडमिन द्वारा अप्रूव नहीं किया गया है!', Colors.orange);
         } else {
           setState(() => _isLoading = false);
-          _showMsg('गलत फोन नंबर या पासवर्ड!', Colors.red);
+          _showMsg('गलत मोबाइल नंबर या पासवर्ड!', Colors.red);
         }
       } else {
         setState(() => _isLoading = false);
@@ -93,7 +91,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     }
   }
 
-  // 2. नया राइडर रजिस्ट्रेशन (पेंडिंग स्टेट के साथ)
+  // 2. नया राइडर रजिस्ट्रेशन (पेंडिंग - isApproved: false)
   Future<void> _registerRider() async {
     String name = _regNameController.text.trim();
     String phone = _regPhoneController.text.trim();
@@ -114,7 +112,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
           'phone': phone,
           'vehicle': vehicle,
           'password': password,
-          'isApproved': false, // शुरू में पेंडिंग रहेगा
+          'isApproved': false, // फ्रॉड रोकने के लिए पेंडिंग रहेगा
           'createdAt': DateTime.now().toIso8601String(),
         }),
       );
@@ -123,14 +121,14 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         _isLoading = false;
         _isRegistering = false;
       });
-      _showMsg('✅ रजिस्ट्रेशन हो गया! एडमिन अप्रूवल के बाद ही लॉगिन कर सकेंगे।', Colors.green);
+      _showMsg('✅ रजिस्ट्रेशन सफल! एडमिन अप्रूवल के बाद ही लॉगिन कर सकेंगे।', Colors.green);
     } catch (e) {
       setState(() => _isLoading = false);
       _showMsg('रजिस्ट्रेशन एरर: $e', Colors.red);
     }
   }
 
-  // 3. एडमिन के लिए पेंडिंग राइडर्स फेच करना
+  // 3. पेंडिंग राइडर्स फेच करना
   Future<void> _fetchPendingRiders() async {
     setState(() => _isLoading = true);
     try {
@@ -156,7 +154,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     }
   }
 
-  // 4. राइडर अप्रूव करने का मेथड
+  // 4. राइडर अप्रूव करना
   Future<void> _approveRider(String riderId) async {
     try {
       await http.patch(
@@ -219,15 +217,14 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // अगर लॉगिन नहीं है तो लॉगिन/रजिस्ट्रेशन स्क्रीन
     if (!_isLoggedIn) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 1,
-          title: Text(_isRegistering ? '📝 नया राइडर रजिस्ट्रेशन' : '🚴‍♂️ राइडर पोर्टल & एडमिन लॉगिन', 
-            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 15)),
+          title: Text(_isRegistering ? '📝 नया राइडर रजिस्ट्रेशन' : '🚴‍♂️ राइडर पोर्टल लॉगिन', 
+            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
         ),
         body: Center(
           child: SingleChildScrollView(
@@ -245,7 +242,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       );
     }
 
-    // अगर मास्टर एडमिन लॉगिन है, तो पेंडिंग राइडर्स का अप्रूवल पैनल दिखेगा
     if (_isAdminLoggedIn) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
@@ -288,7 +284,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       );
     }
 
-    // नॉर्मल राइडर डैशबोर्ड (लॉगिन और अप्रूव होने के बाद)
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
@@ -455,11 +450,11 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('राइडर मोबाइल नंबर डालें या एडमिन के लिए user: admin, pass: tarun#1 डालें', style: TextStyle(fontSize: 12, color: Colors.grey)),
+        const Text('अपने मोबाइल नंबर और पासवर्ड से लॉगिन करें', style: TextStyle(fontSize: 13, color: Colors.grey)),
         const SizedBox(height: 16),
-        TextField(controller: _phoneController, decoration: const InputDecoration(labelText: 'मोबाइल नंबर / (Admin)', border: OutlineInputBorder())),
+        TextField(controller: _phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder())),
         const SizedBox(height: 12),
-        TextField(controller: _passwordController, obscureText: true, decoration: const InputDecoration(labelText: 'पासवर्ड / (tarun#1)', border: OutlineInputBorder())),
+        TextField(controller: _passwordController, obscureText: true, decoration: const InputDecoration(labelText: 'पासवर्ड', border: OutlineInputBorder())),
         const SizedBox(height: 20),
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
@@ -480,7 +475,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('नया डिलीवरी बॉय अकाउंट बनाएं (एडमिन अप्रूवल आवश्यक)', style: TextStyle(fontSize: 12, color: Colors.grey)),
+        const Text('नया डिलीवरी बॉय अकाउंट बनाएं', style: TextStyle(fontSize: 13, color: Colors.grey)),
         const SizedBox(height: 12),
         TextField(controller: _regNameController, decoration: const InputDecoration(labelText: 'पूरा नाम', border: OutlineInputBorder())),
         const SizedBox(height: 10),
