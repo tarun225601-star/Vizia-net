@@ -53,13 +53,13 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
     
     double grandTotal = _calculateGrandTotal();
 
-    // 🟢 यहाँ पाथ '/orders.json' कर दिया गया है ताकि वेंडर को तुरंत आर्डर मिले
     var newOrder = {
       'orderId': 'ord_${DateTime.now().millisecondsSinceEpoch}',
       'customerName': CakeDatabase.currentCustomerName,
       'customerPhone': CakeDatabase.currentUserPhone,
       'customerAddress': CakeDatabase.currentDeliveryAddress.isEmpty ? 'पता उपलब्ध नहीं' : CakeDatabase.currentDeliveryAddress,
       'shopName': CakeDatabase.bakeryShop['shopName'] ?? 'Viziag Mart',
+      'shopAddress': CakeDatabase.bakeryShop['shopAddress'] ?? CakeDatabase.bakeryShop['address'] ?? 'Faridabad',
       'items': CakeDatabase.cartItems,
       'grandTotal': grandTotal,
       'totalAmount': grandTotal,
@@ -119,6 +119,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
           Expanded(
             child: TabBarView(
               children: [
+                // 1st Tab: Cart View
                 CakeDatabase.cartItems.isEmpty
                     ? const Center(child: Text('आपका कार्ट खाली है', style: TextStyle(color: Colors.grey)))
                     : Column(
@@ -167,6 +168,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                         ],
                       ),
                 
+                // 2nd Tab: Order History View (Full implementation)
                 CakeDatabase.localOrdersCache.isEmpty
                     ? const Center(child: Text('कोई पिछला आर्डर नहीं है', style: TextStyle(color: Colors.grey)))
                     : ListView.builder(
@@ -175,6 +177,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                           var ord = CakeDatabase.localOrdersCache[index];
                           String status = ord['status'] ?? ord['orderStatus'] ?? 'Pending';
                           var orderTotal = ord['grandTotal'] ?? ord['totalAmount'] ?? 0;
+                          var itemsList = ord['items'] as List<dynamic>? ?? [];
 
                           return Card(
                             color: const Color(0xFF1E293B),
@@ -184,12 +187,49 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('आर्डर #${ord['orderId'] ?? ''} - ₹${orderTotal.toString()}', 
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                                  const SizedBox(height: 5),
-                                  Text('स्टेटस: $status', style: const TextStyle(color: Colors.amberAccent)),
-                                  Text('पता: ${ord['customerAddress'] ?? ord['deliveryAddress'] ?? 'पता उपलब्ध नहीं'}', 
-                                      style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('आर्डर #${ord['orderId'] ?? ''}', 
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                      Text('₹${orderTotal.toString()}', 
+                                          style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 16)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text('दुकान: ${ord['shopName'] ?? 'Viziag Mart'}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                                  Text('दुकान का पता: ${ord['shopAddress'] ?? 'Faridabad'}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                  const SizedBox(height: 4),
+                                  Text('डिलीवरी पता: ${ord['customerAddress'] ?? ord['deliveryAddress'] ?? 'पता उपलब्ध नहीं'}', 
+                                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                  const Divider(color: Colors.white24, height: 16),
+                                  ...itemsList.map((it) => Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text('• ${it['name']} (x${it['qty']})', style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                        Text('₹${(double.tryParse(it['price'].toString()) ?? 0) * (double.tryParse(it['qty'].toString()) ?? 1)}', 
+                                            style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                                      ],
+                                    ),
+                                  )),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: status.toLowerCase() == 'delivered' ? Colors.green.withOpacity(0.2) : Colors.amber.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text('स्टेटस: $status', style: TextStyle(color: status.toLowerCase() == 'delivered' ? Colors.greenAccent : Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                                      ),
+                                      Text(ord['orderTime'] != null ? ord['orderTime'].toString().substring(0, 16).replaceAll('T', ' ') : '', 
+                                          style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),
