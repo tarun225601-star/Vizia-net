@@ -913,28 +913,36 @@ class _VendorOrdersTabState extends State<VendorOrdersTab> {
   }
 }
 
-class VendorSettingsTab extends StatefulWidget {
-
-class VendorSettingsTab extends StatefulWidget {
-  const VendorSettingsTab({super.key});
+               class VendorSettingsTab extends StatefulWidget {
+  final String vendorId;
+  const VendorSettingsTab({super.key, required this.vendorId});
 
   @override
   State<VendorSettingsTab> createState() => _VendorSettingsTabState();
 }
 
 class _VendorSettingsTabState extends State<VendorSettingsTab> {
-
-  final shopNameCtrl = TextEditingController(text: CakeDatabase.bakeryShop['shopName']);
-  final addressCtrl = TextEditingController(text: CakeDatabase.bakeryShop['address']);
+  final shopNameCtrl = TextEditingController(text: CakeDatabase.bakeryShop['shopName'] ?? '');
+  final addressCtrl = TextEditingController(text: CakeDatabase.bakeryShop['address'] ?? '');
   bool isOpen = CakeDatabase.bakeryShop['isOpen'] ?? true;
 
   Future<void> _saveSettings() async {
     CakeDatabase.bakeryShop['shopName'] = shopNameCtrl.text;
     CakeDatabase.bakeryShop['address'] = addressCtrl.text;
     CakeDatabase.bakeryShop['isOpen'] = isOpen;
-    await http.put(Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json'), body: json.encode(CakeDatabase.bakeryShop));
+    
+    await http.put(
+      Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json'),
+      body: json.encode(CakeDatabase.bakeryShop),
+    );
+
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ दुकान सेटिंग्स सेव हो गई!'), backgroundColor: Colors.green));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ दुकान सेटिंग्स सेव हो गई!'),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   }
 
@@ -946,61 +954,46 @@ class _VendorSettingsTabState extends State<VendorSettingsTab> {
         Card(
           color: isOpen ? Colors.green.shade50 : Colors.red.shade50,
           child: SwitchListTile(
-            title: Text(isOpen ? '🟢 दुकान खुली (Open) है' : '🔴 दुकान बंद (Closed) है', style: TextStyle(fontWeight: FontWeight.bold, color: isOpen ? Colors.green.shade800 : Colors.red.shade800)),
-            subtitle: const Text('कस्टमर को आर्डर करने से रोकने या अनुमति देने के लिए टॉगल करें'),
+            title: Text(isOpen ? '🟢 दुकान खुली है' : '🔴 दुकान बंद है', style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('ग्राहकों के लिए आर्डर्स चालू/बंद करें'),
             value: isOpen,
-            activeColor: Colors.green,
-            onChanged: (val) => setState(() => isOpen = val),
+            onChanged: (val) {
+              setState(() => isOpen = val);
+              _saveSettings();
+            },
           ),
         ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            Column(
-              children: [
-                const Text('दुकान की फोटो', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                const SizedBox(height: 5),
-                GestureDetector(
-                  onTap: () async {
-                    String? img = await pickAndConvertToBase64();
-                    if (img != null) setState(() => CakeDatabase.bakeryShop['shopPhotoPath'] = img);
-                  },
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: buildShopOrProdImage(CakeDatabase.bakeryShop['shopPhotoPath'], 70, 70, Icons.store),
-                  ),
-                ),
-              ],
-            ),
-            Column(
-              children: [
-                const Text('बैनर फोटो', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                const SizedBox(height: 5),
-                GestureDetector(
-                  onTap: () async {
-                    String? img = await pickAndConvertToBase64();
-                    if (img != null) setState(() => CakeDatabase.bakeryShop['bannerPhotoPath'] = img);
-                  },
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: buildShopOrProdImage(CakeDatabase.bakeryShop['bannerPhotoPath'], 70, 120, Icons.image),
-                  ),
-                ),
-              ],
-            ),
-          ],
+        const SizedBox(height: 12),
+        TextField(
+          controller: shopNameCtrl,
+          decoration: const InputDecoration(
+            labelText: 'दुकान का नाम',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.store),
+          ),
         ),
-        const SizedBox(height: 15),
-        TextField(controller: shopNameCtrl, decoration: const InputDecoration(labelText: 'दुकान का नाम')),
-        TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'दुकान का पता')),
-        const SizedBox(height: 15),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+        const SizedBox(height: 12),
+        TextField(
+          controller: addressCtrl,
+          decoration: const InputDecoration(
+            labelText: 'दुकान का पूरा पता',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.location_on),
+          ),
+          maxLines: 2,
+        ),
+        const SizedBox(height: 20),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
           onPressed: _saveSettings,
-          child: const Text('सेव करें', style: TextStyle(fontWeight: FontWeight.bold)),
+          icon: const Icon(Icons.save, color: Colors.white),
+          label: const Text('सेटिंग्स सेव करें', style: TextStyle(color: Colors.white, fontSize: 16)),
         ),
       ],
     );
   }
 }
+
