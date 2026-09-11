@@ -867,8 +867,15 @@ class _VendorOrdersTabState extends State<VendorOrdersTab> {
               : ListView.builder(
                   itemCount: allOrders.length,
                   itemBuilder: (context, index) {
-                    var ord = allOrders[index];
-                       return Card(
+                        var ord = allOrders[index];
+
+    String custName = ord['customerName'] ?? ord['name'] ?? 'ग्राहक';
+    String custPhone = ord['customerPhone'] ?? ord['phone'] ?? '';
+    String address = ord['deliveryAddress'] ?? ord['customerAddress'] ?? ord['address'] ?? 'पता उपलब्ध नहीं';
+    var total = ord['totalAmount'] ?? ord['grandTotal'] ?? ord['total'] ?? 0;
+    String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending';
+
+    return Card(
       margin: const EdgeInsets.all(8),
       child: ListTile(
         title: Text('ग्राहक: $custName ($custPhone)'),
@@ -885,7 +892,8 @@ class _VendorOrdersTabState extends State<VendorOrdersTab> {
         ),
       ),
     );
-                    
+
+                       
     );
   }
 }
