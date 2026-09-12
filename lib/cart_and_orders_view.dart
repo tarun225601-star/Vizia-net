@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'flutter/material.dart'; // (ध्यान रखें: import package:flutter/material.dart;)
+import 'package:flutter/services.dart';
+import 'package:firebase_database/firebase_database.dart'; // 👈 ऑफिशियल Real-time SDK इम्पोर्ट
 import 'package:http/http.dart' as http;
 import 'database_models.dart';
 import 'image_picker_helper.dart';
@@ -14,7 +16,7 @@ class CartAndOrdersView extends StatefulWidget {
 
 class _CartAndOrdersViewState extends State<CartAndOrdersView> {
   bool _isCheckingOut = false;
-  Timer? _autoFetchTimer;
+  StreamSubscription<DatabaseEvent>? _ordersSubscription; // 🚀 5 सेकंड वाले टाइमर की जगह रियल-टाइम स्ट्रीम
 
   @override
   void initState() {
@@ -23,18 +25,52 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
       if (mounted) setState(() {});
     });
 
-    _autoFetchTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
-      var newOrder = await CakeDatabase.fetchSingleLatestOrderOnly();
-      if (newOrder != null && mounted) {
-        setState(() {});
-      }
-    });
+    // 🔥 कस्टमर के लिए भी ब्लिंकिट जैसा रियल-टाइम आर्डर/स्टेटस लिसनर चालू कर दिया है
+    _startCustomerOrdersListener();
   }
 
   @override
   void dispose() {
-    _autoFetchTimer?.cancel(); 
+    _ordersSubscription?.cancel(); // 🛑 मेमोरी लीक रोकने के लिए स्ट्रीम बंद करना जरूरी है
     super.dispose();
+  }
+
+  // ⚡ रियल-टाइम डेटाबेस लिसनर (कस्टमर के लिए)
+  void _startCustomerOrdersListener() {
+    DatabaseReference ordersRef = FirebaseDatabase.instance.ref('orders');
+
+    _ordersSubscription = ordersRef.onValue.listen((event) {
+      final snapshot = event.snapshot;
+      if (snapshot.value == null) return;
+
+      Map<String, dynamic> data = Map<String, dynamic>.from(snapshot.value as Map);
+      List<Map<String, dynamic>> loadedOrders = [];
+
+      data.forEach((key, val) {
+        if (val is Map) {
+          var ord = Map<String, dynamic>.from(val);
+          ord['orderId'] = key;
+
+          // अगर आर्डर इस यूजर का है, तो इसे लोकल लिस्ट में दिखाओ
+          String custPhone = ord['customerPhone'] ?? '';
+          if (custPhone == CakeDatabase.currentUserPhone && CakeDatabase.currentUserPhone.isNotEmpty) {
+            loadedOrders.add(ord);
+          }
+        }
+      });
+
+      // नए ऑर्डर्स ऊपर दिखने चाहिए
+      loadedOrders = loadedOrders.reversed.toList();
+
+      if (mounted) {
+        setState(() {
+          CakeDatabase.localOrdersCache = loadedOrders;
+        });
+        CakeDatabase.saveOrdersLocally(); // लोकल स्टोरेज भी अपडेट रखें
+      }
+    }, onError: (error) {
+      debugPrint("Customer Realtime database error: $error");
+    });
   }
 
   double _calculateGrandTotal() {
@@ -54,7 +90,6 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
     double grandTotal = _calculateGrandTotal();
 
     var newOrder = {
-      'orderId': 'ord_${DateTime.now().millisecondsSinceEpoch}',
       'customerName': CakeDatabase.currentCustomerName,
       'customerPhone': CakeDatabase.currentUserPhone,
       'customerAddress': CakeDatabase.currentDeliveryAddress.isEmpty ? 'पता उपलब्ध नहीं' : CakeDatabase.currentDeliveryAddress,
@@ -64,22 +99,26 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
       'grandTotal': grandTotal,
       'totalAmount': grandTotal,
       'status': 'Pending',
+      'orderStatus': 'Pending ⏳',
       'orderTime': DateTime.now().toIso8601String(),
     };
 
     try {
-      final res = await http.post(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'), 
-        body: json.encode(newOrder)
-      );
-      if (res.statusCode == 200 || res.statusCode == 201) {
+      // 🚀 Firebase SDK के जरिए तुरंत आर्डर पुश करना (Blinkit Speed)
+      DatabaseReference newOrderRef = FirebaseDatabase.instance.ref('orders').push();
+      await newOrderRef.set(newOrder);
+
+      if (mounted) {
         setState(() {
           CakeDatabase.cartItems.clear();
-          CakeDatabase.localOrdersCache.insert(0, newOrder);
         });
-        await CakeDatabase.saveOrdersLocally();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🎉 आर्डर सफलतापूर्वक प्लेस हो गया!'), backgroundColor: Colors.green));
+        HapticFeedback.mediumImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('🎉 आर्डर सफलतापूर्वक प्लेस हो गया!'), backgroundColor: Colors.green),
+        );
       }
+    } catch (e) {
+      debugPrint("Place order error: $e");
     } finally {
       if (mounted) setState(() => _isCheckingOut = false);
     }
@@ -102,16 +141,17 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                     labelColor: Color(0xFFF59E0B),
                     unselectedLabelColor: Colors.grey,
                     indicatorColor: Color(0xFFF59E0B),
-                    tabs: [Tab(text: '🛒 मेरा कार्ट'), Tab(text: '📦 आर्डर इतिहास')],
+                    tabs: [Tab(text: '🛒 मेरा कार्ट'), Tab(text: '📦 आर्डर इतिहास (Live)')],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.sync, color: Color(0xFFF59E0B)),
-                  onPressed: () async {
-                    await CakeDatabase.fetchSingleLatestOrderOnly();
-                    setState(() {});
+                  icon: const Icon(Icons.flash_on, color: Color(0xFFF59E0B)),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('⚡ आर्डर आटोमेटिक लाइव सिंक हो रहे हैं!'), duration: Duration(seconds: 2)),
+                    );
                   },
-                  tooltip: 'आर्डर रिफ्रेश करें',
+                  tooltip: 'Live Synced',
                 ),
               ],
             ),
@@ -168,14 +208,14 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                         ],
                       ),
                 
-                // 2nd Tab: Order History View (Full implementation)
+                // 2nd Tab: Order History View (Real-time Live)
                 CakeDatabase.localOrdersCache.isEmpty
                     ? const Center(child: Text('कोई पिछला आर्डर नहीं है', style: TextStyle(color: Colors.grey)))
                     : ListView.builder(
                         itemCount: CakeDatabase.localOrdersCache.length,
                         itemBuilder: (context, index) {
                           var ord = CakeDatabase.localOrdersCache[index];
-                          String status = ord['status'] ?? ord['orderStatus'] ?? 'Pending';
+                          String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending';
                           var orderTotal = ord['grandTotal'] ?? ord['totalAmount'] ?? 0;
                           var itemsList = ord['items'] as List<dynamic>? ?? [];
 
@@ -190,7 +230,7 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('आर्डर #${ord['orderId'] ?? ''}', 
+                                      Text('आर्डर #${ord['orderId'] != null && ord['orderId'].toString().length > 8 ? ord['orderId'].toString().substring(0, 8) : ord['orderId'] ?? ''}', 
                                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                                       Text('₹${orderTotal.toString()}', 
                                           style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 16)),
@@ -203,17 +243,20 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                                   Text('डिलीवरी पता: ${ord['customerAddress'] ?? ord['deliveryAddress'] ?? 'पता उपलब्ध नहीं'}', 
                                       style: const TextStyle(color: Colors.grey, fontSize: 12)),
                                   const Divider(color: Colors.white24, height: 16),
-                                  ...itemsList.map((it) => Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 2.0),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text('• ${it['name']} (x${it['qty']})', style: const TextStyle(color: Colors.white, fontSize: 13)),
-                                        Text('₹${(double.tryParse(it['price'].toString()) ?? 0) * (double.tryParse(it['qty'].toString()) ?? 1)}', 
-                                            style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                                      ],
-                                    ),
-                                  )),
+                                  ...itemsList.map((it) {
+                                    var m = it is Map ? it : {};
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text('• ${m['name'] ?? 'Item'} (x${m['qty'] ?? 1})', style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                          Text('₹${(double.tryParse(m['price'].toString()) ?? 0) * (double.tryParse(m['qty'].toString()) ?? 1)}', 
+                                              style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                                        ],
+                                      ),
+                                    );
+                                  }),
                                   const SizedBox(height: 8),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -221,12 +264,12 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: status.toLowerCase() == 'delivered' ? Colors.green.withOpacity(0.2) : Colors.amber.withOpacity(0.2),
+                                          color: status.toLowerCase().contains('delivered') ? Colors.green.withOpacity(0.2) : Colors.amber.withOpacity(0.2),
                                           borderRadius: BorderRadius.circular(4),
                                         ),
-                                        child: Text('स्टेटस: $status', style: TextStyle(color: status.toLowerCase() == 'delivered' ? Colors.greenAccent : Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                                        child: Text('स्टेटस: $status', style: TextStyle(color: status.toLowerCase().contains('delivered') ? Colors.greenAccent : Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 12)),
                                       ),
-                                      Text(ord['orderTime'] != null ? ord['orderTime'].toString().substring(0, 16).replaceAll('T', ' ') : '', 
+                                      Text(ord['orderTime'] != null && ord['orderTime'].toString().length >= 16 ? ord['orderTime'].toString().substring(0, 16).replaceAll('T', ' ') : '', 
                                           style: const TextStyle(color: Colors.grey, fontSize: 11)),
                                     ],
                                   ),
