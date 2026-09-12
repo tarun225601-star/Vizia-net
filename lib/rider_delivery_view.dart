@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
+import 'package:firebase_database/firebase_database.dart'; // 👈 ऑफिशियल Real-time SDK इम्पोर्ट
 import 'database_models.dart';
 
 class RiderDeliveryScreen extends StatefulWidget {
@@ -30,13 +29,14 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   List<Map<String, dynamic>> _activeOrders = [];
   List<Map<String, dynamic>> _pendingRiders = [];
 
-  // नेट बचाने वाला स्मार्ट लिसनर टाइमर (अब 12 सेकंड और केवल Count चेक करेगा)
-  Timer? _riderOrderTimer;
+  // 🚀 HTTP Timer की जगह Real-time Stream Subscription
+  StreamSubscription<DatabaseEvent>? _ordersSubscription;
   int _lastOrderCount = 0;
+  bool _isFirstLoad = true;
 
   @override
   void dispose() {
-    _riderOrderTimer?.cancel();
+    _ordersSubscription?.cancel(); // 🛑 मेमोरी लीक रोकने के लिए स्ट्रीम बंद करना जरूरी है
     _phoneController.dispose();
     _passwordController.dispose();
     _regNameController.dispose();
@@ -46,42 +46,63 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     super.dispose();
   }
 
-  // 🔄 जीरो नेट कंजम्पशन लिसनर
+  // 🔥 यह है असली Blinkit वाला जादू (Real-time Stream Listener for Riders)
   void _startRiderOrderListener() {
-    _fetchOnlyActiveOrders(); // तुरंत एक बार लोड करें
-    _riderOrderTimer = Timer.periodic(const Duration(seconds: 12), (timer) async {
-      if (_isLoggedIn && !_isAdminLoggedIn) {
-        await _checkOnlyOrderCount();
-      }
-    });
-  }
+    DatabaseReference ordersRef = FirebaseDatabase.instance.ref('orders');
 
-  // 🌐 केवल आर्डर की गिनती चेक करने का हल्का तरीका (नेट खत्म नहीं होगा)
-  Future<void> _checkOnlyOrderCount() async {
-    try {
-      final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json?shallow=true'));
-      if (response.statusCode == 200 && response.body != 'null') {
-        Map<String, dynamic> data = json.decode(response.body);
-        int currentCount = data.keys.length;
-
-        // अगर नया ऑर्डर आया है, तभी पूरा डेटा लोड करो और वाइब्रेट करो
-        if (currentCount != _lastOrderCount) {
-          HapticFeedback.heavyImpact();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('🚴‍♂️ नया डिलीवरी ऑर्डर आया है!'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-          _fetchOnlyActiveOrders();
+    _ordersSubscription = ordersRef.onValue.listen((event) {
+      final snapshot = event.snapshot;
+      
+      if (snapshot.value == null) {
+        if (mounted) {
+          setState(() {
+            _activeOrders = [];
+            _lastOrderCount = 0;
+          });
         }
+        return;
       }
-    } catch (e) {
-      debugPrint("Count check error: $e");
-    }
+
+      Map<String, dynamic> data = Map<String, dynamic>.from(snapshot.value as Map);
+      List<Map<String, dynamic>> loadedOrders = [];
+
+      data.forEach((key, value) {
+        if (value is Map) {
+          var order = Map<String, dynamic>.from(value);
+          order['orderId'] = key;
+          
+          String status = order['orderStatus'] ?? order['status'] ?? 'Pending';
+          if (!status.toLowerCase().contains('delivered')) {
+            loadedOrders.add(order);
+          }
+        }
+      });
+
+      loadedOrders = loadedOrders.reversed.toList();
+
+      if (mounted) {
+        // अगर नया आर्डर आया है तो वाइब्रेट करो और नोटिफिकेशन दिखाओ
+        if (!_isFirstLoad && loadedOrders.length > _lastOrderCount) {
+          HapticFeedback.heavyImpact();
+          ScaffoldMessenger.of(context).removeCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚡ 🚴‍♂️ नया डिलीवरी ऑर्डर तुरंत प्राप्त हुआ है!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+
+        setState(() {
+          _activeOrders = loadedOrders;
+          _lastOrderCount = loadedOrders.length;
+          _isFirstLoad = false;
+        });
+      }
+    }, onError: (error) {
+      debugPrint("Rider Realtime database error: $error");
+    });
   }
 
   // 1. लॉगिन चेक (मोबाइल नंबर + पासवर्ड या गुप्त एडमिन पासवर्ड)
@@ -106,9 +127,9 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/riders.json'));
-      if (res.statusCode == 200 && res.body != 'null') {
-        Map<String, dynamic> data = json.decode(res.body);
+      final snapshot = await FirebaseDatabase.instance.ref('riders').get();
+      if (snapshot.value != null) {
+        Map<String, dynamic> data = Map<String, dynamic>.from(snapshot.value as Map);
         bool found = false;
         bool approved = false;
 
@@ -128,7 +149,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
             _isLoading = false;
           });
           _showMsg('🎉 राइडर लॉगिन सफल!', Colors.green);
-          _startRiderOrderListener(); 
+          _startRiderOrderListener(); // 🚀 लॉगिन होते ही रियल-टाइम कनेक्शन चालू
         } else if (found && !approved) {
           setState(() => _isLoading = false);
           _showMsg('⏳ आपका अकाउंट अभी एडमिन द्वारा अप्रूव नहीं किया गया है!', Colors.orange);
@@ -160,17 +181,15 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await http.post(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/riders.json'),
-        body: json.encode({
-          'name': name,
-          'phone': phone,
-          'vehicle': vehicle,
-          'password': password,
-          'isApproved': false,
-          'createdAt': DateTime.now().toIso8601String(),
-        }),
-      );
+      DatabaseReference newRiderRef = FirebaseDatabase.instance.ref('riders').push();
+      await newRiderRef.set({
+        'name': name,
+        'phone': phone,
+        'vehicle': vehicle,
+        'password': password,
+        'isApproved': false,
+        'createdAt': DateTime.now().toIso8601String(),
+      });
 
       setState(() {
         _isLoading = false;
@@ -187,9 +206,9 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   Future<void> _fetchPendingRiders() async {
     setState(() => _isLoading = true);
     try {
-      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/riders.json'));
-      if (res.statusCode == 200 && res.body != 'null') {
-        Map<String, dynamic> data = json.decode(res.body);
+      final snapshot = await FirebaseDatabase.instance.ref('riders').get();
+      if (snapshot.value != null) {
+        Map<String, dynamic> data = Map<String, dynamic>.from(snapshot.value as Map);
         List<Map<String, dynamic>> list = [];
         data.forEach((key, value) {
           if (value is Map) {
@@ -212,10 +231,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   // 4. राइडर अप्रूव करना
   Future<void> _approveRider(String riderId) async {
     try {
-      await http.patch(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/riders/$riderId.json'),
-        body: json.encode({'isApproved': true}),
-      );
+      await FirebaseDatabase.instance.ref('riders/$riderId').update({'isApproved': true});
       _showMsg('✅ राइडर सक्सेसफुली अप्रूव हो गया!', Colors.green);
       _fetchPendingRiders();
     } catch (e) {
@@ -229,49 +245,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     }
   }
 
-  // 5. केवल एक्टिव ऑर्डर्स फेच करना
-  Future<void> _fetchOnlyActiveOrders() async {
-    try {
-      final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
-      if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
-        Map<String, dynamic> data = json.decode(response.body);
-        List<Map<String, dynamic>> loadedOrders = [];
-        
-        data.forEach((key, value) {
-          if (value is Map) {
-            var order = Map<String, dynamic>.from(value);
-            order['orderId'] = key;
-            
-            // अगर आर्डर 'Delivered' हो चुका है, तो उसे लिस्ट से छिपा दें
-            String status = order['orderStatus'] ?? order['status'] ?? 'Pending';
-            if (!status.toLowerCase().contains('delivered')) {
-              loadedOrders.add(order);
-            }
-          }
-        });
-
-        loadedOrders = loadedOrders.reversed.toList();
-
-        if (mounted) {
-          setState(() {
-            _activeOrders = loadedOrders;
-            _lastOrderCount = data.keys.length;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _activeOrders = [];
-            _lastOrderCount = 0;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("Rider fetch orders error: $e");
-    }
-  }
-
-  // 🗑️ आर्डर डिलीट करने का फंक्शन
+  // 🗑️ आर्डर डिलीट करने का फंक्शन (Real-time SDK से)
   Future<void> _deleteOrder(String orderId) async {
     bool? confirm = await showDialog<bool>(
       context: context,
@@ -287,15 +261,9 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 
     if (confirm == true) {
       try {
-        final res = await http.delete(
-          Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderId.json'),
-        );
-
-        if (res.statusCode == 200) {
-          HapticFeedback.mediumImpact();
-          _showMsg('🗑️ आर्डर हमेशा के लिए डिलीट कर दिया गया!', Colors.red);
-          _fetchOnlyActiveOrders();
-        }
+        await FirebaseDatabase.instance.ref('orders/$orderId').remove();
+        HapticFeedback.mediumImpact();
+        _showMsg('🗑️ आर्डर हमेशा के लिए डिलीट कर दिया गया!', Colors.red);
       } catch (e) {
         debugPrint("Delete order error: $e");
       }
@@ -326,13 +294,12 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   // 🔄 आर्डर स्टेटस अपडेट करने का फंक्शन (Accept या Delivered)
   Future<void> _updateOrderStatus(String orderId, String newStatus) async {
     try {
-      await http.patch(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderId.json'),
-        body: json.encode({'orderStatus': newStatus, 'status': newStatus}),
-      );
+      await FirebaseDatabase.instance.ref('orders/$orderId').update({
+        'orderStatus': newStatus,
+        'status': newStatus,
+      });
       HapticFeedback.mediumImpact();
       _showMsg('✅ आर्डर स्टेटस बदलकर "$newStatus" कर दिया गया!', Colors.green);
-      _fetchOnlyActiveOrders(); 
     } catch (e) {
       debugPrint("Status update error: $e");
     }
@@ -376,7 +343,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.red),
               onPressed: () {
-                _riderOrderTimer?.cancel();
+                _ordersSubscription?.cancel();
                 setState(() { _isLoggedIn = false; _isAdminLoggedIn = false; });
               },
               tooltip: 'लॉग आउट',
@@ -415,17 +382,17 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
-        title: const Text('🚴‍♂️ राइडर डिलीवरी डैशबोर्ड', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
+        title: const Text('🚴‍♂️ राइडर डिलीवरी डैशबोर्ड (Real-time)', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
         actions: [
-          IconButton(
-            icon: Icon(Icons.sync, color: Colors.green.shade700),
-            onPressed: () => _fetchOnlyActiveOrders(),
-            tooltip: 'रिफ्रेश करें',
+          Container(
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: const Text('🟢 Live', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
           ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.red),
             onPressed: () {
-              _riderOrderTimer?.cancel();
+              _ordersSubscription?.cancel();
               setState(() => _isLoggedIn = false);
             },
             tooltip: 'लॉग आउट',
@@ -439,175 +406,127 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                 children: [
                   Icon(Icons.delivery_dining, size: 70, color: Colors.grey.shade400),
                   const SizedBox(height: 12),
-                  const Text('कोई नया डिलीवरी ऑर्डर उपलब्ध नहीं है!', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  const Text('कोई नया डिलीवरी ऑर्डर उपलब्ध नहीं है! (तुरंत प्रकट होगा)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
                 ],
               ),
             )
-          : RefreshIndicator(
-              onRefresh: () => _fetchOnlyActiveOrders(),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: _activeOrders.length,
-                itemBuilder: (context, index) {
-                  var order = _activeOrders[index];
-                  String orderId = order['orderId'] ?? '';
-                  String customerName = order['customerName'] ?? order['name'] ?? 'Customer';
-                  String phone = order['customerPhone'] ?? order['phone'] ?? '';
-                  String deliveryAddress = order['customerAddress'] ?? order['deliveryAddress'] ?? order['address'] ?? 'पता उपलब्ध नहीं';
-                  
-                  String shopName = order['shopName'] ?? 'Tarun Fruit & Vegetable Shop';
-                  String pickupAddress = order['shopAddress'] ?? 'Sector 15A, Faridabad';
-                  String status = order['orderStatus'] ?? order['status'] ?? 'Pending ⏳';
-                  var items = order['items'] as List<dynamic>? ?? [];
-                  double totalAmount = (order['totalAmount'] ?? order['grandTotal'] ?? 0.0).toDouble();
-                  String timeAgo = _getTimeAgo(order['orderTime']);
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: _activeOrders.length,
+              itemBuilder: (context, index) {
+                var order = _activeOrders[index];
+                String orderId = order['orderId'] ?? '';
+                String customerName = order['customerName'] ?? order['name'] ?? 'Customer';
+                String phone = order['customerPhone'] ?? order['phone'] ?? '';
+                String deliveryAddress = order['customerAddress'] ?? order['deliveryAddress'] ?? order['address'] ?? 'पता उपलब्ध नहीं';
+                
+                String status = order['orderStatus'] ?? order['status'] ?? 'Pending ⏳';
+                var items = order['items'] as List<dynamic>? ?? [];
+                double totalAmount = (order['totalAmount'] ?? order['grandTotal'] ?? 0.0).toDouble();
+                String timeAgo = _getTimeAgo(order['orderTime']);
 
-                  bool isAccepted = status.toLowerCase().contains('accepted') || status.toLowerCase().contains('accepted ✅');
+                bool isAccepted = status.toLowerCase().contains('accepted') || status.toLowerCase().contains('accepted ✅');
 
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text('📦 #${orderId.length > 8 ? orderId.substring(0, 8) : orderId}',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green.shade800)),
-                              const Spacer(),
-                              
-                              // ⏱️ टाइमर (कितनी देर हो गई)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
-                                child: Text(timeAgo, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black54)),
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text('📦 #${orderId.length > 8 ? orderId.substring(0, 8) : orderId}',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green.shade800)),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
+                              child: Text(timeAgo, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black54)),
+                            ),
+                            const SizedBox(width: 6),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                              onPressed: () => _deleteOrder(orderId),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              tooltip: 'ऑर्डर डिलीट करें',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('ग्राहक: $customerName ($phone)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: isAccepted ? Colors.blue.shade100 : Colors.orange.shade100,
+                                borderRadius: BorderRadius.circular(6),
                               ),
-                              const SizedBox(width: 6),
-
-                              // 🗑️ डिलीट बटन
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                                onPressed: () => _deleteOrder(orderId),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                tooltip: 'ऑर्डर डिलीट करें',
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('ग्राहक: $customerName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: isAccepted ? Colors.blue.shade100 : Colors.orange.shade100,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(status, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isAccepted ? Colors.blue.shade800 : Colors.orange.shade800)),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              child: Text(status, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isAccepted ? Colors.blue.shade800 : Colors.orange.shade800)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text('पता: $deliveryAddress', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        const Divider(height: 16),
+                        ...items.map((it) {
+                          var m = it is Map ? it : {};
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(children: [
-                                  const Icon(Icons.store, size: 15, color: Colors.blue),
-                                  const SizedBox(width: 6),
-                                  Expanded(child: Text('पिकअप (Shop): $shopName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue))),
-                                ]),
-                                const SizedBox(height: 4),
-                                Padding(padding: const EdgeInsets.only(left: 21), child: Text(pickupAddress, style: const TextStyle(fontSize: 11))),
+                                Text('• ${m['name'] ?? 'Item'} (x${m['qty'] ?? 1})', style: const TextStyle(fontSize: 11)),
+                                Text('₹${m['price'] ?? 0}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               ],
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          );
+                        }),
+                        const Divider(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('कुल राशि: ₹${totalAmount.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            Row(
                               children: [
-                                Row(children: [
-                                  const Icon(Icons.person_pin_circle, size: 15, color: Colors.redAccent),
-                                  const SizedBox(width: 6),
-                                  Expanded(child: Text('डिलीवरी: $customerName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.redAccent))),
-                                  const Icon(Icons.phone, size: 14, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Text(phone, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                ]),
-                                const SizedBox(height: 4),
-                                Padding(padding: const EdgeInsets.only(left: 21), child: Text(deliveryAddress, style: const TextStyle(fontSize: 11))),
-                              ],
-                            ),
-                          ),
-                          const Divider(height: 16),
-                          const Text('खरीदे गए आइटम्स:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black54)),
-                          const SizedBox(height: 4),
-                          ...items.map((item) {
-                            var m = item is Map ? item : {};
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('• ${m['name'] ?? 'Item'} (x${m['qty'] ?? 1})', style: const TextStyle(fontSize: 11)),
-                                  Text('₹${m['price'] ?? 0}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            );
-                          }),
-                          const Divider(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('कुल राशि: ₹${totalAmount.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
-                              
-                              // 🚴‍♂️ एक्शन बटन्स (Accept और Delivered)
-                              Row(
-                                children: [
-                                  if (!isAccepted)
-                                    Padding(
-                                      padding: const EdgeInsets.only(right: 6),
-                                      child: ElevatedButton.icon(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.blue.shade700,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                        ),
-                                        onPressed: () => _updateOrderStatus(orderId, 'Accepted ✅'),
-                                        icon: const Icon(Icons.thumb_up, size: 14),
-                                        label: const Text('Accept', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                if (!isAccepted)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blue.shade700,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       ),
+                                      onPressed: () => _updateOrderStatus(orderId, 'Accepted ✅'),
+                                      icon: const Icon(Icons.thumb_up, size: 12),
+                                      label: const Text('Accept', style: TextStyle(fontSize: 10)),
                                     ),
-                                  ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green.shade700,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                    ),
-                                    onPressed: () => _updateOrderStatus(orderId, 'Delivered ✅'),
-                                    icon: const Icon(Icons.check_circle, size: 14),
-                                    label: const Text('Delivered', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                                   ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green.shade700,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  ),
+                                  onPressed: () => _updateOrderStatus(orderId, 'Delivered ✅'),
+                                  icon: const Icon(Icons.check_circle, size: 12),
+                                  label: const Text('Delivered', style: TextStyle(fontSize: 10)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
     );
   }
@@ -617,23 +536,26 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.delivery_dining, size: 60, color: Colors.green),
-        const SizedBox(height: 10),
-        const Text('राइडर लॉगिन', textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const Icon(Icons.delivery_dining, size: 65, color: Colors.green),
+        const SizedBox(height: 15),
+        const Text('राइडर पोर्टल में लॉगिन करें', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 20),
         TextField(controller: _phoneController, keyboardType: TextInputType.phone, maxLength: 10, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), counterText: '', prefixIcon: Icon(Icons.phone))),
-        const SizedBox(height: 12),
-        TextField(controller: _passwordController, obscureText: true, decoration: const InputDecoration(labelText: 'पासवर्ड', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock))),
+        const SizedBox(height: 15),
+        TextField(controller: _passwordController, obscureText: true, decoration: const InputDecoration(labelText: 'पासवर्ड / एडमिन की', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock))),
         const SizedBox(height: 20),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
-          onPressed: _isLoading ? null : _loginRider,
-          child: const Text('लॉगिन करें', style: TextStyle(fontWeight: FontWeight.bold)),
+        SizedBox(
+          height: 48,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+            onPressed: _isLoading ? null : _loginRider,
+            child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('लॉगिन करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
         ),
         const SizedBox(height: 10),
         TextButton(
           onPressed: () => setState(() => _isRegistering = true),
-          child: const Text('नया अकाउंट रजिस्टर करें? (Register)'),
+          child: const Text('नया राइडर रजिस्ट्रेशन करें →', style: TextStyle(color: Colors.green)),
         ),
       ],
     );
@@ -644,22 +566,23 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.person_add, size: 60, color: Colors.green),
-        const SizedBox(height: 10),
-        const Text('नया राइडर रजिस्ट्रेशन', textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const Text('📝 नया राइडर फॉर्म', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 15),
-        TextField(controller: _regNameController, decoration: const InputDecoration(labelText: 'पूरा नाम', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person))),
-        const SizedBox(height: 10),
+        TextField(controller: _regNameController, decoration: const InputDecoration(labelText: 'पूरा नाम (Full Name)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person))),
+        const SizedBox(height: 12),
         TextField(controller: _regPhoneController, keyboardType: TextInputType.phone, maxLength: 10, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), counterText: '', prefixIcon: Icon(Icons.phone))),
-        const SizedBox(height: 10),
-        TextField(controller: _regVehicleController, decoration: const InputDecoration(labelText: 'वाहन का विवरण (जैसे: Bike / Scooter)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.two_wheeler))),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
+        TextField(controller: _regVehicleController, decoration: const InputDecoration(labelText: 'वाहन का विवरण (Bike/Scooty No.)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.two_wheeler))),
+        const SizedBox(height: 12),
         TextField(controller: _regPasswordController, obscureText: true, decoration: const InputDecoration(labelText: 'पासवर्ड बनाएं', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock))),
         const SizedBox(height: 20),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
-          onPressed: _isLoading ? null : _registerRider,
-          child: const Text('रजिस्टर करें', style: TextStyle(fontWeight: FontWeight.bold)),
+        SizedBox(
+          height: 48,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+            onPressed: _isLoading ? null : _registerRider,
+            child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('रजिस्टर करें', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
         ),
         const SizedBox(height: 10),
         TextButton(
