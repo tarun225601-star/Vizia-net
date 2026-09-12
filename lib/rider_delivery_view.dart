@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:http/http.dart' as http;
 import 'database_models.dart';
 
 class RiderDeliveryScreen extends StatefulWidget {
@@ -29,13 +30,16 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   List<Map<String, dynamic>> _activeOrders = [];
   List<Map<String, dynamic>> _pendingRiders = [];
 
-  StreamSubscription<DatabaseEvent>? _ordersSubscription;
-  int _lastOrderCount = 0;
-  bool _isFirstLoad = true;
+  Timer? _pollingTimer;
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   void dispose() {
-    _ordersSubscription?.cancel();
+    _pollingTimer?.cancel();
     _phoneController.dispose();
     _passwordController.dispose();
     _regNameController.dispose();
@@ -45,61 +49,51 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     super.dispose();
   }
 
-  void _startRiderOrderListener() {
-    DatabaseReference ordersRef = FirebaseDatabase.instance.ref('orders');
+  void _startRiderOrderPolling() {
+    _fetchOrdersRest();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_isLoggedIn && !_isAdminLoggedIn) {
+        _fetchOrdersRest();
+      }
+    });
+  }
 
-    _ordersSubscription = ordersRef.onValue.listen((event) {
-      final snapshot = event.snapshot;
-      
-      if (snapshot.value == null) {
+  Future<void> _fetchOrdersRest() async {
+    try {
+      final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
+      if (response.statusCode == 200 && response.body != 'null') {
+        Map<String, dynamic> data = json.decode(response.body);
+        List<Map<String, dynamic>> loadedOrders = [];
+
+        data.forEach((key, value) {
+          if (value is Map) {
+            var order = Map<String, dynamic>.from(value);
+            order['orderId'] = key;
+            
+            String status = order['orderStatus'] ?? order['status'] ?? 'Pending';
+            if (!status.toLowerCase().contains('delivered')) {
+              loadedOrders.add(order);
+            }
+          }
+        });
+
+        loadedOrders = loadedOrders.reversed.toList();
+
+        if (mounted) {
+          setState(() {
+            _activeOrders = loadedOrders;
+          });
+        }
+      } else {
         if (mounted) {
           setState(() {
             _activeOrders = [];
-            _lastOrderCount = 0;
           });
         }
-        return;
       }
-
-      Map<String, dynamic> data = Map<String, dynamic>.from(snapshot.value as Map);
-      List<Map<String, dynamic>> loadedOrders = [];
-
-      data.forEach((key, value) {
-        if (value is Map) {
-          var order = Map<String, dynamic>.from(value);
-          order['orderId'] = key;
-          
-          String status = order['orderStatus'] ?? order['status'] ?? 'Pending';
-          if (!status.toLowerCase().contains('delivered')) {
-            loadedOrders.add(order);
-          }
-        }
-      });
-
-      loadedOrders = loadedOrders.reversed.toList();
-
-      if (mounted) {
-        if (!_isFirstLoad && loadedOrders.length > _lastOrderCount) {
-          HapticFeedback.heavyImpact();
-          ScaffoldMessenger.of(context).removeCurrentSnackBar();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('⚡ 🚴‍♂️ नया डिलीवरी ऑर्डर तुरंत प्राप्त हुआ है!'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 4),
-            ),
-          );
-        }
-
-        setState(() {
-          _activeOrders = loadedOrders;
-          _lastOrderCount = loadedOrders.length;
-          _isFirstLoad = false;
-        });
-      }
-    }, onError: (error) {
-      debugPrint("Rider Realtime database error: $error");
-    });
+    } catch (e) {
+      debugPrint("Rest order fetch error: $e");
+    }
   }
 
   Future<void> _loginRider() async {
@@ -117,15 +111,15 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         _isLoggedIn = true;
       });
       _showMsg('👑 एडमिन पैनल लॉगिन सफल!', Colors.green);
-      _fetchPendingRiders();
+      _fetchPendingRidersRest();
       return;
     }
 
     setState(() => _isLoading = true);
     try {
-      final snapshot = await FirebaseDatabase.instance.ref('riders').get();
-      if (snapshot.value != null) {
-        Map<String, dynamic> data = Map<String, dynamic>.from(snapshot.value as Map);
+      final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/riders.json'));
+      if (response.statusCode == 200 && response.body != 'null') {
+        Map<String, dynamic> data = json.decode(response.body);
         bool found = false;
         bool approved = false;
 
@@ -145,7 +139,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
             _isLoading = false;
           });
           _showMsg('🎉 राइडर लॉगिन सफल!', Colors.green);
-          _startRiderOrderListener();
+          _startRiderOrderPolling();
         } else if (found && !approved) {
           setState(() => _isLoading = false);
           _showMsg('⏳ आपका अकाउंट अभी एडमिन द्वारा अप्रूव नहीं किया गया है!', Colors.orange);
@@ -176,33 +170,40 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 
     setState(() => _isLoading = true);
     try {
-      DatabaseReference newRiderRef = FirebaseDatabase.instance.ref('riders').push();
-      await newRiderRef.set({
-        'name': name,
-        'phone': phone,
-        'vehicle': vehicle,
-        'password': password,
-        'isApproved': false,
-        'createdAt': DateTime.now().toIso8601String(),
-      });
+      final response = await http.post(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/riders.json'),
+        body: json.encode({
+          'name': name,
+          'phone': phone,
+          'vehicle': vehicle,
+          'password': password,
+          'isApproved': false,
+          'createdAt': DateTime.now().toIso8601String(),
+        }),
+      );
 
-      setState(() {
-        _isLoading = false;
-        _isRegistering = false;
-      });
-      _showMsg('✅ रजिस्ट्रेशन सफल! एडमिन अप्रूवल के बाद ही लॉगिन कर सकेंगे।', Colors.green);
+      if (response.statusCode == 200) {
+        setState(() {
+          _isLoading = false;
+          _isRegistering = false;
+        });
+        _showMsg('✅ रजिस्ट्रेशन सफल! एडमिन अप्रूवल के बाद ही लॉगिन कर सकेंगे।', Colors.green);
+      } else {
+        setState(() => _isLoading = false);
+        _showMsg('रजिस्ट्रेशन फेल हुआ!', Colors.red);
+      }
     } catch (e) {
       setState(() => _isLoading = false);
       _showMsg('रजिस्ट्रेशन एरर: $e', Colors.red);
     }
   }
 
-  Future<void> _fetchPendingRiders() async {
+  Future<void> _fetchPendingRidersRest() async {
     setState(() => _isLoading = true);
     try {
-      final snapshot = await FirebaseDatabase.instance.ref('riders').get();
-      if (snapshot.value != null) {
-        Map<String, dynamic> data = Map<String, dynamic>.from(snapshot.value as Map);
+      final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/riders.json'));
+      if (response.statusCode == 200 && response.body != 'null') {
+        Map<String, dynamic> data = json.decode(response.body);
         List<Map<String, dynamic>> list = [];
         data.forEach((key, value) {
           if (value is Map) {
@@ -224,9 +225,12 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 
   Future<void> _approveRider(String riderId) async {
     try {
-      await FirebaseDatabase.instance.ref('riders/$riderId').update({'isApproved': true});
+      await http.patch(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/riders/$riderId.json'),
+        body: json.encode({'isApproved': true}),
+      );
       _showMsg('✅ राइडर सक्सेसफुली अप्रूव हो गया!', Colors.green);
-      _fetchPendingRiders();
+      _fetchPendingRidersRest();
     } catch (e) {
       _showMsg('अप्रूवल एरर: $e', Colors.red);
     }
@@ -253,9 +257,10 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 
     if (confirm == true) {
       try {
-        await FirebaseDatabase.instance.ref('orders/$orderId').remove();
+        await http.delete(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderId.json'));
         HapticFeedback.mediumImpact();
         _showMsg('🗑️ आर्डर हमेशा के लिए डिलीट कर दिया गया!', Colors.red);
+        _fetchOrdersRest();
       } catch (e) {
         debugPrint("Delete order error: $e");
       }
@@ -284,12 +289,16 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
 
   Future<void> _updateOrderStatus(String orderId, String newStatus) async {
     try {
-      await FirebaseDatabase.instance.ref('orders/$orderId').update({
-        'orderStatus': newStatus,
-        'status': newStatus,
-      });
+      await http.patch(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderId.json'),
+        body: json.encode({
+          'orderStatus': newStatus,
+          'status': newStatus,
+        }),
+      );
       HapticFeedback.mediumImpact();
       _showMsg('✅ आर्डर स्टेटस बदलकर "$newStatus" कर दिया गया!', Colors.green);
+      _fetchOrdersRest();
     } catch (e) {
       debugPrint("Status update error: $e");
     }
@@ -333,7 +342,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.red),
               onPressed: () {
-                _ordersSubscription?.cancel();
+                _pollingTimer?.cancel();
                 setState(() { _isLoggedIn = false; _isAdminLoggedIn = false; });
               },
               tooltip: 'लॉग आउट',
@@ -372,7 +381,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
-        title: const Text('🚴‍♂️ राइडर डिलीवरी डैशबोर्ड (Real-time)', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
+        title: const Text('🚴‍♂️ राइडर डिलीवरी डैशबोर्ड', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
         actions: [
           Container(
             alignment: Alignment.center,
@@ -382,7 +391,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.red),
             onPressed: () {
-              _ordersSubscription?.cancel();
+              _pollingTimer?.cancel();
               setState(() => _isLoggedIn = false);
             },
             tooltip: 'लॉग आउट',
@@ -396,7 +405,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                 children: [
                   Icon(Icons.delivery_dining, size: 70, color: Colors.grey.shade400),
                   const SizedBox(height: 12),
-                  const Text('कोई नया डिलीवरी ऑर्डर उपलब्ध नहीं है! (तुरंत प्रकट होगा)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  const Text('कोई नया डिलीवरी ऑर्डर उपलब्ध नहीं है!', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
                 ],
               ),
             )
@@ -496,21 +505,20 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                                       ),
                                       onPressed: () => _updateOrderStatus(orderId, 'Accepted ✅'),
                                       icon: const Icon(Icons.check, size: 14),
-                                      label: const Text('Accept', style: TextStyle(fontSize: 11)),
+                                      label: const Text('लेव', style: TextStyle(fontSize: 11)),
                                     ),
                                   ),
-                                if (isAccepted)
-                                  ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      minimumSize: Size.zero,
-                                    ),
-                                    onPressed: () => _updateOrderStatus(orderId, 'Delivered 🎉'),
-                                    icon: const Icon(Icons.done_all, size: 14),
-                                    label: const Text('Delivered', style: TextStyle(fontSize: 11)),
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    minimumSize: Size.zero,
                                   ),
+                                  onPressed: () => _updateOrderStatus(orderId, 'Delivered 🎉'),
+                                  icon: const Icon(Icons.done_all, size: 14),
+                                  label: const Text('डिलिवर्ड', style: TextStyle(fontSize: 11)),
+                                ),
                               ],
                             ),
                           ],
@@ -529,16 +537,12 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.delivery_dining, size: 50, color: Colors.green),
-        const SizedBox(height: 12),
-        const Text('राइडर पोर्टल में लॉगिन करें', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 16),
         TextField(
           controller: _phoneController,
           keyboardType: TextInputType.phone,
           decoration: const InputDecoration(labelText: 'मोबाइल नंबर', prefixIcon: Icon(Icons.phone)),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         TextField(
           controller: _passwordController,
           obscureText: true,
@@ -550,10 +554,10 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
           onPressed: _isLoading ? null : _loginRider,
           child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('लॉगिन करें', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         TextButton(
           onPressed: () => setState(() => _isRegistering = true),
-          child: const Text('नया राइडर रजिस्ट्रेशन करें →', style: TextStyle(color: Colors.green)),
+          child: const Text('नया राइडर रजिस्ट्रेशन करें', style: TextStyle(color: Colors.green)),
         ),
       ],
     );
@@ -564,25 +568,23 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('नया राइडर रजिस्ट्रेशन', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 14),
         TextField(controller: _regNameController, decoration: const InputDecoration(labelText: 'पूरा नाम', prefixIcon: Icon(Icons.person))),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         TextField(controller: _regPhoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', prefixIcon: Icon(Icons.phone))),
-        const SizedBox(height: 8),
-        TextField(controller: _regVehicleController, decoration: const InputDecoration(labelText: 'वाहन का नाम/नंबर (जैसे: Bike, DL... )', prefixIcon: Icon(Icons.directions_bike))),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
+        TextField(controller: _regVehicleController, decoration: const InputDecoration(labelText: 'वाहन का नाम/नंबर (Bike/Scooty)', prefixIcon: Icon(Icons.directions_bike))),
+        const SizedBox(height: 10),
         TextField(controller: _regPasswordController, obscureText: true, decoration: const InputDecoration(labelText: 'पासवर्ड बनाएं', prefixIcon: Icon(Icons.lock))),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
           onPressed: _isLoading ? null : _registerRider,
           child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('रजिस्टर करें', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         TextButton(
           onPressed: () => setState(() => _isRegistering = false),
-          child: const Text('← वापस लॉगिन पर जाएँ', style: TextStyle(color: Colors.grey)),
+          child: const Text('पहले से रजिस्टर्ड हैं? लॉगिन करें', style: TextStyle(color: Colors.green)),
         ),
       ],
     );
