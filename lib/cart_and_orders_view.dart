@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'flutter/material.dart'; // (ध्यान रखें: import package:flutter/material.dart;)
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_database/firebase_database.dart'; // 👈 ऑफिशियल Real-time SDK इम्पोर्ट
+import 'package:firebase_database/firebase_database.dart';
 import 'package:http/http.dart' as http;
 import 'database_models.dart';
 import 'image_picker_helper.dart';
@@ -16,7 +16,7 @@ class CartAndOrdersView extends StatefulWidget {
 
 class _CartAndOrdersViewState extends State<CartAndOrdersView> {
   bool _isCheckingOut = false;
-  StreamSubscription<DatabaseEvent>? _ordersSubscription; // 🚀 5 सेकंड वाले टाइमर की जगह रियल-टाइम स्ट्रीम
+  StreamSubscription<DatabaseEvent>? _ordersSubscription;
 
   @override
   void initState() {
@@ -24,18 +24,15 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
     CakeDatabase.loadOrdersLocally().then((_) {
       if (mounted) setState(() {});
     });
-
-    // 🔥 कस्टमर के लिए भी ब्लिंकिट जैसा रियल-टाइम आर्डर/स्टेटस लिसनर चालू कर दिया है
     _startCustomerOrdersListener();
   }
 
   @override
   void dispose() {
-    _ordersSubscription?.cancel(); // 🛑 मेमोरी लीक रोकने के लिए स्ट्रीम बंद करना जरूरी है
+    _ordersSubscription?.cancel();
     super.dispose();
   }
 
-  // ⚡ रियल-टाइम डेटाबेस लिसनर (कस्टमर के लिए)
   void _startCustomerOrdersListener() {
     DatabaseReference ordersRef = FirebaseDatabase.instance.ref('orders');
 
@@ -51,7 +48,6 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
           var ord = Map<String, dynamic>.from(val);
           ord['orderId'] = key;
 
-          // अगर आर्डर इस यूजर का है, तो इसे लोकल लिस्ट में दिखाओ
           String custPhone = ord['customerPhone'] ?? '';
           if (custPhone == CakeDatabase.currentUserPhone && CakeDatabase.currentUserPhone.isNotEmpty) {
             loadedOrders.add(ord);
@@ -59,14 +55,13 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
         }
       });
 
-      // नए ऑर्डर्स ऊपर दिखने चाहिए
       loadedOrders = loadedOrders.reversed.toList();
 
       if (mounted) {
         setState(() {
           CakeDatabase.localOrdersCache = loadedOrders;
         });
-        CakeDatabase.saveOrdersLocally(); // लोकल स्टोरेज भी अपडेट रखें
+        CakeDatabase.saveOrdersLocally();
       }
     }, onError: (error) {
       debugPrint("Customer Realtime database error: $error");
@@ -104,7 +99,6 @@ class _CartAndOrdersViewState extends State<CartAndOrdersView> {
     };
 
     try {
-      // 🚀 Firebase SDK के जरिए तुरंत आर्डर पुश करना (Blinkit Speed)
       DatabaseReference newOrderRef = FirebaseDatabase.instance.ref('orders').push();
       await newOrderRef.set(newOrder);
 
