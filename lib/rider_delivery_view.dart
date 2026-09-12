@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Haptic Feedback (वाइब्रेशन) के लिए
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'database_models.dart';
 
@@ -30,7 +30,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   List<Map<String, dynamic>> _activeOrders = [];
   List<Map<String, dynamic>> _pendingRiders = [];
 
-  // ऑटोमैटिक रिफ्रेश और वाइब्रेशन के लिए वेरिएबल्स
+  // नेट बचाने वाला स्मार्ट लिसनर टाइमर (अब 12 सेकंड और केवल Count चेक करेगा)
   Timer? _riderOrderTimer;
   int _lastOrderCount = 0;
 
@@ -46,14 +46,42 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     super.dispose();
   }
 
-  // 🔄 ऑटोमैटिक बैकग्राउंड ऑर्डर लिसनर (हर 4 सेकंड में चेक करेगा और नया ऑर्डर आने पर वाइब्रेट करेगा)
+  // 🔄 जीरो नेट कंजम्पशन लिसनर
   void _startRiderOrderListener() {
-    _fetchAssignedOrders(); // तुरंत एक बार लोड करें
-    _riderOrderTimer = Timer.periodic(const Duration(seconds: 4), (timer) async {
+    _fetchOnlyActiveOrders(); // तुरंत एक बार लोड करें
+    _riderOrderTimer = Timer.periodic(const Duration(seconds: 12), (timer) async {
       if (_isLoggedIn && !_isAdminLoggedIn) {
-        await _fetchAssignedOrders(isBackgroundCheck: true);
+        await _checkOnlyOrderCount();
       }
     });
+  }
+
+  // 🌐 केवल आर्डर की गिनती चेक करने का हल्का तरीका (नेट खत्म नहीं होगा)
+  Future<void> _checkOnlyOrderCount() async {
+    try {
+      final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json?shallow=true'));
+      if (response.statusCode == 200 && response.body != 'null') {
+        Map<String, dynamic> data = json.decode(response.body);
+        int currentCount = data.keys.length;
+
+        // अगर नया ऑर्डर आया है, तभी पूरा डेटा लोड करो और वाइब्रेट करो
+        if (currentCount != _lastOrderCount) {
+          HapticFeedback.heavyImpact();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('🚴‍♂️ नया डिलीवरी ऑर्डर आया है!'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+          _fetchOnlyActiveOrders();
+        }
+      }
+    } catch (e) {
+      debugPrint("Count check error: $e");
+    }
   }
 
   // 1. लॉगिन चेक (मोबाइल नंबर + पासवर्ड या गुप्त एडमिन पासवर्ड)
@@ -100,7 +128,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
             _isLoading = false;
           });
           _showMsg('🎉 राइडर लॉगिन सफल!', Colors.green);
-          _startRiderOrderListener(); // 🚀 ऑटोमैटिक आर्डर लिसनर चालू
+          _startRiderOrderListener(); 
         } else if (found && !approved) {
           setState(() => _isLoading = false);
           _showMsg('⏳ आपका अकाउंट अभी एडमिन द्वारा अप्रूव नहीं किया गया है!', Colors.orange);
@@ -201,8 +229,8 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     }
   }
 
-  // 5. लाइव ऑर्डर्स फेच करना
-  Future<void> _fetchAssignedOrders({bool isBackgroundCheck = false}) async {
+  // 5. केवल एक्टिव ऑर्डर्स फेच करना
+  Future<void> _fetchOnlyActiveOrders() async {
     try {
       final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
       if (response.statusCode == 200 && response.body != 'null' && response.body.isNotEmpty) {
@@ -225,20 +253,9 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         loadedOrders = loadedOrders.reversed.toList();
 
         if (mounted) {
-          if (isBackgroundCheck && loadedOrders.length > _lastOrderCount) {
-            HapticFeedback.heavyImpact();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('🚴‍♂️ नया डिलीवरी ऑर्डर आ गया है!'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-
           setState(() {
             _activeOrders = loadedOrders;
-            _lastOrderCount = loadedOrders.length;
+            _lastOrderCount = data.keys.length;
           });
         }
       } else {
@@ -277,7 +294,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         if (res.statusCode == 200) {
           HapticFeedback.mediumImpact();
           _showMsg('🗑️ आर्डर हमेशा के लिए डिलीट कर दिया गया!', Colors.red);
-          _fetchAssignedOrders();
+          _fetchOnlyActiveOrders();
         }
       } catch (e) {
         debugPrint("Delete order error: $e");
@@ -315,7 +332,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       );
       HapticFeedback.mediumImpact();
       _showMsg('✅ आर्डर स्टेटस बदलकर "$newStatus" कर दिया गया!', Colors.green);
-      _fetchAssignedOrders(); 
+      _fetchOnlyActiveOrders(); 
     } catch (e) {
       debugPrint("Status update error: $e");
     }
@@ -402,7 +419,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.sync, color: Colors.green.shade700),
-            onPressed: () => _fetchAssignedOrders(),
+            onPressed: () => _fetchOnlyActiveOrders(),
             tooltip: 'रिफ्रेश करें',
           ),
           IconButton(
@@ -427,7 +444,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
               ),
             )
           : RefreshIndicator(
-              onRefresh: () => _fetchAssignedOrders(),
+              onRefresh: () => _fetchOnlyActiveOrders(),
               child: ListView.builder(
                 padding: const EdgeInsets.all(12),
                 itemCount: _activeOrders.length,
@@ -611,7 +628,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
           onPressed: _isLoading ? null : _loginRider,
-          child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('लॉगिन करें', style: TextStyle(fontWeight: FontWeight.bold)),
+          child: const Text('लॉगिन करें', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
         const SizedBox(height: 10),
         TextButton(
@@ -642,7 +659,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
           onPressed: _isLoading ? null : _registerRider,
-          child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('रजिस्टर करें', style: TextStyle(fontWeight: FontWeight.bold)),
+          child: const Text('रजिस्टर करें', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
         const SizedBox(height: 10),
         TextButton(
