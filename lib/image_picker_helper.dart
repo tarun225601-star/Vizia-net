@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ImagePickerHelper {
-  // 🚀 गैलरी से इमेज पिक करके Base64 में बदलने का मेन फंक्शन
-  static Future<String?> pickImageAsBase64() async {
+  // 🚀 गैलरी से इमेज पिक करके Base64 में बदलने का मेथड (वही नाम जो main.dart में चाहिए)
+  static Future<String?> pickAndConvertToBase64() async {
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? pickedFile = await picker.pickImage(
@@ -27,8 +27,8 @@ class ImagePickerHelper {
     }
   }
 
-  // 📸 कैमरे से फोटो खींचकर Base64 में बदलने के लिए फंक्शन
-  static Future<String?> captureImageAsBase64() async {
+  // 📸 कैमरे से फोटो खींचकर Base64 में बदलने के लिए
+  static Future<String?> captureAndConvertToBase64() async {
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? capturedFile = await picker.pickImage(
@@ -49,7 +49,7 @@ class ImagePickerHelper {
     }
   }
 
-  // 🖼️ UI पर इमेज रेंडर करने का मुख्य लॉजिक
+  // 🖼️ UI पर इमेज रेंडर करने का लॉजिक
   static Widget renderImage(String? path, double height, double width, IconData fallbackIcon) {
     if (path != null && path.isNotEmpty) {
       if (path.startsWith('http')) {
@@ -99,8 +99,12 @@ class ImagePickerHelper {
   }
 }
 
-// 🛠️ यह एक्सटेंशन आपके पुराने लिखे हुए 'buildShopOrProdImage' मेथड को अपने आप बिना किसी झंझट के चला देगा
+// 🛠️ एक्सटेंशन ताकि main.dart की स्टेट क्लास में सीधे कॉल हो सके
 extension ImageHelperExtension on State {
+  Future<String?> pickAndConvertToBase64() async {
+    return await ImagePickerHelper.pickAndConvertToBase64();
+  }
+
   Widget buildShopOrProdImage(String? path, double height, double width, IconData fallbackIcon) {
     return ImagePickerHelper.renderImage(path, height, width, fallbackIcon);
   }
