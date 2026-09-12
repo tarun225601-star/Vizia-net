@@ -88,12 +88,20 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
 
   void _addToCart(Map<String, dynamic> prod, double qty) {
     try {
-      if (CakeDatabase.bakeryShop['isOpen'] == false) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ दुकान अभी बंद है!'), backgroundColor: Colors.red));
+      // 1. चेक करें कि दुकान खुली है या बंद
+      bool isShopOpen = CakeDatabase.bakeryShop['isOpen'] ?? true;
+      if (!isShopOpen) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🔴 दुकान अभी बंद (Closed) है! आर्डर नहीं ले सकते।'), backgroundColor: Colors.red));
         return;
       }
 
-      // 🔍 वेंडर का फोन नंबर और डेटा मैच करके सही दुकान का पता उठाने का लॉजिक
+      // 2. चेक करें कि आइटम आउट ऑफ स्टॉक तो नहीं है
+      int stock = (prod['stock'] ?? 1) is int ? (prod['stock'] ?? 1) : int.tryParse(prod['stock'].toString()) ?? 1;
+      if (stock <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ यह आइटम Out of Stock है!'), backgroundColor: Colors.red));
+        return;
+      }
+
       String prodVendorPhone = prod['vendorPhone'] ?? prod['phone'] ?? '';
       String shopAddress = CakeDatabase.bakeryShop['address'] ?? 'sector 15a ajronda sabji mandi faridabad';
       String shopName = CakeDatabase.bakeryShop['shopName'] ?? 'tarun fruit shop';
@@ -125,6 +133,9 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
   Widget build(BuildContext context) {
     var shop = CakeDatabase.bakeryShop;
     
+    // दुकान खुली है या बंद, इसका स्टेटस चेक करें (डिफ़ॉल्ट true यानी खुली हुई)
+    bool isShopOpen = shop['isOpen'] ?? true;
+    
     String shopAddress = (shop['address'] ?? 'Faridabad').toString().toLowerCase();
     bool isLocalFaridabadShop = shopAddress.contains(_targetCity) || shopAddress.isEmpty;
 
@@ -146,6 +157,28 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
       body: ListView(
         padding: const EdgeInsets.all(10),
         children: [
+          // अगर दुकान बंद है तो स्क्रीन के सबसे ऊपर साफ-साफ लाल बैनर दिखेगा
+          if (!isShopOpen)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade700,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.store_mall_directory, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text(
+                    '🔴 दुकान अभी बंद (Closed) है!',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+
           TextField(
             controller: _searchController,
             onChanged: (val) => setState(() => _searchQuery = val),
@@ -270,76 +303,84 @@ class _MarketplaceBuyerViewState extends State<MarketplaceBuyerView> {
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     var prod = filtered[index];
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200, width: 1),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.12),
-                            blurRadius: 5,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                              child: Stack(
-                                children: [
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: buildShopOrProdImage(prod['image'], double.infinity, double.infinity, Icons.eco),
-                                  ),
-                                  Positioned(
-                                    top: 6,
-                                    left: 6,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: Colors.blue.shade700, borderRadius: BorderRadius.circular(4)),
-                                      child: const Text('⚡ 9 MINS', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    int stock = (prod['stock'] ?? 1) is int ? (prod['stock'] ?? 1) : int.tryParse(prod['stock'].toString()) ?? 1;
+                    
+                    // अगर दुकान बंद है या स्टॉक खत्म है, तो आइटम को फीका (Dim) कर देंगे
+                    bool isDimmed = !isShopOpen || stock <= 0;
+
+                    return Opacity(
+                      opacity: isDimmed ? 0.4 : 1.0, // फीका कलर करने का लॉजिक
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200, width: 1),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.12),
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
                             ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(prod['name'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 12)),
-                                const SizedBox(height: 2),
-                                Text('1 ${prod['unit'] ?? 'Kg'}', style: const TextStyle(color: Colors.black54, fontSize: 10)),
-                                const SizedBox(height: 6),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                                child: Stack(
                                   children: [
-                                    Text('₹${prod['price'] ?? 0}', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
                                     SizedBox(
-                                      height: 28,
-                                      child: OutlinedButton(
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: Colors.green.shade700,
-                                          side: BorderSide(color: Colors.green.shade700, width: 1.2),
-                                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                        ),
-                                        onPressed: () => _addToCart(prod, 1.0),
-                                        child: const Text('ADD', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                      width: double.infinity,
+                                      child: buildShopOrProdImage(prod['image'], double.infinity, double.infinity, Icons.eco),
+                                    ),
+                                    Positioned(
+                                      top: 6,
+                                      left: 6,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(color: !isShopOpen ? Colors.red : Colors.blue.shade700, borderRadius: BorderRadius.circular(4)),
+                                        child: Text(!isShopOpen ? 'CLOSED' : '⚡ 9 MINS', style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
                                       ),
                                     ),
                                   ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ],
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(prod['name'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 12)),
+                                  const SizedBox(height: 2),
+                                  Text(stock <= 0 ? 'Out of Stock' : '1 ${prod['unit'] ?? 'Kg'}', style: TextStyle(color: stock <= 0 ? Colors.red : Colors.black54, fontSize: 10, fontWeight: stock <= 0 ? FontWeight.bold : FontWeight.normal)),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('₹${prod['price'] ?? 0}', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
+                                      SizedBox(
+                                        height: 28,
+                                        child: OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: isDimmed ? Colors.grey : Colors.green.shade700,
+                                            side: BorderSide(color: isDimmed ? Colors.grey : Colors.green.shade700, width: 1.2),
+                                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                          ),
+                                          onPressed: () => _addToCart(prod, 1.0), // क्लिक करने पर अंदर ही चेक हो जाएगा कि दुकान खुली है या नहीं
+                                          child: Text(stock <= 0 ? 'SOLD' : 'ADD', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
