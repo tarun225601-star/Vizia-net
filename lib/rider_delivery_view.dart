@@ -30,16 +30,13 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   List<Map<String, dynamic>> _activeOrders = [];
   List<Map<String, dynamic>> _pendingRiders = [];
 
-  Timer? _pollingTimer;
-
-  @override
-  void initState() {
-    super.initState();
-  }
+  Timer? _smartPollingTimer;
+  int _lastOrderCount = 0;
+  bool _isFirstLoad = true;
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
+    _smartPollingTimer?.cancel();
     _phoneController.dispose();
     _passwordController.dispose();
     _regNameController.dispose();
@@ -49,16 +46,43 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     super.dispose();
   }
 
-  void _startRiderOrderPolling() {
-    _fetchOrdersRest();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (_isLoggedIn && !_isAdminLoggedIn) {
-        _fetchOrdersRest();
+  // 🚀 स्मार्ट चेकर: यह सिर्फ आर्डरों की गिनती चेक करता है (बिल्कुल डेटा खर्च नहीं होता)
+  void _startSmartOrderChecker() {
+    _fetchOrdersRest(isInitial: true);
+    
+    _smartPollingTimer = Timer.periodic(const Duration(seconds: 6), (timer) async {
+      if (!_isLoggedIn || _isAdminLoggedIn) return;
+      try {
+        // shallow=true से सिर्फ keys (IDs) आती हैं, डेटा नहीं (Internet 100% Safe)
+        final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json?shallow=true'));
+        if (response.statusCode == 200 && response.body != 'null') {
+          Map<String, dynamic> data = json.decode(response.body);
+          int currentCount = data.keys.length;
+
+          if (!_isFirstLoad && currentCount > _lastOrderCount) {
+            // नया आर्डर आते ही यह तुरंत पूरा डेटा खींच लेगा और घंटी/नोटिस देगा
+            HapticFeedback.heavyImpact();
+            if (mounted) {
+              ScaffoldMessenger.of(context).removeCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('⚡ 🚴‍♂️ नया डिलीवरी ऑर्डर प्राप्त हुआ है!'),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 4),
+                ),
+              );
+            }
+            _fetchOrdersRest(isInitial: false);
+          }
+          _lastOrderCount = currentCount;
+        }
+      } catch (e) {
+        debugPrint("Smart check error: $e");
       }
     });
   }
 
-  Future<void> _fetchOrdersRest() async {
+  Future<void> _fetchOrdersRest({bool isInitial = false}) async {
     try {
       final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
       if (response.statusCode == 200 && response.body != 'null') {
@@ -82,12 +106,16 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         if (mounted) {
           setState(() {
             _activeOrders = loadedOrders;
+            _lastOrderCount = data.keys.length;
+            _isFirstLoad = false;
           });
         }
       } else {
         if (mounted) {
           setState(() {
             _activeOrders = [];
+            _lastOrderCount = 0;
+            _isFirstLoad = false;
           });
         }
       }
@@ -139,7 +167,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
             _isLoading = false;
           });
           _showMsg('🎉 राइडर लॉगिन सफल!', Colors.green);
-          _startRiderOrderPolling();
+          _startSmartOrderChecker();
         } else if (found && !approved) {
           setState(() => _isLoading = false);
           _showMsg('⏳ आपका अकाउंट अभी एडमिन द्वारा अप्रूव नहीं किया गया है!', Colors.orange);
@@ -342,7 +370,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.red),
               onPressed: () {
-                _pollingTimer?.cancel();
+                _smartPollingTimer?.cancel();
                 setState(() { _isLoggedIn = false; _isAdminLoggedIn = false; });
               },
               tooltip: 'लॉग आउट',
@@ -381,17 +409,17 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
-        title: const Text('🚴‍♂️ राइडर डिलीवरी डैशबोर्ड', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
+        title: const Text('🚴‍♂️ राइडर डिलीवरी डैशबोर्ड (Smart Auto-Refresh)', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 15)),
         actions: [
-          Container(
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: const Text('🟢 Live', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.green),
+            onPressed: () => _fetchOrdersRest(),
+            tooltip: 'मैनुअल रिफ्रेश',
           ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.red),
             onPressed: () {
-              _pollingTimer?.cancel();
+              _smartPollingTimer?.cancel();
               setState(() => _isLoggedIn = false);
             },
             tooltip: 'लॉग आउट',
@@ -406,6 +434,8 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                   Icon(Icons.delivery_dining, size: 70, color: Colors.grey.shade400),
                   const SizedBox(height: 12),
                   const Text('कोई नया डिलीवरी ऑर्डर उपलब्ध नहीं है!', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  const Text('(नया आर्डर आते ही स्क्रीन अपने आप अपडेट हो जाएगी)', style: TextStyle(fontSize: 11, color: Colors.green)),
                 ],
               ),
             )
