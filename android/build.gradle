@@ -7,6 +7,8 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:7.4.2'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        // 🟢 यह लाइन जोड़ना सबसे जरूरी है ताकि 'com.google.gms.google-services' काम करे
+        classpath 'com.google.gms:google-services:4.4.2'
     }
 }
 
