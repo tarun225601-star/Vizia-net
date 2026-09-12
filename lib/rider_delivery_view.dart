@@ -326,7 +326,8 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                       String orderId = order['orderId'] ?? '';
                       String customerName = order['customerName'] ?? order['name'] ?? 'Customer';
                       String phone = order['customerPhone'] ?? order['phone'] ?? '';
-                      String deliveryAddress = order['deliveryAddress'] ?? order['address'] ?? '';
+                      String deliveryAddress = order['customerAddress'] ?? order['deliveryAddress'] ?? order['address'] ?? 'पता उपलब्ध नहीं';
+                      
                       String shopName = order['shopName'] ?? 'Tarun Fruit & Vegetable Shop';
                       String pickupAddress = order['shopAddress'] ?? 'Sector 15A, Faridabad';
                       String status = order['orderStatus'] ?? order['status'] ?? 'Pending ⏳';
