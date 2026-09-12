@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
+import 'package:flutter/services.dart'; // Haptic Feedback के लिए
 import 'database_models.dart';
 
 class VendorAuthAndPortalView extends StatefulWidget {
@@ -23,12 +25,105 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   final loginPassCtrl = TextEditingController();
 
   bool _isLoading = false;
-  bool _isShopOpen = true; // दुकान खुली है या बंद, इसका स्टेट
+  bool _isShopOpen = true; 
+
+  // लाइव ऑर्डर्स और ऑटोमैटिक रिफ्रेश के लिए वेरिएबल्स
+  List<Map<String, dynamic>> _vendorOrders = [];
+  Timer? _orderFetchTimer;
+  int _lastOrderCount = 0;
 
   @override
   void initState() {
     super.initState();
     _isShopOpen = CakeDatabase.bakeryShop['isOpen'] ?? true;
+  }
+
+  @override
+  void dispose() {
+    _orderFetchTimer?.cancel();
+    super.dispose();
+  }
+
+  // वेंडर के लिए ऑटोमैटिक बैकग्राउंड ऑर्डर फेचिंग (जैसे ही नया आर्डर आएगा, वाइब्रेशन बजेगा)
+  void _startVendorOrderListener() {
+    _fetchVendorOrders(); // तुरंत एक बार लोड करें
+    _orderFetchTimer = Timer.periodic(const Duration(seconds: 4), (timer) async {
+      if (_viewMode == 3) {
+        await _fetchVendorOrders(isBackgroundCheck: true);
+      }
+    });
+  }
+
+  Future<void> _fetchVendorOrders({bool isBackgroundCheck = false}) async {
+    try {
+      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
+      if (res.statusCode == 200 && res.body != 'null' && res.body.isNotEmpty) {
+        Map<String, dynamic> data = json.decode(res.body);
+        List<Map<String, dynamic>> loadedOrders = [];
+        data.forEach((key, val) {
+          if (val is Map) {
+            var ord = Map<String, dynamic>.from(val);
+            ord['orderId'] = key;
+            loadedOrders.add(ord);
+          }
+        });
+
+        // नए आर्डर सबसे ऊपर
+        loadedOrders = loadedOrders.reversed.toList();
+
+        if (mounted) {
+          // अगर नया आर्डर आया है और पुराना काउंट कम था, तो Haptic Feedback (वाइब्रेशन) बजाएं!
+          if (isBackgroundCheck && loadedOrders.length > _lastOrderCount) {
+            HapticFeedback.heavyImpact(); // 📳 तेज वाइब्रेशन
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('🔔 नया आर्डर प्राप्त हुआ है!'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+
+          setState(() {
+            _vendorOrders = loadedOrders;
+            _lastOrderCount = loadedOrders.length;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Vendor fetch error: $e");
+    }
+  }
+
+  Future<void> _updateOrderStatus(String orderId, String newStatus) async {
+    try {
+      await http.patch(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderId.json'),
+        body: json.encode({'status': newStatus, 'orderStatus': newStatus}),
+      );
+      HapticFeedback.mediumImpact();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ आर्डर स्टेटस बदलकर "$newStatus" कर दिया गया!'), backgroundColor: Colors.green));
+      }
+      _fetchVendorOrders();
+    } catch (e) {
+      debugPrint("Status update error: $e");
+    }
+  }
+
+  // समय की गणना (कितना टाइम हो गया आर्डर आए हुए)
+  String _getTimeAgo(String? timeStr) {
+    if (timeStr == null || timeStr.isEmpty) return '';
+    try {
+      DateTime orderTime = DateTime.parse(timeStr);
+      Duration diff = DateTime.now().difference(orderTime);
+      if (diff.inMinutes < 1) return 'अभी-अभी (${orderTime.hour.toString().padLeft(2, '0')}:${orderTime.minute.toString().padLeft(2, '0')})';
+      if (diff.inMinutes < 60) return '${diff.inMinutes} मिनट पहले';
+      if (diff.inHours < 24) return '${diff.inHours} घंटे पहले';
+      return '${orderTime.day}/${orderTime.month} ${orderTime.hour}:${orderTime.minute}';
+    } catch (e) {
+      return timeStr;
+    }
   }
 
   Future<void> _submitRegistration() async {
@@ -104,6 +199,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
       if (isApproved) {
         setState(() => _viewMode = 3);
+        _startVendorOrderListener(); // डैशबोर्ड खुलते ही ऑटोमैटिक आर्डर लिसनर चालू
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ स्वागत है! वेंडर डैशबोर्ड खुल गया है।'), backgroundColor: Colors.green));
         }
@@ -126,7 +222,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     }
   }
 
-  // Firebase पर दुकान का ओपन/क्लोज़ स्टेटस सेव करने का फंक्शन
   Future<void> _toggleShopStatus(bool value) async {
     setState(() => _isShopOpen = value);
     CakeDatabase.bakeryShop['isOpen'] = value;
@@ -257,34 +352,27 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // 🟢 वेंडर डैशबोर्ड (जब लॉगिन सफल हो जाए) - यहाँ दुकान बंद/चालू करने का स्विच है
+    // 🟢 वेंडर डैशबोर्ड (जब लॉगिन सफल हो जाए)
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.admin_panel_settings, size: 60, color: Colors.green),
-          const SizedBox(height: 10),
-          const Text('🎉 वेंडर डैशबोर्ड', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
-
           // दुकान ओपन/क्लोज़ करने वाला स्विच कार्ड
           Card(
             elevation: 3,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(12.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('दुकान की स्थिति (Shop Status)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      const SizedBox(height: 4),
+                      const Text('दुकान की स्थिति', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       Text(
-                        _isShopOpen ? '🟢 खुली हुई है (Accepting Orders)' : '🔴 बंद है (Closed)',
-                        style: TextStyle(color: _isShopOpen ? Colors.green.shade700 : Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
+                        _isShopOpen ? '🟢 खुली हुई है (Open)' : '🔴 बंद है (Closed)',
+                        style: TextStyle(color: _isShopOpen ? Colors.green.shade700 : Colors.red, fontWeight: FontWeight.bold, fontSize: 11),
                       ),
                     ],
                   ),
@@ -293,21 +381,126 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                     activeColor: Colors.green,
                     onChanged: _toggleShopStatus,
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.logout, color: Colors.red, size: 22),
+                    onPressed: () {
+                      _orderFetchTimer?.cancel();
+                      setState(() => _viewMode = 0);
+                    },
+                    tooltip: 'लॉग आउट',
+                  ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 10),
 
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700, foregroundColor: Colors.white),
-              onPressed: () => setState(() => _viewMode = 0),
-              icon: const Icon(Icons.logout),
-              label: const Text('लॉग आउट करें', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
+          // लाइव ऑर्डर्स की लिस्ट हेडिंग
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('📦 नए लाइव ऑर्डर्स', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              IconButton(
+                icon: const Icon(Icons.sync, color: Colors.green, size: 20),
+                onPressed: () => _fetchVendorOrders(),
+                tooltip: 'रिफ्रेश करें',
+              ),
+            ],
+          ),
+          const Divider(height: 8),
+
+          // ऑर्डर्स लिस्टव्यू (ऑटोमैटिक अपडेट और टाइम-स्टैम्प के साथ)
+          Expanded(
+            child: _vendorOrders.isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.inbox, size: 50, color: Colors.grey),
+                        SizedBox(height: 8),
+                        Text('अभी कोई नया ऑर्डर नहीं है...', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _vendorOrders.length,
+                    itemBuilder: (context, index) {
+                      var ord = _vendorOrders[index];
+                      String orderId = ord['orderId'] ?? '';
+                      String customerName = ord['customerName'] ?? 'Customer';
+                      String phone = ord['customerPhone'] ?? '';
+                      String address = ord['customerAddress'] ?? ord['deliveryAddress'] ?? 'पता नहीं';
+                      String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending';
+                      var items = ord['items'] as List<dynamic>? ?? [];
+                      double total = (ord['grandTotal'] ?? ord['totalAmount'] ?? 0.0).toDouble();
+                      String timeAgo = _getTimeAgo(ord['orderTime']);
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('📦 #${orderId.length > 8 ? orderId.substring(0, 8) : orderId}', 
+                                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 13)),
+                                  // ⏱️ टाइम और डेट (Time Ago काउंटर)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
+                                    child: Text(timeAgo, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black54)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('ग्राहक: $customerName ($phone)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: status.contains('Accepted') ? Colors.green.shade100 : Colors.orange.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(status, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, 
+                                        color: status.contains('Accepted') ? Colors.green.shade800 : Colors.orange.shade800)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text('पता: $address', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                              const Divider(height: 12),
+                              ...items.map((it) => Text('• ${it['name']} (x${it['qty']}) - ₹${it['price']}', style: const TextStyle(fontSize: 11))),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('कुल: ₹${total.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                                  
+                                  // ✅ Accept Order Button
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green.shade700, 
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    ),
+                                    onPressed: () => _updateOrderStatus(orderId, 'Accepted by Vendor 🟢'),
+                                    child: const Text('ऑर्डर एक्सेप्ट करें', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
