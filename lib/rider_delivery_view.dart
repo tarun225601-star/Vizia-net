@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'database_models.dart';
 
 class RiderDeliveryScreen extends StatefulWidget {
@@ -31,8 +32,27 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
   List<Map<String, dynamic>> _pendingRiders = [];
 
   Timer? _smartPollingTimer;
-  int _lastOrderCount = 0;
+  Set<String> _localSeenOrderIds = {};
   bool _isFirstLoad = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocalSeenOrders();
+  }
+
+  Future<void> _loadLocalSeenOrders() async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> savedIds = prefs.getStringList('seen_order_ids') ?? [];
+    setState(() {
+      _localSeenOrderIds = savedIds.toSet();
+    });
+  }
+
+  Future<void> _saveSeenOrderIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('seen_order_ids', _localSeenOrderIds.toList());
+  }
 
   @override
   void dispose() {
@@ -46,21 +66,26 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     super.dispose();
   }
 
-  // 🚀 स्मार्ट चेकर: यह सिर्फ आर्डरों की गिनती चेक करता है (बिल्कुल डेटा खर्च नहीं होता)
+  // 🚀 सुपर स्मार्ट लोकल-कैश पोलिंग: सिर्फ नई आईडी चेक करेगा, पुराना डेटा जीरो डाउनलोड!
   void _startSmartOrderChecker() {
-    _fetchOrdersRest(isInitial: true);
+    _fetchAllActiveOrdersRest(isInitial: true);
     
     _smartPollingTimer = Timer.periodic(const Duration(seconds: 6), (timer) async {
       if (!_isLoggedIn || _isAdminLoggedIn) return;
       try {
-        // shallow=true से सिर्फ keys (IDs) आती हैं, डेटा नहीं (Internet 100% Safe)
         final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json?shallow=true'));
         if (response.statusCode == 200 && response.body != 'null') {
           Map<String, dynamic> data = json.decode(response.body);
-          int currentCount = data.keys.length;
+          
+          bool hasNewOrder = false;
+          for (String serverId in data.keys) {
+            if (!_localSeenOrderIds.contains(serverId)) {
+              hasNewOrder = true;
+              break;
+            }
+          }
 
-          if (!_isFirstLoad && currentCount > _lastOrderCount) {
-            // नया आर्डर आते ही यह तुरंत पूरा डेटा खींच लेगा और घंटी/नोटिस देगा
+          if (!_isFirstLoad && hasNewOrder) {
             HapticFeedback.heavyImpact();
             if (mounted) {
               ScaffoldMessenger.of(context).removeCurrentSnackBar();
@@ -72,17 +97,16 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
                 ),
               );
             }
-            _fetchOrdersRest(isInitial: false);
+            _fetchAllActiveOrdersRest(isInitial: false);
           }
-          _lastOrderCount = currentCount;
         }
       } catch (e) {
-        debugPrint("Smart check error: $e");
+        debugPrint("Smart local-cache check error: $e");
       }
     });
   }
 
-  Future<void> _fetchOrdersRest({bool isInitial = false}) async {
+  Future<void> _fetchAllActiveOrdersRest({bool isInitial = false}) async {
     try {
       final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
       if (response.statusCode == 200 && response.body != 'null') {
@@ -94,6 +118,9 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
             var order = Map<String, dynamic>.from(value);
             order['orderId'] = key;
             
+            // लोकल मेमोरी में आईडी सेव करें ताकि दोबारा डाउनलोड या डिस्टर्ब न हो
+            _localSeenOrderIds.add(key);
+
             String status = order['orderStatus'] ?? order['status'] ?? 'Pending';
             if (!status.toLowerCase().contains('delivered')) {
               loadedOrders.add(order);
@@ -101,12 +128,12 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
           }
         });
 
+        _saveSeenOrderIds();
         loadedOrders = loadedOrders.reversed.toList();
 
         if (mounted) {
           setState(() {
             _activeOrders = loadedOrders;
-            _lastOrderCount = data.keys.length;
             _isFirstLoad = false;
           });
         }
@@ -114,7 +141,6 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
         if (mounted) {
           setState(() {
             _activeOrders = [];
-            _lastOrderCount = 0;
             _isFirstLoad = false;
           });
         }
@@ -286,9 +312,11 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
     if (confirm == true) {
       try {
         await http.delete(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderId.json'));
+        _localSeenOrderIds.remove(orderId);
+        _saveSeenOrderIds();
         HapticFeedback.mediumImpact();
         _showMsg('🗑️ आर्डर हमेशा के लिए डिलीट कर दिया गया!', Colors.red);
-        _fetchOrdersRest();
+        _fetchAllActiveOrdersRest();
       } catch (e) {
         debugPrint("Delete order error: $e");
       }
@@ -326,7 +354,7 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       );
       HapticFeedback.mediumImpact();
       _showMsg('✅ आर्डर स्टेटस बदलकर "$newStatus" कर दिया गया!', Colors.green);
-      _fetchOrdersRest();
+      _fetchAllActiveOrdersRest();
     } catch (e) {
       debugPrint("Status update error: $e");
     }
@@ -409,11 +437,11 @@ class _RiderDeliveryScreenState extends State<RiderDeliveryScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
-        title: const Text('🚴‍♂️ राइडर डिलीवरी डैशबोर्ड (Smart Auto-Refresh)', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 15)),
+        title: const Text('🚴‍♂️ राइडर डिलीवरी (Local Cached Auto-Sync)', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.green),
-            onPressed: () => _fetchOrdersRest(),
+            onPressed: () => _fetchAllActiveOrdersRest(),
             tooltip: 'मैनुअल रिफ्रेश',
           ),
           IconButton(
