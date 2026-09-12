@@ -22,8 +22,14 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   final loginPhoneCtrl = TextEditingController();
   final loginPassCtrl = TextEditingController();
 
-  final adminCodeCtrl = TextEditingController();
   bool _isLoading = false;
+  bool _isShopOpen = true; // दुकान खुली है या बंद, इसका स्टेट
+
+  @override
+  void initState() {
+    super.initState();
+    _isShopOpen = CakeDatabase.bakeryShop['isOpen'] ?? true;
+  }
 
   Future<void> _submitRegistration() async {
     if (regPhoneCtrl.text.trim().length < 10 || regShopNameCtrl.text.isEmpty) {
@@ -55,7 +61,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('⏳ रिक्वेस्ट सबमिट हो गई'),
-            content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन (तरुण) द्वारा अप्रूव होने के बाद ही आप लॉगिन कर पाएंगे।'),
+            content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन द्वारा अप्रूव होने के बाद ही आप लॉगिन कर पाएंगे।'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -107,7 +113,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('⚠️ लॉगिन असफल (Not Approved)'),
-              content: const Text('आपकी दुकान अभी तक मास्टर एडमिन (तरुण) द्वारा अप्रूव नहीं की गई है! कृपया पहले अप्रूवल लें या सही डिटेल्स भरें।'),
+              content: const Text('आपकी दुकान अभी तक मास्टर एडमिन द्वारा अप्रूव नहीं की गई है!'),
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('ठीक है')),
               ],
@@ -117,6 +123,29 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // Firebase पर दुकान का ओपन/क्लोज़ स्टेटस सेव करने का फंक्शन
+  Future<void> _toggleShopStatus(bool value) async {
+    setState(() => _isShopOpen = value);
+    CakeDatabase.bakeryShop['isOpen'] = value;
+
+    try {
+      await http.patch(
+        Uri.parse('${CakeDatabase.firebaseRestUrl}/shop_profile.json'),
+        body: json.encode({'isOpen': value}),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(value ? '🟢 दुकान अब खुली (Open) है।' : '🔴 दुकान अब बंद (Closed) कर दी गई है।'),
+            backgroundColor: value ? Colors.green : Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Shop status update error: $e");
     }
   }
 
@@ -132,7 +161,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             const SizedBox(height: 15),
             const Text('🛍️ वेंडर पोर्टल', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
-            const Text('बिना एडमिन अप्रूवल के कोई भी वेंडर लॉगिन नहीं कर सकता', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
+            const Text('दुकानदार लॉगिन और नया रजिस्ट्रेशन', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
             const SizedBox(height: 40),
             
             SizedBox(
@@ -206,7 +235,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             const SizedBox(height: 15),
             const Text('🔐 वेंडर लॉगिन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
-            const Text('पहले एडमिन से अप्रूव कराना अनिवार्य है', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text('वेंडर पोर्टल में आपका स्वागत है', style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 25),
             TextField(controller: loginPhoneCtrl, keyboardType: TextInputType.phone, maxLength: 10, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), counterText: '', prefixIcon: Icon(Icons.phone))),
             const SizedBox(height: 15),
@@ -228,16 +257,57 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // जब वेंडर लॉगिन हो जाए
-    return Center(
+    // 🟢 वेंडर डैशबोर्ड (जब लॉगिन सफल हो जाए) - यहाँ दुकान बंद/चालू करने का स्विच है
+    return Padding(
+      padding: const EdgeInsets.all(20),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text('🎉 वेंडर डैशबोर्ड में आपका स्वागत है!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Icon(Icons.admin_panel_settings, size: 60, color: Colors.green),
+          const SizedBox(height: 10),
+          const Text('🎉 वेंडर डैशबोर्ड', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () => setState(() => _viewMode = 0),
-            child: const Text('लॉग आउट करें'),
+
+          // दुकान ओपन/क्लोज़ करने वाला स्विच कार्ड
+          Card(
+            elevation: 3,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('दुकान की स्थिति (Shop Status)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const SizedBox(height: 4),
+                      Text(
+                        _isShopOpen ? '🟢 खुली हुई है (Accepting Orders)' : '🔴 बंद है (Closed)',
+                        style: TextStyle(color: _isShopOpen ? Colors.green.shade700 : Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  Switch(
+                    value: _isShopOpen,
+                    activeColor: Colors.green,
+                    onChanged: _toggleShopStatus,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 30),
+
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700, foregroundColor: Colors.white),
+              onPressed: () => setState(() => _viewMode = 0),
+              icon: const Icon(Icons.logout),
+              label: const Text('लॉग आउट करें', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
           ),
         ],
       ),
