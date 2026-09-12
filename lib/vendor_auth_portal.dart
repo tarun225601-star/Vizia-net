@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import 'package:flutter/services.dart'; // Haptic Feedback के लिए
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'database_models.dart';
 
 class VendorAuthAndPortalView extends StatefulWidget {
@@ -27,7 +27,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   bool _isLoading = false;
   bool _isShopOpen = true; 
 
-  // लाइव ऑर्डर्स और ऑटोमैटिक रिफ्रेश के लिए वेरिएबल्स
   List<Map<String, dynamic>> _vendorOrders = [];
   Timer? _orderFetchTimer;
   int _lastOrderCount = 0;
@@ -41,12 +40,18 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   @override
   void dispose() {
     _orderFetchTimer?.cancel();
+    regShopNameCtrl.dispose();
+    regPhoneCtrl.dispose();
+    regAddressCtrl.dispose();
+    regPass1Ctrl.dispose();
+    regPass2Ctrl.dispose();
+    loginPhoneCtrl.dispose();
+    loginPassCtrl.dispose();
     super.dispose();
   }
 
-  // वेंडर के लिए ऑटोमैटिक बैकग्राउंड ऑर्डर फेचिंग (जैसे ही नया आर्डर आएगा, वाइब्रेशन बजेगा)
   void _startVendorOrderListener() {
-    _fetchVendorOrders(); // तुरंत एक बार लोड करें
+    _fetchVendorOrders();
     _orderFetchTimer = Timer.periodic(const Duration(seconds: 4), (timer) async {
       if (_viewMode == 3) {
         await _fetchVendorOrders(isBackgroundCheck: true);
@@ -54,27 +59,32 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     });
   }
 
+  // 🚀 केवल नए और लाइव ऑर्डर फेच करेगा, डिलीवर हुए आर्डर अपने आप छंट जाएंगे
   Future<void> _fetchVendorOrders({bool isBackgroundCheck = false}) async {
     try {
       final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
       if (res.statusCode == 200 && res.body != 'null' && res.body.isNotEmpty) {
         Map<String, dynamic> data = json.decode(res.body);
         List<Map<String, dynamic>> loadedOrders = [];
+        
         data.forEach((key, val) {
           if (val is Map) {
             var ord = Map<String, dynamic>.from(val);
             ord['orderId'] = key;
-            loadedOrders.add(ord);
+            
+            // स्टेटस चेक: केवल वही आर्डर रखेंगे जो डिलीवर नहीं हुए हैं
+            String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending';
+            if (!status.toLowerCase().contains('delivered')) {
+              loadedOrders.add(ord);
+            }
           }
         });
 
-        // नए आर्डर सबसे ऊपर
         loadedOrders = loadedOrders.reversed.toList();
 
         if (mounted) {
-          // अगर नया आर्डर आया है और पुराना काउंट कम था, तो Haptic Feedback (वाइब्रेशन) बजाएं!
           if (isBackgroundCheck && loadedOrders.length > _lastOrderCount) {
-            HapticFeedback.heavyImpact(); // 📳 तेज वाइब्रेशन
+            HapticFeedback.heavyImpact();
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('🔔 नया आर्डर प्राप्त हुआ है!'),
@@ -89,9 +99,51 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             _lastOrderCount = loadedOrders.length;
           });
         }
+      } else {
+        if (mounted) {
+          setState(() {
+            _vendorOrders = [];
+            _lastOrderCount = 0;
+          });
+        }
       }
     } catch (e) {
       debugPrint("Vendor fetch error: $e");
+    }
+  }
+
+  // 🗑️ हर ऑर्डर पर डिलीट बटन का फंक्शन
+  Future<void> _deleteOrder(String orderId) async {
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('⚠️ आर्डर डिलीट करें?'),
+        content: const Text('क्या आप इस आर्डर को हमेशा के लिए हटाना चाहते हैं?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('नहीं')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('हाँ, डिलीट करें', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        final res = await http.delete(
+          Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderId.json'),
+        );
+
+        if (res.statusCode == 200) {
+          HapticFeedback.mediumImpact();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('🗑️ आर्डर हमेशा के लिए डिलीट कर दिया गया!'), backgroundColor: Colors.red),
+            );
+          }
+          _fetchVendorOrders();
+        }
+      } catch (e) {
+        debugPrint("Delete order error: $e");
+      }
     }
   }
 
@@ -111,16 +163,16 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     }
   }
 
-  // समय की गणना (कितना टाइम हो गया आर्डर आए हुए)
+  // ⏱️ समय और डेट को सही फॉर्मेट में दिखाने वाला फंक्शन
   String _getTimeAgo(String? timeStr) {
-    if (timeStr == null || timeStr.isEmpty) return '';
+    if (timeStr == null || timeStr.isEmpty) return 'अभी-अभी';
     try {
       DateTime orderTime = DateTime.parse(timeStr);
       Duration diff = DateTime.now().difference(orderTime);
-      if (diff.inMinutes < 1) return 'अभी-अभी (${orderTime.hour.toString().padLeft(2, '0')}:${orderTime.minute.toString().padLeft(2, '0')})';
+      if (diff.inMinutes < 1) return 'अभी-अभी';
       if (diff.inMinutes < 60) return '${diff.inMinutes} मिनट पहले';
       if (diff.inHours < 24) return '${diff.inHours} घंटे पहले';
-      return '${orderTime.day}/${orderTime.month} ${orderTime.hour}:${orderTime.minute}';
+      return '${orderTime.day}/${orderTime.month} ${orderTime.hour.toString().padLeft(2, '0')}:${orderTime.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return timeStr;
     }
@@ -199,7 +251,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
       if (isApproved) {
         setState(() => _viewMode = 3);
-        _startVendorOrderListener(); // डैशबोर्ड खुलते ही ऑटोमैटिक आर्डर लिसनर चालू
+        _startVendorOrderListener();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ स्वागत है! वेंडर डैशबोर्ड खुल गया है।'), backgroundColor: Colors.green));
         }
@@ -352,12 +404,10 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
-    // 🟢 वेंडर डैशबोर्ड (जब लॉगिन सफल हो जाए)
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          // दुकान ओपन/क्लोज़ करने वाला स्विच कार्ड
           Card(
             elevation: 3,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -395,7 +445,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           ),
           const SizedBox(height: 10),
 
-          // लाइव ऑर्डर्स की लिस्ट हेडिंग
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -409,7 +458,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           ),
           const Divider(height: 8),
 
-          // ऑर्डर्स लिस्टव्यू (ऑटोमैटिक अपडेट और टाइम-स्टैम्प के साथ)
           Expanded(
             child: _vendorOrders.isEmpty
                 ? const Center(
@@ -430,10 +478,12 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                       String customerName = ord['customerName'] ?? 'Customer';
                       String phone = ord['customerPhone'] ?? '';
                       String address = ord['customerAddress'] ?? ord['deliveryAddress'] ?? 'पता नहीं';
-                      String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending';
+                      String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending ⏳';
                       var items = ord['items'] as List<dynamic>? ?? [];
                       double total = (ord['grandTotal'] ?? ord['totalAmount'] ?? 0.0).toDouble();
-                      String timeAgo = _getTimeAgo(ord['orderTime']);
+                      
+                      // ⏱️ टाइम और डेट प्राप्त करें (कई बार डेटाबेस में orderTime या timestamp होता है)
+                      String timeAgo = _getTimeAgo(ord['orderTime'] ?? ord['timestamp']);
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -449,11 +499,31 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                                 children: [
                                   Text('📦 #${orderId.length > 8 ? orderId.substring(0, 8) : orderId}', 
                                       style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 13)),
-                                  // ⏱️ टाइम और डेट (Time Ago काउंटर)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
-                                    child: Text(timeAgo, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black54)),
+                                  
+                                  Row(
+                                    children: [
+                                      // ⏱️ यहाँ टाइमर और डेट स्पष्ट रूप से दिखाई देगा
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.access_time, size: 10, color: Colors.black54),
+                                            const SizedBox(width: 4),
+                                            Text(timeAgo, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black54)),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // 🗑️ हर ऑर्डर पर डिलीट बटन
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                        onPressed: () => _deleteOrder(orderId),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        tooltip: 'ऑर्डर डिलीट करें',
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -478,20 +548,42 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                               const Divider(height: 12),
                               ...items.map((it) => Text('• ${it['name']} (x${it['qty']}) - ₹${it['price']}', style: const TextStyle(fontSize: 11))),
                               const SizedBox(height: 8),
+                              
+                              // 🔘 एक्सेप्ट और एक्शन बटन्स
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text('कुल: ₹${total.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
                                   
-                                  // ✅ Accept Order Button
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green.shade700, 
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    ),
-                                    onPressed: () => _updateOrderStatus(orderId, 'Accepted by Vendor 🟢'),
-                                    child: const Text('ऑर्डर एक्सेप्ट करें', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  Row(
+                                    children: [
+                                      // अगर आर्डर अभी पेंडिंग है तो एक्सेप्ट बटन दिखाओ
+                                      if (!status.contains('Accepted') && !status.contains('Out for Delivery'))
+                                        ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green.shade700, 
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          ),
+                                          onPressed: () => _updateOrderStatus(orderId, 'Accepted by Vendor 🟢'),
+                                          icon: const Icon(Icons.check, size: 14),
+                                          label: const Text('ऑर्डर एक्सेप्ट करें', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ),
+
+                                      // अगर एक्सेप्ट हो गया है, तो डिलीवरी के लिए भेजने का बटन दिखाओ
+                                      if (status.contains('Accepted')) ...[
+                                        const SizedBox(width: 6),
+                                        OutlinedButton.icon(
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: Colors.orange.shade800,
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                          ),
+                                          onPressed: () => _updateOrderStatus(orderId, 'Out for Delivery 🚴‍♂️'),
+                                          icon: const Icon(Icons.delivery_dining, size: 14),
+                                          label: const Text('Out for Delivery', style: TextStyle(fontSize: 10)),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ],
                               ),
