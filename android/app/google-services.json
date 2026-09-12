@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "335927019140",
+    "firebase_url": "https://viziagmart-default-rtdb.firebaseio.com",
+    "project_id": "viziagmart",
+    "storage_bucket": "viziagmart.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:335927019140:android:c7730be6057ad18036a401",
+        "android_client_info": {
+          "package_name": "com.example.viziagmart"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzDiHEh7mmDVJqk2EvbsNGYa6POks4FE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
