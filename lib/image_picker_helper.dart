@@ -17,13 +17,10 @@ class ImagePickerHelper {
       );
 
       if (pickedFile == null) return null;
-
       final Uint8List bytes = await pickedFile.readAsBytes();
       if (bytes.isEmpty) return null;
 
-      String base64String = base64Encode(bytes);
-      return 'data:image/jpeg;base64,$base64String';
-      
+      return 'data:image/jpeg;base64,${base64Encode(bytes)}';
     } catch (e) {
       debugPrint('❌ एरर: $e');
       return null;
@@ -42,21 +39,18 @@ class ImagePickerHelper {
       );
 
       if (capturedFile == null) return null;
-
       final Uint8List bytes = await capturedFile.readAsBytes();
       if (bytes.isEmpty) return null;
 
-      String base64String = base64Encode(bytes);
-      return 'data:image/jpeg;base64,$base64String';
-      
+      return 'data:image/jpeg;base64,${base64Encode(bytes)}';
     } catch (e) {
       debugPrint('❌ कैमरा एरर: $e');
       return null;
     }
   }
 
-  // 🖼️ UI पर इमेज दिखाने के लिए सेफ विजेट हेल्पर
-  static Widget buildCachedOrMemoryImage(String? path, double height, double width, IconData fallbackIcon) {
+  // 🖼️ UI पर इमेज रेंडर करने का मुख्य लॉजिक
+  static Widget renderImage(String? path, double height, double width, IconData fallbackIcon) {
     if (path != null && path.isNotEmpty) {
       if (path.startsWith('http')) {
         return Image.network(
@@ -74,15 +68,14 @@ class ImagePickerHelper {
       } else if (path.startsWith('data:image')) {
         try {
           final base64String = path.contains(',') ? path.split(',').last : path;
-          final bytes = base64Decode(base64String);
           return Image.memory(
-            bytes,
+            base64Decode(base64String),
             height: height,
             width: width,
             fit: BoxFit.cover,
           );
         } catch (e) {
-          debugPrint('Base64 Decoding Error: $e');
+          debugPrint('Base64 Error: $e');
         }
       } else if (!kIsWeb && File(path).existsSync()) {
         return Image.file(
@@ -104,9 +97,11 @@ class ImagePickerHelper {
       child: Icon(fallbackIcon, size: height * 0.4, color: const Color(0xFFF59E0B)),
     );
   }
+}
 
-  // 🛒 शॉप या प्रोडक्ट इमेज रेंडर करने के लिए शॉर्टकट मेथड
-  static Widget buildShopOrProdImage(String? path, double height, double width, IconData fallbackIcon) {
-    return buildCachedOrMemoryImage(path, height, width, fallbackIcon);
+// 🛠️ यह एक्सटेंशन आपके पुराने लिखे हुए 'buildShopOrProdImage' मेथड को अपने आप बिना किसी झंझट के चला देगा
+extension ImageHelperExtension on State {
+  Widget buildShopOrProdImage(String? path, double height, double width, IconData fallbackIcon) {
+    return ImagePickerHelper.renderImage(path, height, width, fallbackIcon);
   }
 }
