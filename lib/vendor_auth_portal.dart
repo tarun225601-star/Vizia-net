@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_database/firebase_database.dart'; // 👈 ऑफिशियल Real-time SDK इम्पोर्ट
-import 'package:http/http.dart' as http; // सिर्फ रजिस्ट्रेशन/लॉगिन के लिए (चाहो तो इसे भी हटा सकते हो)
+import 'package:firebase_database/firebase_database.dart'; // 👈 ऑफिशियल Real-time SDK
+import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'database_models.dart';
 
@@ -24,12 +24,13 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
   final loginPhoneCtrl = TextEditingController();
   final loginPassCtrl = TextEditingController();
+  final adminCodeCtrl = TextEditingController();
 
   bool _isLoading = false;
   bool _isShopOpen = true; 
 
   List<Map<String, dynamic>> _vendorOrders = [];
-  StreamSubscription<DatabaseEvent>? _ordersSubscription; // 🚀 HTTP Timer की जगह Real-time Stream
+  StreamSubscription<DatabaseEvent>? _ordersSubscription; 
   int _lastOrderCount = 0;
   bool _isFirstLoad = true;
 
@@ -41,7 +42,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
   @override
   void dispose() {
-    _ordersSubscription?.cancel(); // 🛑 मेमोरी लीक रोकने के लिए स्ट्रीम बंद करना जरूरी है
+    _ordersSubscription?.cancel(); 
     regShopNameCtrl.dispose();
     regPhoneCtrl.dispose();
     regAddressCtrl.dispose();
@@ -49,11 +50,13 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     regPass2Ctrl.dispose();
     loginPhoneCtrl.dispose();
     loginPassCtrl.dispose();
+    adminCodeCtrl.dispose();
     super.dispose();
   }
 
-  // 🔥 यह है असली Blinkit वाला जादू: Real-time Stream Listener
+  // 🔥 ब्लिंकिट जैसा 1 सेकंड वाला रियल-टाइम आर्डर लिसनर
   void _startVendorOrderListener() {
+    _ordersSubscription?.cancel();
     DatabaseReference ordersRef = FirebaseDatabase.instance.ref('orders');
 
     _ordersSubscription = ordersRef.onValue.listen((event) {
@@ -84,11 +87,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
         }
       });
 
-      // नए ऑर्डर्स को ऊपर दिखाने के लिए रिवर्स करना
       loadedOrders = loadedOrders.reversed.toList();
 
       if (mounted) {
-        // अगर नया आर्डर आया है तो घंटी बजाओ और नोटिफ़िकेशन दिखाओ
         if (!_isFirstLoad && loadedOrders.length > _lastOrderCount) {
           HapticFeedback.heavyImpact();
           ScaffoldMessenger.of(context).removeCurrentSnackBar();
@@ -112,7 +113,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     });
   }
 
-  // 🗑️ ऑफिशियल SDK से ऑर्डर डिलीट करने का तरीका
   Future<void> _deleteOrder(String orderId) async {
     bool? confirm = await showDialog<bool>(
       context: context,
@@ -132,7 +132,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
         HapticFeedback.mediumImpact();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('🗑️ आर्डर हमेशा के लिए डिलीट कर दिया गया!'), backgroundColor: Colors.red),
+            const SnackBar(content: Text('🗑️ आर्डर डिलीट कर दिया गया!'), backgroundColor: Colors.red),
           );
         }
       } catch (e) {
@@ -141,7 +141,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     }
   }
 
-  // ✅ ऑफिशियल SDK से स्टेटस अपडेट करने का तरीका
   Future<void> _updateOrderStatus(String orderId, String newStatus) async {
     try {
       await FirebaseDatabase.instance.ref('orders/$orderId').update({
@@ -157,7 +156,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     }
   }
 
-  // ⏱️ समय और डेट को सही फॉर्मेट में दिखाने वाला फंक्शन
   String _getTimeAgo(String? timeStr) {
     if (timeStr == null || timeStr.isEmpty) return 'अभी-अभी';
     try {
@@ -187,6 +185,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       var shopData = {
         'name': regShopNameCtrl.text.trim(),
         'phone': regPhoneCtrl.text.trim(),
+        'shopAddress': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
         'address': regAddressCtrl.text.trim().isEmpty ? 'Faridabad' : regAddressCtrl.text.trim(),
         'pass': regPass1Ctrl.text.trim(),
         'status': 'pending',
@@ -202,7 +201,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('⏳ रिक्वेस्ट सबमिट हो गई'),
-            content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन द्वारा अप्रूव होने के बाद ही आप लॉगिन कर पाएंगे।'),
+            content: const Text('आपकी दुकान का रजिस्ट्रेशन हो गया है। मास्टर एडमिन (तरुण) द्वारा अप्रूव होने के बाद ही आप लॉगिन कर पाएंगे।'),
             actions: [
               TextButton(
                 onPressed: () {
@@ -245,7 +244,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
       if (isApproved) {
         setState(() => _viewMode = 3);
-        _startVendorOrderListener(); // 🚀 लॉगिन होते ही रियल-टाइम कनेक्शन शुरू
+        _startVendorOrderListener(); // 🚀 डैशबोर्ड खुलते ही रियल-टाइम स्ट्रीम चालू
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ स्वागत है! वेंडर डैशबोर्ड खुल गया है।'), backgroundColor: Colors.green));
         }
@@ -255,7 +254,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('⚠️ लॉगिन असफल (Not Approved)'),
-              content: const Text('आपकी दुकान अभी तक मास्टर एडमिन द्वारा अप्रूव नहीं की गई है!'),
+              content: const Text('आपकी दुकान अभी तक मास्टर एडमिन (तरुण) द्वारा अप्रूव नहीं की गई है! कृपया पहले अप्रूवल लें।'),
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('ठीक है')),
               ],
@@ -302,7 +301,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             const SizedBox(height: 15),
             const Text('🛍️ वेंडर पोर्टल', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
-            const Text('दुकानदार लॉगिन और नया रजिस्ट्रेशन', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
+            const Text('बिना एडमिन अप्रूवल के कोई भी वेंडर लॉगिन नहीं कर सकता', style: TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
             const SizedBox(height: 40),
             
             SizedBox(
@@ -376,7 +375,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
             const SizedBox(height: 15),
             const Text('🔐 वेंडर लॉगिन', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
-            const Text('वेंडर पोर्टल में आपका स्वागत है', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text('पहले एडमिन से अप्रूव कराना अनिवार्य है', style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 25),
             TextField(controller: loginPhoneCtrl, keyboardType: TextInputType.phone, maxLength: 10, decoration: const InputDecoration(labelText: 'मोबाइल नंबर', border: OutlineInputBorder(), counterText: '', prefixIcon: Icon(Icons.phone))),
             const SizedBox(height: 15),
@@ -398,6 +397,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
       );
     }
 
+    // 🟢 वेंडर डैशबोर्ड (लाइव ऑर्डर्स के साथ)
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -428,7 +428,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                   IconButton(
                     icon: const Icon(Icons.logout, color: Colors.red, size: 22),
                     onPressed: () {
-                      _ordersSubscription?.cancel(); // लॉगआउट पर स्ट्रीम बंद
+                      _ordersSubscription?.cancel();
                       setState(() => _viewMode = 0);
                     },
                     tooltip: 'लॉग आउट',
@@ -442,7 +442,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('🚀 लाइव ऑर्डर्स (Instant Real-time)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const Text('🚀 लाइव ऑर्डर्स (Blinkit Style)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(12)),
@@ -475,12 +475,11 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                       String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending ⏳';
                       var items = ord['items'] as List<dynamic>? ?? [];
                       double total = (ord['grandTotal'] ?? ord['totalAmount'] ?? 0.0).toDouble();
-                      
                       String timeAgo = _getTimeAgo(ord['orderTime'] ?? ord['timestamp']);
                       bool isAccepted = status.toLowerCase().contains('accepted');
 
                       return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
+                        margin: const EdgeInsets.symmetric(vertical: 6),
                         elevation: 2,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         child: Padding(
@@ -490,86 +489,53 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                             children: [
                               Row(
                                 children: [
-                                  Text('📦 #${orderId.length > 8 ? orderId.substring(0, 8) : orderId}',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.green.shade800)),
+                                  Text('🆔 $orderId', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
                                   const Spacer(),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
-                                    child: Text(timeAgo, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black54)),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
-                                    onPressed: () => _deleteOrder(orderId),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
+                                  Text(timeAgo, style: const TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.bold)),
                                 ],
                               ),
+                              const Divider(height: 10),
+                              Text('👤 ग्राहक: $customerName ($phone)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text('📍 पता: $address', style: const TextStyle(fontSize: 12, color: Colors.black54)),
                               const SizedBox(height: 6),
+                              ...items.map((item) {
+                                var itmMap = item is Map ? Map<String, dynamic>.from(item) : {};
+                                String title = itmMap['name'] ?? itmMap['title'] ?? 'Item';
+                                int qty = (itmMap['qty'] as num?)?.toInt() ?? 1;
+                                double price = (itmMap['price'] as num?)?.toDouble() ?? 0.0;
+                                return Text('• $title x $qty (₹${price * qty})', style: const TextStyle(fontSize: 12));
+                              }),
+                              const SizedBox(height: 8),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('ग्राहक: $customerName ($phone)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: isAccepted ? Colors.blue.shade100 : Colors.orange.shade100,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(status, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isAccepted ? Colors.blue.shade800 : Colors.orange.shade800)),
-                                  ),
+                                  Text('कुल राशि: ₹$total', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.green, fontSize: 13)),
+                                  const Spacer(),
+                                  Text('स्थिति: $status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: isAccepted ? Colors.green : Colors.blue)),
                                 ],
                               ),
-                              const SizedBox(height: 4),
-                              Text('पता: $address', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                              const Divider(height: 12),
-                              ...items.map((it) {
-                                var m = it is Map ? it : {};
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 2),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text('• ${m['name'] ?? 'Item'} (x${m['qty'] ?? 1})', style: const TextStyle(fontSize: 11)),
-                                      Text('₹${m['price'] ?? 0}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                                );
-                              }),
-                              const Divider(height: 12),
+                              const SizedBox(height: 10),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('कुल राशि: ₹${total.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                  Row(
-                                    children: [
-                                      if (!isAccepted)
-                                        Padding(
-                                          padding: const EdgeInsets.only(right: 6),
-                                          child: ElevatedButton.icon(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.blue.shade700,
-                                              foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                            ),
-                                            onPressed: () => _updateOrderStatus(orderId, 'Accepted ✅'),
-                                            icon: const Icon(Icons.thumb_up, size: 12),
-                                            label: const Text('Accept', style: TextStyle(fontSize: 10)),
-                                          ),
-                                        ),
-                                      ElevatedButton.icon(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green.shade700,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        ),
-                                        onPressed: () => _updateOrderStatus(orderId, 'Packed / Ready ✅'),
-                                        icon: const Icon(Icons.check, size: 12),
-                                        label: const Text('Ready', style: TextStyle(fontSize: 10)),
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red)),
+                                      onPressed: () => _deleteOrder(orderId),
+                                      child: const Text('डिलीट', style: TextStyle(fontSize: 11)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isAccepted ? Colors.orange : Colors.green,
+                                        foregroundColor: Colors.white,
                                       ),
-                                    ],
+                                      onPressed: () {
+                                        String nextStatus = isAccepted ? 'Ready For Delivery 🛵' : 'Accepted ✅';
+                                        _updateOrderStatus(orderId, nextStatus);
+                                      },
+                                      child: Text(isAccepted ? 'तैयार है 📦' : 'स्वीकार करें ✓', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                    ),
                                   ),
                                 ],
                               ),
