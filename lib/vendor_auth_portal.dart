@@ -1,8 +1,9 @@
-import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
+import 'package:firebase_database/firebase_database.dart'; // 👈 ऑफिशियल Real-time SDK इम्पोर्ट
+import 'package:http/http.dart' as http; // सिर्फ रजिस्ट्रेशन/लॉगिन के लिए (चाहो तो इसे भी हटा सकते हो)
+import 'dart:convert';
 import 'database_models.dart';
 
 class VendorAuthAndPortalView extends StatefulWidget {
@@ -28,8 +29,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
   bool _isShopOpen = true; 
 
   List<Map<String, dynamic>> _vendorOrders = [];
-  Timer? _orderFetchTimer;
+  StreamSubscription<DatabaseEvent>? _ordersSubscription; // 🚀 HTTP Timer की जगह Real-time Stream
   int _lastOrderCount = 0;
+  bool _isFirstLoad = true;
 
   @override
   void initState() {
@@ -39,7 +41,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
   @override
   void dispose() {
-    _orderFetchTimer?.cancel();
+    _ordersSubscription?.cancel(); // 🛑 मेमोरी लीक रोकने के लिए स्ट्रीम बंद करना जरूरी है
     regShopNameCtrl.dispose();
     regPhoneCtrl.dispose();
     regAddressCtrl.dispose();
@@ -50,86 +52,67 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     super.dispose();
   }
 
-  // 🔄 सुपर स्मार्ट लिसनर: अब यह हर 12 सेकंड में केवल Count चेक करेगा (Zero Data Waste)
+  // 🔥 यह है असली Blinkit वाला जादू: Real-time Stream Listener
   void _startVendorOrderListener() {
-    _fetchVendorOrders();
-    _orderFetchTimer = Timer.periodic(const Duration(seconds: 12), (timer) async {
-      if (_viewMode == 3) {
-        await _checkOnlyOrderCount();
-      }
-    });
-  }
+    DatabaseReference ordersRef = FirebaseDatabase.instance.ref('orders');
 
-  // 🌐 केवल आर्डर की Keys/Count चेक करने का हल्का तरीका (नेट नहीं खाएगा)
-  Future<void> _checkOnlyOrderCount() async {
-    try {
-      final response = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json?shallow=true'));
-      if (response.statusCode == 200 && response.body != 'null') {
-        Map<String, dynamic> data = json.decode(response.body);
-        int currentCount = data.keys.length;
-
-        // अगर कोई नया ऑर्डर बढ़ा है, तभी पूरा डेटा फेच करो
-        if (currentCount != _lastOrderCount) {
-          HapticFeedback.heavyImpact();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('🔔 नया आर्डर प्राप्त हुआ है!'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-          _fetchVendorOrders();
-        }
-      }
-    } catch (e) {
-      debugPrint("Count check error: $e");
-    }
-  }
-
-  // 🚀 केवल नए और लाइव ऑर्डर फेच करेगा, डिलीवर हुए आर्डर अपने आप छंट जाएंगे
-  Future<void> _fetchVendorOrders() async {
-    try {
-      final res = await http.get(Uri.parse('${CakeDatabase.firebaseRestUrl}/orders.json'));
-      if (res.statusCode == 200 && res.body != 'null' && res.body.isNotEmpty) {
-        Map<String, dynamic> data = json.decode(res.body);
-        List<Map<String, dynamic>> loadedOrders = [];
-        
-        data.forEach((key, val) {
-          if (val is Map) {
-            var ord = Map<String, dynamic>.from(val);
-            ord['orderId'] = key;
-            
-            String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending';
-            if (!status.toLowerCase().contains('delivered')) {
-              loadedOrders.add(ord);
-            }
-          }
-        });
-
-        loadedOrders = loadedOrders.reversed.toList();
-
-        if (mounted) {
-          setState(() {
-            _vendorOrders = loadedOrders;
-            _lastOrderCount = data.keys.length;
-          });
-        }
-      } else {
+    _ordersSubscription = ordersRef.onValue.listen((event) {
+      final snapshot = event.snapshot;
+      
+      if (snapshot.value == null) {
         if (mounted) {
           setState(() {
             _vendorOrders = [];
             _lastOrderCount = 0;
           });
         }
+        return;
       }
-    } catch (e) {
-      debugPrint("Vendor fetch error: $e");
-    }
+
+      Map<String, dynamic> data = Map<String, dynamic>.from(snapshot.value as Map);
+      List<Map<String, dynamic>> loadedOrders = [];
+
+      data.forEach((key, val) {
+        if (val is Map) {
+          var ord = Map<String, dynamic>.from(val);
+          ord['orderId'] = key;
+          
+          String status = ord['orderStatus'] ?? ord['status'] ?? 'Pending';
+          if (!status.toLowerCase().contains('delivered')) {
+            loadedOrders.add(ord);
+          }
+        }
+      });
+
+      // नए ऑर्डर्स को ऊपर दिखाने के लिए रिवर्स करना
+      loadedOrders = loadedOrders.reversed.toList();
+
+      if (mounted) {
+        // अगर नया आर्डर आया है तो घंटी बजाओ और नोटिफ़िकेशन दिखाओ
+        if (!_isFirstLoad && loadedOrders.length > _lastOrderCount) {
+          HapticFeedback.heavyImpact();
+          ScaffoldMessenger.of(context).removeCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚡ नया आर्डर तुरंत प्राप्त हुआ है!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+
+        setState(() {
+          _vendorOrders = loadedOrders;
+          _lastOrderCount = loadedOrders.length;
+          _isFirstLoad = false;
+        });
+      }
+    }, onError: (error) {
+      debugPrint("Realtime database error: $error");
+    });
   }
 
-  // 🗑️ हर ऑर्डर पर डिलीट बटन का फंक्शन
+  // 🗑️ ऑफिशियल SDK से ऑर्डर डिलीट करने का तरीका
   Future<void> _deleteOrder(String orderId) async {
     bool? confirm = await showDialog<bool>(
       context: context,
@@ -145,18 +128,12 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
     if (confirm == true) {
       try {
-        final res = await http.delete(
-          Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderId.json'),
-        );
-
-        if (res.statusCode == 200) {
-          HapticFeedback.mediumImpact();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('🗑️ आर्डर हमेशा के लिए डिलीट कर दिया गया!'), backgroundColor: Colors.red),
-            );
-          }
-          _fetchVendorOrders();
+        await FirebaseDatabase.instance.ref('orders/$orderId').remove();
+        HapticFeedback.mediumImpact();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('🗑️ आर्डर हमेशा के लिए डिलीट कर दिया गया!'), backgroundColor: Colors.red),
+          );
         }
       } catch (e) {
         debugPrint("Delete order error: $e");
@@ -164,17 +141,17 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
     }
   }
 
+  // ✅ ऑफिशियल SDK से स्टेटस अपडेट करने का तरीका
   Future<void> _updateOrderStatus(String orderId, String newStatus) async {
     try {
-      await http.patch(
-        Uri.parse('${CakeDatabase.firebaseRestUrl}/orders/$orderId.json'),
-        body: json.encode({'status': newStatus, 'orderStatus': newStatus}),
-      );
+      await FirebaseDatabase.instance.ref('orders/$orderId').update({
+        'status': newStatus,
+        'orderStatus': newStatus,
+      });
       HapticFeedback.mediumImpact();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ आर्डर स्टेटस बदलकर "$newStatus" कर दिया गया!'), backgroundColor: Colors.green));
       }
-      _fetchVendorOrders();
     } catch (e) {
       debugPrint("Status update error: $e");
     }
@@ -268,7 +245,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
 
       if (isApproved) {
         setState(() => _viewMode = 3);
-        _startVendorOrderListener();
+        _startVendorOrderListener(); // 🚀 लॉगिन होते ही रियल-टाइम कनेक्शन शुरू
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ स्वागत है! वेंडर डैशबोर्ड खुल गया है।'), backgroundColor: Colors.green));
         }
@@ -451,7 +428,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                   IconButton(
                     icon: const Icon(Icons.logout, color: Colors.red, size: 22),
                     onPressed: () {
-                      _orderFetchTimer?.cancel();
+                      _ordersSubscription?.cancel(); // लॉगआउट पर स्ट्रीम बंद
                       setState(() => _viewMode = 0);
                     },
                     tooltip: 'लॉग आउट',
@@ -465,11 +442,11 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('📦 नए लाइव ऑर्डर्स', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              IconButton(
-                icon: const Icon(Icons.sync, color: Colors.green, size: 20),
-                onPressed: () => _fetchVendorOrders(),
-                tooltip: 'रिफ्रेश करें',
+              const Text('🚀 लाइव ऑर्डर्स (Instant Real-time)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(12)),
+                child: const Text('🟢 Live Connected', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -481,9 +458,9 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.inbox, size: 50, color: Colors.grey),
+                        Icon(Icons.flash_on, size: 50, color: Colors.amber),
                         SizedBox(height: 8),
-                        Text('अभी कोई नया ऑर्डर नहीं है...', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                        Text('ऑर्डर का इंतज़ार है... (तुरंत प्रकट होगा)', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   )
@@ -500,8 +477,7 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                       double total = (ord['grandTotal'] ?? ord['totalAmount'] ?? 0.0).toDouble();
                       
                       String timeAgo = _getTimeAgo(ord['orderTime'] ?? ord['timestamp']);
-
-                      bool isAccepted = status.toLowerCase().contains('accepted') || status.toLowerCase().contains('accepted ✅');
+                      bool isAccepted = status.toLowerCase().contains('accepted');
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -528,7 +504,6 @@ class _VendorAuthAndPortalViewState extends State<VendorAuthAndPortalView> {
                                     onPressed: () => _deleteOrder(orderId),
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(),
-                                    tooltip: 'ऑर्डर डिलीट करें',
                                   ),
                                 ],
                               ),
